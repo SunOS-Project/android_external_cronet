@@ -426,13 +426,13 @@ public class PkpTest {
             throws Exception {
         // Set common CronetEngine parameters
         mBuilder = new ExperimentalHttpEngine.Builder(getContext());
-        mBuilder.enablePublicKeyPinningBypassForLocalTrustAnchors(bypassPinningForLocalAnchors);
+        mBuilder.setEnablePublicKeyPinningBypassForLocalTrustAnchors(bypassPinningForLocalAnchors);
         JSONObject hostResolverParams = CronetTestUtil.generateHostResolverRules();
         JSONObject experimentalOptions = new JSONObject()
                                                  .put("HostResolverRules", hostResolverParams);
         mBuilder.setExperimentalOptions(experimentalOptions.toString());
         mBuilder.setStoragePath(getTestStorage(getContext()));
-        mBuilder.enableHttpCache(HttpEngine.Builder.HTTP_CACHE_DISK_NO_HTTP, 1000 * 1024);
+        mBuilder.setEnableHttpCache(HttpEngine.Builder.HTTP_CACHE_DISK_NO_HTTP, 1000 * 1024);
         final String[] server_certs = {SERVER_CERT_PEM};
         CronetTestUtil.setMockCertVerifierForTesting(
                 mBuilder, MockCertVerifier.createMockCertVerifier(server_certs, knownRoot));

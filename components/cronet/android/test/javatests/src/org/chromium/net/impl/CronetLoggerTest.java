@@ -280,14 +280,14 @@ public final class CronetLoggerTest {
                 (ExperimentalHttpEngine.Builder) mTestFramework.mBuilder;
 
         builder.setExperimentalOptions(experimentalOptions);
-        builder.enablePublicKeyPinningBypassForLocalTrustAnchors(
+        builder.setEnablePublicKeyPinningBypassForLocalTrustAnchors(
                 isPublicKeyPinningBypassForLocalTrustAnchorsEnabled);
         builder.setUserAgent(userAgent);
         builder.setStoragePath(storagePath);
-        builder.enableQuic(isQuicEnabled);
-        builder.enableHttp2(isHttp2Enabled);
-        builder.enableBrotli(isBrotliEnabled);
-        builder.enableHttpCache(cacheMode, 0);
+        builder.setEnableQuic(isQuicEnabled);
+        builder.setEnableHttp2(isHttp2Enabled);
+        builder.setEnableBrotli(isBrotliEnabled);
+        builder.setEnableHttpCache(cacheMode, 0);
         builder.enableNetworkQualityEstimator(isNetworkQualityEstimatorEnabled);
         builder.setThreadPriority(threadPriority);
 
