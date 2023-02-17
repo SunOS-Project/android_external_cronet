@@ -12,14 +12,14 @@ import org.chromium.base.annotations.CalledByNative;
 import org.chromium.base.annotations.JNINamespace;
 import org.chromium.base.annotations.NativeClassQualifiedName;
 import org.chromium.base.annotations.NativeMethods;
-import org.chromium.net.BidirectionalStream;
-import org.chromium.net.CallbackException;
-import org.chromium.net.CronetException;
-import org.chromium.net.ExperimentalBidirectionalStream;
-import org.chromium.net.NetworkException;
-import org.chromium.net.RequestFinishedInfo;
+import android.net.http.BidirectionalStream;
+import android.net.http.CallbackException;
+import android.net.http.HttpException;
+import android.net.http.ExperimentalBidirectionalStream;
+import android.net.http.NetworkException;
+import android.net.http.RequestFinishedInfo;
 import org.chromium.net.RequestPriority;
-import org.chromium.net.UrlResponseInfo;
+import android.net.http.UrlResponseInfo;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -100,7 +100,7 @@ public class CronetBidirectionalStream extends ExperimentalBidirectionalStream {
     private final boolean mTrafficStatsUidSet;
     private final int mTrafficStatsUid;
     private final long mNetworkHandle;
-    private CronetException mException;
+    private HttpException mException;
 
     /*
      * Synchronizes access to mNativeStream, mReadState and mWriteState.
@@ -780,7 +780,7 @@ public class CronetBidirectionalStream extends ExperimentalBidirectionalStream {
     /**
      * Fails the stream with an exception. Only called on the Executor.
      */
-    private void failWithExceptionOnExecutor(CronetException e) {
+    private void failWithExceptionOnExecutor(HttpException e) {
         mException = e;
         // Do not call into mCallback if request is complete.
         synchronized (mNativeStreamLock) {
@@ -813,7 +813,7 @@ public class CronetBidirectionalStream extends ExperimentalBidirectionalStream {
     /**
      * Fails the stream with an exception. Can be called on any thread.
      */
-    private void failWithException(final CronetException exception) {
+    private void failWithException(final HttpException exception) {
         postTaskToExecutor(new Runnable() {
             @Override
             public void run() {

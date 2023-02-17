@@ -11,8 +11,11 @@ import static org.chromium.net.CronetTestRule.SERVER_CERT_PEM;
 import static org.chromium.net.CronetTestRule.SERVER_KEY_PKCS8_PEM;
 import static org.chromium.net.CronetTestRule.getContext;
 
-import android.support.test.runner.AndroidJUnit4;
+import android.net.http.HttpEngine;
+import android.net.http.ExperimentalHttpEngine;
+import android.net.http.UrlRequest;
 
+import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.SmallTest;
 
 import org.junit.After;
@@ -21,7 +24,6 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
-import org.chromium.base.test.util.Feature;
 import org.chromium.net.CronetTestRule.OnlyRunNativeCronet;
 
 /**
@@ -32,7 +34,7 @@ public class NetworkErrorLoggingTest {
     @Rule
     public final CronetTestRule mTestRule = new CronetTestRule();
 
-    private CronetEngine mCronetEngine;
+    private HttpEngine mCronetEngine;
 
     @Before
     public void setUp() throws Exception {
@@ -51,11 +53,10 @@ public class NetworkErrorLoggingTest {
 
     @Test
     @SmallTest
-    @Feature({"Cronet"})
     @OnlyRunNativeCronet
     public void testManualReportUpload() throws Exception {
-        ExperimentalCronetEngine.Builder builder =
-                new ExperimentalCronetEngine.Builder(getContext());
+        ExperimentalHttpEngine.Builder builder =
+                new ExperimentalHttpEngine.Builder(getContext());
         CronetTestUtil.setMockCertVerifierForTesting(
                 builder, QuicTestServer.createMockCertVerifier());
         mCronetEngine = builder.build();
@@ -78,11 +79,10 @@ public class NetworkErrorLoggingTest {
 
     @Test
     @SmallTest
-    @Feature({"Cronet"})
     @OnlyRunNativeCronet
     public void testUploadNELReportsFromHeaders() throws Exception {
-        ExperimentalCronetEngine.Builder builder =
-                new ExperimentalCronetEngine.Builder(getContext());
+        ExperimentalHttpEngine.Builder builder =
+                new ExperimentalHttpEngine.Builder(getContext());
         builder.setExperimentalOptions("{\"NetworkErrorLogging\": {\"enable\": true}}");
         CronetTestUtil.setMockCertVerifierForTesting(
                 builder, QuicTestServer.createMockCertVerifier());
@@ -114,11 +114,10 @@ public class NetworkErrorLoggingTest {
 
     @Test
     @SmallTest
-    @Feature({"Cronet"})
     @OnlyRunNativeCronet
     public void testUploadNELReportsFromPreloadedPolicy() throws Exception {
-        ExperimentalCronetEngine.Builder builder =
-                new ExperimentalCronetEngine.Builder(getContext());
+        ExperimentalHttpEngine.Builder builder =
+                new ExperimentalHttpEngine.Builder(getContext());
         String serverOrigin = Http2TestServer.getServerUrl();
         String collectorUrl = Http2TestServer.getReportingCollectorUrl();
         builder.setExperimentalOptions(""

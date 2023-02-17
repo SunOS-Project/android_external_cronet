@@ -4,19 +4,19 @@
 
 package org.chromium.net.impl;
 
-import org.chromium.net.BidirectionalStream;
-import org.chromium.net.CronetEngine;
-import org.chromium.net.CronetException;
-import org.chromium.net.NetworkQualityRttListener;
-import org.chromium.net.NetworkQualityThroughputListener;
-import org.chromium.net.RequestFinishedInfo;
-import org.chromium.net.UploadDataProvider;
-import org.chromium.net.UploadDataSink;
-import org.chromium.net.UrlRequest;
-import org.chromium.net.UrlResponseInfo;
+import android.net.http.BidirectionalStream;
+import android.net.http.HttpException;
+import android.net.http.NetworkQualityRttListener;
+import android.net.http.NetworkQualityThroughputListener;
+import android.net.http.RequestFinishedInfo;
+import android.net.http.UploadDataProvider;
+import android.net.http.UploadDataSink;
+import android.net.http.UrlRequest;
+import android.net.http.UrlResponseInfo;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.time.Instant;
 import java.util.concurrent.Executor;
 
 /**
@@ -63,7 +63,7 @@ public class VersionSafeCallbacks {
         }
 
         @Override
-        public void onFailed(UrlRequest request, UrlResponseInfo info, CronetException error) {
+        public void onFailed(UrlRequest request, UrlResponseInfo info, HttpException error) {
             mWrappedCallback.onFailed(request, info, error);
         }
 
@@ -134,7 +134,7 @@ public class VersionSafeCallbacks {
 
         @Override
         public void onFailed(
-                BidirectionalStream stream, UrlResponseInfo info, CronetException error) {
+                BidirectionalStream stream, UrlResponseInfo info, HttpException error) {
             mWrappedCallback.onFailed(stream, info, error);
         }
 
@@ -211,8 +211,8 @@ public class VersionSafeCallbacks {
         }
 
         @Override
-        public void onRttObservation(int rttMs, long whenMs, int source) {
-            mWrappedListener.onRttObservation(rttMs, whenMs, source);
+        public void onRttObservation(int rttMs, Instant observationInstant, int source) {
+            mWrappedListener.onRttObservation(rttMs, observationInstant, source);
         }
 
         @Override
@@ -249,8 +249,8 @@ public class VersionSafeCallbacks {
         }
 
         @Override
-        public void onThroughputObservation(int throughputKbps, long whenMs, int source) {
-            mWrappedListener.onThroughputObservation(throughputKbps, whenMs, source);
+        public void onThroughputObservation(int throughputKbps, Instant observationInstant, int source) {
+            mWrappedListener.onThroughputObservation(throughputKbps, observationInstant, source);
         }
 
         @Override
@@ -270,22 +270,6 @@ public class VersionSafeCallbacks {
             }
             return mWrappedListener.equals(
                     ((NetworkQualityThroughputListenerWrapper) o).mWrappedListener);
-        }
-    }
-
-    /**
-     * Wrap a {@link CronetEngine.Builder.LibraryLoader} in a version safe manner.
-     */
-    public static final class LibraryLoader extends CronetEngine.Builder.LibraryLoader {
-        private final CronetEngine.Builder.LibraryLoader mWrappedLoader;
-
-        public LibraryLoader(CronetEngine.Builder.LibraryLoader libraryLoader) {
-            mWrappedLoader = libraryLoader;
-        }
-
-        @Override
-        public void loadLibrary(String libName) {
-            mWrappedLoader.loadLibrary(libName);
         }
     }
 }

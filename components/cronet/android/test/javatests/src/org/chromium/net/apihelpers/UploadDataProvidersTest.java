@@ -11,10 +11,11 @@ import static org.junit.Assert.assertTrue;
 import static org.chromium.net.CronetTestRule.assertContains;
 import static org.chromium.net.CronetTestRule.getContext;
 
+import android.net.http.apihelpers.UploadDataProviders;
 import android.os.ConditionVariable;
 import android.os.ParcelFileDescriptor;
-import android.support.test.runner.AndroidJUnit4;
 
+import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.SmallTest;
 
 import org.junit.After;
@@ -23,16 +24,15 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
-import org.chromium.base.test.util.Feature;
-import org.chromium.net.CallbackException;
+import android.net.http.CallbackException;
 import org.chromium.net.CronetTestRule;
 import org.chromium.net.CronetTestRule.CronetTestFramework;
 import org.chromium.net.CronetTestRule.OnlyRunNativeCronet;
 import org.chromium.net.NativeTestServer;
 import org.chromium.net.TestUrlRequestCallback;
-import org.chromium.net.UploadDataProvider;
-import org.chromium.net.UploadDataSink;
-import org.chromium.net.UrlRequest;
+import android.net.http.UploadDataProvider;
+import android.net.http.UploadDataSink;
+import android.net.http.UrlRequest;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -73,7 +73,6 @@ public class UploadDataProvidersTest {
 
     @Test
     @SmallTest
-    @Feature({"Cronet"})
     public void testFileProvider() throws Exception {
         TestUrlRequestCallback callback = new TestUrlRequestCallback();
         UrlRequest.Builder builder = mTestFramework.mCronetEngine.newUrlRequestBuilder(
@@ -89,7 +88,6 @@ public class UploadDataProvidersTest {
 
     @Test
     @SmallTest
-    @Feature({"Cronet"})
     public void testFileDescriptorProvider() throws Exception {
         ParcelFileDescriptor descriptor =
                 ParcelFileDescriptor.open(mFile, ParcelFileDescriptor.MODE_READ_ONLY);
@@ -108,7 +106,6 @@ public class UploadDataProvidersTest {
 
     @Test
     @SmallTest
-    @Feature({"Cronet"})
     public void testBadFileDescriptorProvider() throws Exception {
         TestUrlRequestCallback callback = new TestUrlRequestCallback();
         UrlRequest.Builder builder = mTestFramework.mCronetEngine.newUrlRequestBuilder(
@@ -129,7 +126,6 @@ public class UploadDataProvidersTest {
 
     @Test
     @SmallTest
-    @Feature({"Cronet"})
     public void testBufferProvider() throws Exception {
         TestUrlRequestCallback callback = new TestUrlRequestCallback();
         UrlRequest.Builder builder = mTestFramework.mCronetEngine.newUrlRequestBuilder(
@@ -146,7 +142,6 @@ public class UploadDataProvidersTest {
 
     @Test
     @SmallTest
-    @Feature({"Cronet"})
     @OnlyRunNativeCronet
     // Tests that ByteBuffer's limit cannot be changed by the caller.
     public void testUploadChangeBufferLimit() throws Exception {
@@ -188,7 +183,6 @@ public class UploadDataProvidersTest {
 
     @Test
     @SmallTest
-    @Feature({"Cronet"})
     public void testNoErrorWhenCanceledDuringStart() throws Exception {
         TestUrlRequestCallback callback = new TestUrlRequestCallback();
         UrlRequest.Builder builder = mTestFramework.mCronetEngine.newUrlRequestBuilder(
@@ -222,7 +216,6 @@ public class UploadDataProvidersTest {
 
     @Test
     @SmallTest
-    @Feature({"Cronet"})
     public void testNoErrorWhenExceptionDuringStart() throws Exception {
         TestUrlRequestCallback callback = new TestUrlRequestCallback();
         UrlRequest.Builder builder = mTestFramework.mCronetEngine.newUrlRequestBuilder(
@@ -256,7 +249,6 @@ public class UploadDataProvidersTest {
 
     @Test
     @SmallTest
-    @Feature({"Cronet"})
     // Tests that creating a ByteBufferUploadProvider using a byte array with an
     // offset gives a ByteBuffer with position 0. crbug.com/603124.
     public void testCreateByteBufferUploadWithArrayOffset() throws Exception {

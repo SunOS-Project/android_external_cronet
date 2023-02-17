@@ -4,6 +4,9 @@
 
 package org.chromium.net;
 
+import android.net.http.BidirectionalStream;
+import android.net.http.HttpException;
+import android.net.http.UrlResponseInfo;
 import android.os.ConditionVariable;
 
 import static junit.framework.Assert.assertEquals;
@@ -26,7 +29,7 @@ import java.util.concurrent.ThreadFactory;
  */
 public class TestBidirectionalStreamCallback extends BidirectionalStream.Callback {
     public UrlResponseInfo mResponseInfo;
-    public CronetException mError;
+    public HttpException mError;
 
     public ResponseStep mResponseStep = ResponseStep.NOTHING;
 
@@ -295,7 +298,7 @@ public class TestBidirectionalStreamCallback extends BidirectionalStream.Callbac
     }
 
     @Override
-    public void onFailed(BidirectionalStream stream, UrlResponseInfo info, CronetException error) {
+    public void onFailed(BidirectionalStream stream, UrlResponseInfo info, HttpException error) {
         checkOnValidThread();
         assertTrue(stream.isDone());
         // Shouldn't happen after success.

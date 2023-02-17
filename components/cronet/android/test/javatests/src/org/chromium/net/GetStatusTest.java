@@ -10,9 +10,10 @@ import static org.junit.Assert.fail;
 
 import static org.chromium.net.CronetTestRule.getContext;
 
+import android.net.http.UrlRequest;
 import android.os.ConditionVariable;
-import android.support.test.runner.AndroidJUnit4;
 
+import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.SmallTest;
 
 import org.junit.After;
@@ -22,12 +23,11 @@ import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.junit.runner.RunWith;
 
-import org.chromium.base.test.util.Feature;
 import org.chromium.net.CronetTestRule.CronetTestFramework;
 import org.chromium.net.CronetTestRule.OnlyRunNativeCronet;
 import org.chromium.net.TestUrlRequestCallback.ResponseStep;
-import org.chromium.net.UrlRequest.Status;
-import org.chromium.net.UrlRequest.StatusListener;
+import android.net.http.UrlRequest.Status;
+import android.net.http.UrlRequest.StatusListener;
 import org.chromium.net.impl.LoadState;
 import org.chromium.net.impl.UrlRequestBase;
 
@@ -79,7 +79,6 @@ public class GetStatusTest {
 
     @Test
     @SmallTest
-    @Feature({"Cronet"})
     public void testSimpleGet() throws Exception {
         String url = NativeTestServer.getEchoMethodURL();
         TestUrlRequestCallback callback = new TestUrlRequestCallback();
@@ -138,7 +137,6 @@ public class GetStatusTest {
 
     @Test
     @SmallTest
-    @Feature({"Cronet"})
     public void testInvalidLoadState() throws Exception {
         try {
             UrlRequestBase.convertLoadState(LoadState.OBSOLETE_WAITING_FOR_APPCACHE);
@@ -154,7 +152,6 @@ public class GetStatusTest {
 
     @Test
     @SmallTest
-    @Feature({"Cronet"})
     // Regression test for crbug.com/606872.
     @OnlyRunNativeCronet
     public void testGetStatusForUpload() throws Exception {

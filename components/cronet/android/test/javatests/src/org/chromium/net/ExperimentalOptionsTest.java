@@ -15,8 +15,14 @@ import static org.chromium.net.CronetTestRule.assertContains;
 import static org.chromium.net.CronetTestRule.getContext;
 import static org.chromium.net.CronetTestRule.getTestStorage;
 
-import android.support.test.runner.AndroidJUnit4;
+import android.net.http.BidirectionalStream;
+import android.net.http.HttpEngine;
+import android.net.http.ExperimentalBidirectionalStream;
+import android.net.http.ExperimentalHttpEngine;
+import android.net.http.NetworkException;
+import android.net.http.UrlRequest;
 
+import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.LargeTest;
 import androidx.test.filters.MediumTest;
 
@@ -32,7 +38,6 @@ import org.chromium.base.Log;
 import org.chromium.base.PathUtils;
 import org.chromium.base.annotations.JNINamespace;
 import org.chromium.base.test.util.DisabledTest;
-import org.chromium.base.test.util.Feature;
 import org.chromium.net.CronetTestRule.OnlyRunNativeCronet;
 import org.chromium.net.MetricsTestUtil.TestRequestFinishedListener;
 import org.chromium.net.impl.CronetUrlRequestContext;
@@ -57,12 +62,12 @@ public class ExperimentalOptionsTest {
     public ExpectedException expectedException = ExpectedException.none();
 
     private static final String TAG = ExperimentalOptionsTest.class.getSimpleName();
-    private ExperimentalCronetEngine.Builder mBuilder;
+    private ExperimentalHttpEngine.Builder mBuilder;
     private CountDownLatch mHangingUrlLatch;
 
     @Before
     public void setUp() throws Exception {
-        mBuilder = new ExperimentalCronetEngine.Builder(getContext());
+        mBuilder = new ExperimentalHttpEngine.Builder(getContext());
         mHangingUrlLatch = new CountDownLatch(1);
         CronetTestUtil.setMockCertVerifierForTesting(
                 mBuilder, QuicTestServer.createMockCertVerifier());
@@ -78,7 +83,6 @@ public class ExperimentalOptionsTest {
 
     @Test
     @MediumTest
-    @Feature({"Cronet"})
     @OnlyRunNativeCronet
     // Tests that NetLog writes effective experimental options to NetLog.
     public void testNetLog() throws Exception {
@@ -89,7 +93,7 @@ public class ExperimentalOptionsTest {
                 new JSONObject().put("HostResolverRules", hostResolverParams);
         mBuilder.setExperimentalOptions(experimentalOptions.toString());
 
-        CronetEngine cronetEngine = mBuilder.build();
+        HttpEngine cronetEngine = mBuilder.build();
         cronetEngine.startNetLogToFile(logfile.getPath(), false);
         String url = Http2TestServer.getEchoMethodUrl();
         TestUrlRequestCallback callback = new TestUrlRequestCallback();
@@ -110,7 +114,6 @@ public class ExperimentalOptionsTest {
     @DisabledTest(message = "crbug.com/1021941")
     @Test
     @MediumTest
-    @Feature({"Cronet"})
     @OnlyRunNativeCronet
     public void testSetSSLKeyLogFile() throws Exception {
         String url = Http2TestServer.getEchoMethodUrl();
@@ -119,7 +122,7 @@ public class ExperimentalOptionsTest {
 
         JSONObject experimentalOptions = new JSONObject().put("ssl_key_log_file", file.getPath());
         mBuilder.setExperimentalOptions(experimentalOptions.toString());
-        CronetEngine cronetEngine = mBuilder.build();
+        HttpEngine cronetEngine = mBuilder.build();
 
         TestUrlRequestCallback callback = new TestUrlRequestCallback();
         UrlRequest.Builder builder =
@@ -177,7 +180,6 @@ public class ExperimentalOptionsTest {
 
     @Test
     @MediumTest
-    @Feature({"Cronet"})
     @OnlyRunNativeCronet
     // Tests that basic Cronet functionality works when host cache persistence is enabled, and that
     // persistence works.
@@ -192,7 +194,7 @@ public class ExperimentalOptionsTest {
         String testUrl = new URL("http", testHost, realPort, javaUrl.getPath()).toString();
 
         mBuilder.setStoragePath(getTestStorage(getContext()))
-                .enableHttpCache(CronetEngine.Builder.HTTP_CACHE_DISK, 0);
+                .setEnableHttpCache(HttpEngine.Builder.HTTP_CACHE_DISK, 0);
 
         // Set a short delay so the pref gets written quickly.
         JSONObject staleDns = new JSONObject()
@@ -236,7 +238,6 @@ public class ExperimentalOptionsTest {
 
     @Test
     @MediumTest
-    @Feature({"Cronet"})
     @OnlyRunNativeCronet
     // Experimental options should be specified through a JSON compliant string. When that is not
     // the case building a Cronet engine should fail when it is allowed to do so.
@@ -246,12 +247,11 @@ public class ExperimentalOptionsTest {
             expectedException.expectMessage("Experimental options parsing failed");
         }
         mBuilder.setExperimentalOptions("Not a serialized JSON object");
-        CronetEngine cronetEngine = mBuilder.build();
+        HttpEngine cronetEngine = mBuilder.build();
     }
 
     @Test
     @MediumTest
-    @Feature({"Cronet"})
     @OnlyRunNativeCronet
     public void testDetectBrokenConnection() throws Exception {
         String url = Http2TestServer.getEchoMethodUrl();
@@ -259,7 +259,7 @@ public class ExperimentalOptionsTest {
         JSONObject experimentalOptions =
                 new JSONObject().put("bidi_stream_detect_broken_connection", heartbeatIntervalSecs);
         mBuilder.setExperimentalOptions(experimentalOptions.toString());
-        ExperimentalCronetEngine cronetEngine = (ExperimentalCronetEngine) mBuilder.build();
+        ExperimentalHttpEngine cronetEngine = (ExperimentalHttpEngine) mBuilder.build();
 
         TestBidirectionalStreamCallback callback = new TestBidirectionalStreamCallback();
         ExperimentalBidirectionalStream.Builder builder =
@@ -276,7 +276,6 @@ public class ExperimentalOptionsTest {
     @DisabledTest(message = "crbug.com/1320725")
     @Test
     @LargeTest
-    @Feature({"Cronet"})
     @OnlyRunNativeCronet
     public void testDetectBrokenConnectionOnNetworkFailure() throws Exception {
         // HangingRequestUrl stops the server from replying until mHangingUrlLatch is opened,
@@ -288,7 +287,7 @@ public class ExperimentalOptionsTest {
         JSONObject experimentalOptions =
                 new JSONObject().put("bidi_stream_detect_broken_connection", heartbeatIntervalSecs);
         mBuilder.setExperimentalOptions(experimentalOptions.toString());
-        ExperimentalCronetEngine cronetEngine = (ExperimentalCronetEngine) mBuilder.build();
+        ExperimentalHttpEngine cronetEngine = (ExperimentalHttpEngine) mBuilder.build();
         cronetEngine.addRequestFinishedListener(requestFinishedListener);
         ExperimentalBidirectionalStream.Builder builder =
                 cronetEngine
@@ -302,7 +301,7 @@ public class ExperimentalOptionsTest {
         assertContains("Exception in BidirectionalStream: net::ERR_HTTP2_PING_FAILED",
                 callback.mError.getMessage());
         assertEquals(NetError.ERR_HTTP2_PING_FAILED,
-                ((NetworkException) callback.mError).getCronetInternalErrorCode());
+                ((NetworkException) callback.mError).getInternalErrorCode());
         cronetEngine.shutdown();
     }
 

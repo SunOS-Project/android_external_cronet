@@ -6,12 +6,12 @@ package org.chromium.net.impl;
 import androidx.annotation.IntDef;
 import androidx.annotation.Nullable;
 
-import org.chromium.net.BidirectionalStream;
-import org.chromium.net.ExperimentalBidirectionalStream;
-import org.chromium.net.ExperimentalCronetEngine;
-import org.chromium.net.ExperimentalUrlRequest;
-import org.chromium.net.RequestFinishedInfo;
-import org.chromium.net.UrlRequest;
+import android.net.http.BidirectionalStream;
+import android.net.http.ExperimentalBidirectionalStream;
+import android.net.http.ExperimentalHttpEngine;
+import android.net.http.ExperimentalUrlRequest;
+import android.net.http.RequestFinishedInfo;
+import android.net.http.UrlRequest;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -22,10 +22,9 @@ import java.util.Map;
 import java.util.concurrent.Executor;
 
 /**
- * Base class of {@link CronetUrlRequestContext} and {@link JavaCronetEngine} that contains
- * shared logic.
+ * Base class of {@link CronetUrlRequestContext}.
  */
-public abstract class CronetEngineBase extends ExperimentalCronetEngine {
+public abstract class CronetEngineBase extends ExperimentalHttpEngine {
     /*
      * Network handle representing the default network. To be used when a network has not been
      * explicitly set.
@@ -45,7 +44,7 @@ public abstract class CronetEngineBase extends ExperimentalCronetEngine {
      *         {@link UrlRequest.Builder#REQUEST_PRIORITY_IDLE REQUEST_PRIORITY_*}
      *         values.
      * @param requestAnnotations Objects to pass on to
-     *        {@link org.chromium.net.RequestFinishedInfo.Listener}.
+     *        {@link RequestFinishedInfo.Listener}.
      * @param disableCache disables cache for the request.
      *         If context is not set up to use cache this param has no effect.
      * @param disableConnectionMigration disables connection migration for this
@@ -91,7 +90,7 @@ public abstract class CronetEngineBase extends ExperimentalCronetEngine {
      *         headers until flush() is called, and try to combine them
      *         with the next data frame.
      * @param requestAnnotations Objects to pass on to
-     *       {@link org.chromium.net.RequestFinishedInfo.Listener}.
+     *       {@link RequestFinishedInfo.Listener}.
      * @param trafficStatsTagSet {@code true} if {@code trafficStatsTag} represents a TrafficStats
      *         tag to apply to sockets used to perform this request.
      * @param trafficStatsTag TrafficStats tag to apply to sockets used to perform this request.

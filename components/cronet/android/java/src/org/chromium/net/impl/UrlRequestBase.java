@@ -5,10 +5,9 @@ package org.chromium.net.impl;
 
 import androidx.annotation.IntDef;
 
-import org.chromium.net.ExperimentalUrlRequest;
-import org.chromium.net.UploadDataProvider;
-import org.chromium.net.UrlRequest;
-import org.chromium.net.UrlRequest.Status;
+import android.net.http.ExperimentalUrlRequest;
+import android.net.http.UploadDataProvider;
+import android.net.http.UrlRequest;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -16,7 +15,7 @@ import java.util.concurrent.Executor;
 
 /**
  * Base class for classes that implement {@link UrlRequest} including experimental
- * features. {@link CronetUrlRequest} and {@link JavaUrlRequest} extends this class.
+ * features.
  */
 public abstract class UrlRequestBase extends ExperimentalUrlRequest {
     /**

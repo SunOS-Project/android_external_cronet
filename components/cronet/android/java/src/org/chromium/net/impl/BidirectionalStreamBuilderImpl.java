@@ -6,9 +6,9 @@ package org.chromium.net.impl;
 import android.annotation.SuppressLint;
 import android.os.Build;
 
-import org.chromium.net.BidirectionalStream;
-import org.chromium.net.CronetEngine;
-import org.chromium.net.ExperimentalBidirectionalStream;
+import android.net.http.BidirectionalStream;
+import android.net.http.HttpEngine;
+import android.net.http.ExperimentalBidirectionalStream;
 
 import java.util.AbstractMap;
 import java.util.ArrayList;
@@ -63,7 +63,7 @@ public class BidirectionalStreamBuilderImpl extends ExperimentalBidirectionalStr
      * different events
      *     occuring
      * @param executor the {@link Executor} on which {@code callback} methods will be invoked
-     * @param cronetEngine the {@link CronetEngine} used to create the stream
+     * @param cronetEngine the {@link HttpEngine} used to create the stream
      */
     BidirectionalStreamBuilderImpl(String url, BidirectionalStream.Callback callback,
             Executor executor, CronetEngineBase cronetEngine) {

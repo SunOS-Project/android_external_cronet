@@ -12,8 +12,14 @@ import static org.junit.Assert.assertTrue;
 import static org.chromium.base.CollectionUtil.newHashSet;
 import static org.chromium.net.CronetTestRule.getContext;
 
-import android.support.test.runner.AndroidJUnit4;
+import android.net.http.BidirectionalStream;
+import android.net.http.ExperimentalHttpEngine;
+import android.net.http.NetworkException;
+import android.net.http.QuicException;
+import android.net.http.RequestFinishedInfo;
+import android.net.http.UrlResponseInfo;
 
+import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.SmallTest;
 
 import org.json.JSONObject;
@@ -22,7 +28,6 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
-import org.chromium.base.test.util.Feature;
 import org.chromium.net.CronetTestRule.OnlyRunNativeCronet;
 import org.chromium.net.MetricsTestUtil.TestRequestFinishedListener;
 
@@ -38,7 +43,7 @@ public class BidirectionalStreamQuicTest {
     @Rule
     public final CronetTestRule mTestRule = new CronetTestRule();
 
-    private ExperimentalCronetEngine mCronetEngine;
+    private ExperimentalHttpEngine mCronetEngine;
     private enum QuicBidirectionalStreams {
         ENABLED,
         DISABLED,
@@ -47,12 +52,12 @@ public class BidirectionalStreamQuicTest {
     private void setUp(QuicBidirectionalStreams enabled) throws Exception {
         // Load library first to create MockCertVerifier.
         System.loadLibrary("cronet_tests");
-        ExperimentalCronetEngine.Builder builder =
-                new ExperimentalCronetEngine.Builder(getContext());
+        ExperimentalHttpEngine.Builder builder =
+                new ExperimentalHttpEngine.Builder(getContext());
 
         QuicTestServer.startQuicTestServer(getContext());
 
-        builder.enableQuic(true);
+        builder.setEnableQuic(true);
         JSONObject quicParams = new JSONObject();
         if (enabled == QuicBidirectionalStreams.DISABLED) {
             quicParams.put("quic_disable_bidirectional_streams", true);
@@ -79,7 +84,6 @@ public class BidirectionalStreamQuicTest {
 
     @Test
     @SmallTest
-    @Feature({"Cronet"})
     @OnlyRunNativeCronet
     // Test that QUIC is negotiated.
     public void testSimpleGet() throws Exception {
@@ -102,7 +106,6 @@ public class BidirectionalStreamQuicTest {
 
     @Test
     @SmallTest
-    @Feature({"Cronet"})
     @OnlyRunNativeCronet
     public void testSimplePost() throws Exception {
         setUp(QuicBidirectionalStreams.ENABLED);
@@ -144,7 +147,6 @@ public class BidirectionalStreamQuicTest {
 
     @Test
     @SmallTest
-    @Feature({"Cronet"})
     @OnlyRunNativeCronet
     public void testSimplePostWithFlush() throws Exception {
         setUp(QuicBidirectionalStreams.ENABLED);
@@ -178,7 +180,6 @@ public class BidirectionalStreamQuicTest {
 
     @Test
     @SmallTest
-    @Feature({"Cronet"})
     @OnlyRunNativeCronet
     public void testSimplePostWithFlushTwice() throws Exception {
         setUp(QuicBidirectionalStreams.ENABLED);
@@ -215,7 +216,6 @@ public class BidirectionalStreamQuicTest {
 
     @Test
     @SmallTest
-    @Feature({"Cronet"})
     @OnlyRunNativeCronet
     public void testSimpleGetWithFlush() throws Exception {
         setUp(QuicBidirectionalStreams.ENABLED);
@@ -260,7 +260,6 @@ public class BidirectionalStreamQuicTest {
 
     @Test
     @SmallTest
-    @Feature({"Cronet"})
     @OnlyRunNativeCronet
     public void testSimplePostWithFlushAfterOneWrite() throws Exception {
         setUp(QuicBidirectionalStreams.ENABLED);
@@ -292,7 +291,6 @@ public class BidirectionalStreamQuicTest {
 
     @Test
     @SmallTest
-    @Feature({"Cronet"})
     @OnlyRunNativeCronet
     public void testQuicBidirectionalStreamDisabled() throws Exception {
         setUp(QuicBidirectionalStreams.DISABLED);
@@ -314,7 +312,6 @@ public class BidirectionalStreamQuicTest {
 
     @Test
     @SmallTest
-    @Feature({"Cronet"})
     @OnlyRunNativeCronet
     // Tests that if the stream failed between the time when we issue a Write()
     // and when the Write() is executed in the native stack, there is no crash.
@@ -356,15 +353,14 @@ public class BidirectionalStreamQuicTest {
         assertNotNull(callback.mError);
         assertTrue(callback.mError instanceof NetworkException);
         NetworkException networkError = (NetworkException) callback.mError;
-        assertTrue(NetError.ERR_QUIC_PROTOCOL_ERROR == networkError.getCronetInternalErrorCode()
-                || NetError.ERR_CONNECTION_REFUSED == networkError.getCronetInternalErrorCode());
-        if (NetError.ERR_CONNECTION_REFUSED == networkError.getCronetInternalErrorCode()) return;
+        assertTrue(NetError.ERR_QUIC_PROTOCOL_ERROR == networkError.getInternalErrorCode()
+                || NetError.ERR_CONNECTION_REFUSED == networkError.getInternalErrorCode());
+        if (NetError.ERR_CONNECTION_REFUSED == networkError.getInternalErrorCode()) return;
         assertTrue(callback.mError instanceof QuicException);
     }
 
     @Test
     @SmallTest
-    @Feature({"Cronet"})
     @OnlyRunNativeCronet
     public void testStreamFailWithQuicDetailedErrorCode() throws Exception {
         setUp(QuicBidirectionalStreams.ENABLED);

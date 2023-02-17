@@ -3,23 +3,27 @@
 // found in the LICENSE file.
 package org.chromium.net.impl;
 
+import static android.net.http.ExperimentalHttpEngine.UNBIND_NETWORK_HANDLE;
+
 import android.annotation.SuppressLint;
-import android.os.Build;
+import android.net.Network;
 import android.util.Log;
 import android.util.Pair;
 
-import org.chromium.net.CronetEngine;
-import org.chromium.net.ExperimentalUrlRequest;
-import org.chromium.net.RequestFinishedInfo;
-import org.chromium.net.UploadDataProvider;
-import org.chromium.net.UrlRequest;
+import android.net.http.HttpEngine;
+import android.net.http.ExperimentalUrlRequest;
+import android.net.http.RequestFinishedInfo;
+import android.net.http.UploadDataProvider;
+import android.net.http.UrlRequest;
+
+import androidx.annotation.Nullable;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.concurrent.Executor;
 
 /**
- * Implements {@link org.chromium.net.ExperimentalUrlRequest.Builder}.
+ * Implements {@link ExperimentalUrlRequest.Builder}.
  */
 public class UrlRequestBuilderImpl extends ExperimentalUrlRequest.Builder {
     private static final String ACCEPT_ENCODING = "Accept-Encoding";
@@ -75,7 +79,7 @@ public class UrlRequestBuilderImpl extends ExperimentalUrlRequest.Builder {
      * @param url URL for the generated requests.
      * @param callback callback object that gets invoked on different events.
      * @param executor {@link Executor} on which all callbacks will be invoked.
-     * @param cronetEngine {@link CronetEngine} used to execute this request.
+     * @param cronetEngine {@link HttpEngine} used to execute this request.
      */
     UrlRequestBuilderImpl(String url, UrlRequest.Callback callback, Executor executor,
             CronetEngineBase cronetEngine) {
@@ -206,12 +210,12 @@ public class UrlRequestBuilderImpl extends ExperimentalUrlRequest.Builder {
     }
 
     @Override
-    public UrlRequestBuilderImpl bindToNetwork(long networkHandle) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
-            throw new UnsupportedOperationException(
-                    "The multi-network API is available starting from Android Marshmallow");
+    public UrlRequestBuilderImpl bindToNetwork(@Nullable Network network) {
+        if (network == null) {
+            mNetworkHandle = UNBIND_NETWORK_HANDLE;
+        } else {
+            mNetworkHandle = network.getNetworkHandle();
         }
-        mNetworkHandle = networkHandle;
         return this;
     }
 

@@ -13,17 +13,18 @@ import static org.junit.Assert.assertTrue;
 
 import static org.chromium.net.CronetTestRule.assertContains;
 
+import android.net.http.NetworkException;
+import android.net.http.UrlRequest;
 import android.os.Build;
-import android.support.test.runner.AndroidJUnit4;
 import android.system.Os;
 
+import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.SmallTest;
 
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
-import org.chromium.base.test.util.Feature;
 import org.chromium.net.CronetTestRule.CronetTestFramework;
 import org.chromium.net.CronetTestRule.OnlyRunNativeCronet;
 import org.chromium.net.CronetTestRule.RequiresMinAndroidApi;
@@ -48,7 +49,6 @@ public class NetworkChangeNotifierTest {
      */
     @Test
     @SmallTest
-    @Feature({"Cronet"})
     @OnlyRunNativeCronet
     @RequiresMinAndroidApi(Build.VERSION_CODES.LOLLIPOP)
     // Os and OsConstants aren't exposed until Lollipop
@@ -105,7 +105,7 @@ public class NetworkChangeNotifierTest {
         assertNotNull(callback.mError);
         assertTrue(callback.mOnErrorCalled);
         assertEquals(NetError.ERR_NETWORK_CHANGED,
-                ((NetworkException) callback.mError).getCronetInternalErrorCode());
+                ((NetworkException) callback.mError).getInternalErrorCode());
         assertContains("Exception in CronetUrlRequest: net::ERR_NETWORK_CHANGED",
                 callback.mError.getMessage());
     }

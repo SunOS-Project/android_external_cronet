@@ -10,8 +10,13 @@ import static org.junit.Assert.assertTrue;
 import static org.chromium.net.CronetTestRule.getContext;
 import static org.chromium.net.CronetTestRule.getTestStorage;
 
-import android.support.test.runner.AndroidJUnit4;
+import android.net.http.HttpEngine;
+import android.net.http.ExperimentalHttpEngine;
+import android.net.http.RequestFinishedInfo;
+import android.net.http.UrlRequest;
+import android.net.http.UrlResponseInfo;
 
+import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.LargeTest;
 import androidx.test.filters.SmallTest;
 
@@ -23,7 +28,6 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 
 import org.chromium.base.Log;
-import org.chromium.base.test.util.Feature;
 import org.chromium.net.CronetTestRule.OnlyRunNativeCronet;
 import org.chromium.net.MetricsTestUtil.TestRequestFinishedListener;
 
@@ -43,7 +47,7 @@ public class QuicTest {
     public final CronetTestRule mTestRule = new CronetTestRule();
 
     private static final String TAG = QuicTest.class.getSimpleName();
-    private ExperimentalCronetEngine.Builder mBuilder;
+    private ExperimentalHttpEngine.Builder mBuilder;
 
     @Before
     public void setUp() throws Exception {
@@ -51,7 +55,7 @@ public class QuicTest {
         System.loadLibrary("cronet_tests");
         QuicTestServer.startQuicTestServer(getContext());
 
-        mBuilder = new ExperimentalCronetEngine.Builder(getContext());
+        mBuilder = new ExperimentalHttpEngine.Builder(getContext());
         mBuilder.enableNetworkQualityEstimator(true).enableQuic(true);
         mBuilder.addQuicHint(QuicTestServer.getServerHost(), QuicTestServer.getServerPort(),
                 QuicTestServer.getServerPort());
@@ -76,7 +80,7 @@ public class QuicTest {
                                                  .put("NetworkQualityEstimator", nqeParams);
         mBuilder.setExperimentalOptions(experimentalOptions.toString());
         mBuilder.setStoragePath(getTestStorage(getContext()));
-        mBuilder.enableHttpCache(CronetEngine.Builder.HTTP_CACHE_DISK_NO_HTTP, 1000 * 1024);
+        mBuilder.setEnableHttpCache(HttpEngine.Builder.HTTP_CACHE_DISK_NO_HTTP, 1000 * 1024);
         CronetTestUtil.setMockCertVerifierForTesting(
                 mBuilder, QuicTestServer.createMockCertVerifier());
     }
@@ -88,10 +92,9 @@ public class QuicTest {
 
     @Test
     @LargeTest
-    @Feature({"Cronet"})
     @OnlyRunNativeCronet
     public void testQuicLoadUrl() throws Exception {
-        ExperimentalCronetEngine cronetEngine = mBuilder.build();
+        ExperimentalHttpEngine cronetEngine = mBuilder.build();
         String quicURL = QuicTestServer.getServerURL() + "/simple.txt";
         TestUrlRequestCallback callback = new TestUrlRequestCallback();
 
@@ -129,11 +132,11 @@ public class QuicTest {
         cronetEngine.shutdown();
 
         // Make another request using a new context but with no QUIC hints.
-        ExperimentalCronetEngine.Builder builder =
-                new ExperimentalCronetEngine.Builder(getContext());
+        ExperimentalHttpEngine.Builder builder =
+                new ExperimentalHttpEngine.Builder(getContext());
         builder.setStoragePath(getTestStorage(getContext()));
-        builder.enableHttpCache(CronetEngine.Builder.HTTP_CACHE_DISK, 1000 * 1024);
-        builder.enableQuic(true);
+        builder.setEnableHttpCache(HttpEngine.Builder.HTTP_CACHE_DISK, 1000 * 1024);
+        builder.setEnableQuic(true);
         JSONObject hostResolverParams = CronetTestUtil.generateHostResolverRules();
         JSONObject experimentalOptions = new JSONObject()
                                                  .put("HostResolverRules", hostResolverParams);
@@ -170,11 +173,10 @@ public class QuicTest {
      */
     @Test
     @LargeTest
-    @Feature({"Cronet"})
     @OnlyRunNativeCronet
     @SuppressWarnings("deprecation")
     public void testNQEWithQuic() throws Exception {
-        ExperimentalCronetEngine cronetEngine = mBuilder.build();
+        ExperimentalHttpEngine cronetEngine = mBuilder.build();
         String quicURL = QuicTestServer.getServerURL() + "/simple.txt";
 
         TestNetworkQualityRttListener rttListener =
@@ -251,9 +253,8 @@ public class QuicTest {
     @Test
     @SmallTest
     @OnlyRunNativeCronet
-    @Feature({"Cronet"})
     public void testMetricsWithQuic() throws Exception {
-        ExperimentalCronetEngine cronetEngine = mBuilder.build();
+        ExperimentalHttpEngine cronetEngine = mBuilder.build();
         TestRequestFinishedListener requestFinishedListener = new TestRequestFinishedListener();
         cronetEngine.addRequestFinishedListener(requestFinishedListener);
 
