@@ -9,8 +9,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
-import android.support.test.runner.AndroidJUnit4;
-
+import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.SmallTest;
 
 import org.junit.After;
@@ -20,7 +19,6 @@ import org.junit.Test;
 import org.junit.rules.TestName;
 import org.junit.runner.RunWith;
 
-import org.chromium.base.test.util.Feature;
 import org.chromium.net.CronetTestRule.CronetTestFramework;
 import org.chromium.net.CronetTestRule.OnlyRunNativeCronet;
 import org.chromium.net.CronetTestRule.RequiresMinApi;
@@ -59,7 +57,6 @@ public class CronetTestRuleTest {
     @Test
     @SmallTest
     @RequiresMinApi(999999999)
-    @Feature({"Cronet"})
     public void testRequiresMinApiDisable() {
         fail("RequiresMinApi failed to disable.");
     }
@@ -67,7 +64,6 @@ public class CronetTestRuleTest {
     @Test
     @SmallTest
     @RequiresMinApi(-999999999)
-    @Feature({"Cronet"})
     public void testRequiresMinApiMustRun() {
         mTestWasRun = true;
     }
@@ -76,7 +72,6 @@ public class CronetTestRuleTest {
 
     @Test
     @SmallTest
-    @Feature({"Cronet"})
     @OnlyRunNativeCronet
     public void testRunOnlyNativeMustRun() {
         assertFalse(mTestRule.testingJavaImpl());
