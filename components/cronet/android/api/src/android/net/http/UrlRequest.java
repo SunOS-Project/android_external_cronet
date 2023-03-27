@@ -14,6 +14,8 @@ import androidx.annotation.Nullable;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.nio.ByteBuffer;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Executor;
 
 /**
@@ -26,6 +28,28 @@ import java.util.concurrent.Executor;
 public abstract class UrlRequest {
 
     UrlRequest() {}
+
+    /**
+     * Lowest request priority. Passed to {@link Builder#setPriority}.
+     */
+    public static final int REQUEST_PRIORITY_IDLE = 0;
+    /**
+     * Very low request priority. Passed to {@link Builder#setPriority}.
+     */
+    public static final int REQUEST_PRIORITY_LOWEST = 1;
+    /**
+     * Low request priority. Passed to {@link Builder#setPriority}.
+     */
+    public static final int REQUEST_PRIORITY_LOW = 2;
+    /**
+     * Medium request priority. Passed to {@link Builder#setPriority}. This is the
+     * default priority given to the request.
+     */
+    public static final int REQUEST_PRIORITY_MEDIUM = 3;
+    /**
+     * Highest request priority. Passed to {@link Builder#setPriority}.
+     */
+    public static final int REQUEST_PRIORITY_HIGHEST = 4;
 
     /**
      * Builder for {@link UrlRequest}s. Allows configuring requests before constructing them
@@ -68,29 +92,7 @@ public abstract class UrlRequest {
          * @return the builder to facilitate chaining.
          */
         @NonNull
-        public abstract Builder setDisableCache(boolean disableCache);
-
-        /**
-         * Lowest request priority. Passed to {@link #setPriority}.
-         */
-        public static final int REQUEST_PRIORITY_IDLE = 0;
-        /**
-         * Very low request priority. Passed to {@link #setPriority}.
-         */
-        public static final int REQUEST_PRIORITY_LOWEST = 1;
-        /**
-         * Low request priority. Passed to {@link #setPriority}.
-         */
-        public static final int REQUEST_PRIORITY_LOW = 2;
-        /**
-         * Medium request priority. Passed to {@link #setPriority}. This is the
-         * default priority given to the request.
-         */
-        public static final int REQUEST_PRIORITY_MEDIUM = 3;
-        /**
-         * Highest request priority. Passed to {@link #setPriority}.
-         */
-        public static final int REQUEST_PRIORITY_HIGHEST = 4;
+        public abstract Builder setCacheDisabled(boolean disableCache);
 
         /**
          * Sets priority of the request which should be one of the
@@ -116,7 +118,9 @@ public abstract class UrlRequest {
          *     {@code Executor} the request itself is using.
          * @return the builder to facilitate chaining.
          */
-        @NonNull
+        // SuppressLint: UploadDataProvider is wrapped by other classes after set.
+        // Also, UploadDataProvider is a class to provide an upload body and getter is not useful
+        @NonNull @SuppressLint("MissingGetterMatchingBuilder")
         public abstract Builder setUploadDataProvider(
                 @NonNull UploadDataProvider uploadDataProvider, @NonNull Executor executor);
 
@@ -135,7 +139,7 @@ public abstract class UrlRequest {
          * @return the builder to facilitate chaining.
          */
         @NonNull
-        public abstract Builder setAllowDirectExecutor(boolean allowDirectExecutor);
+        public abstract Builder setDirectExecutorAllowed(boolean allowDirectExecutor);
 
         /**
          * Binds the request to the specified network. The HTTP stack will send this request
@@ -209,7 +213,7 @@ public abstract class UrlRequest {
      * {@link java.util.concurrent.Executor} used during construction of the
      * {@code UrlRequest}.
      */
-    public abstract static class Callback {
+    public interface Callback {
         /**
          * Invoked whenever a redirect is encountered. This will only be invoked
          * between the call to {@link UrlRequest#start} and
@@ -229,7 +233,7 @@ public abstract class UrlRequest {
          */
         // SuppressLint: Exception will be wrapped and passed to #onFailed, see above javadoc
         @SuppressLint("GenericException")
-        public abstract void onRedirectReceived(@NonNull UrlRequest request,
+        void onRedirectReceived(@NonNull UrlRequest request,
                 @NonNull UrlResponseInfo info, @NonNull String newLocationUrl) throws Exception;
 
         /**
@@ -251,7 +255,7 @@ public abstract class UrlRequest {
          */
         // SuppressLint: Exception will be wrapped and passed to #onFailed, see above javadoc
         @SuppressLint("GenericException")
-        public abstract void onResponseStarted(@NonNull UrlRequest request,
+        void onResponseStarted(@NonNull UrlRequest request,
                 @NonNull UrlResponseInfo info) throws Exception;
 
         /**
@@ -278,7 +282,7 @@ public abstract class UrlRequest {
          */
         // SuppressLint: Exception will be wrapped and passed to #onFailed, see above javadoc
         @SuppressLint("GenericException")
-        public abstract void onReadCompleted(@NonNull UrlRequest request,
+        void onReadCompleted(@NonNull UrlRequest request,
                 @NonNull UrlResponseInfo info, @NonNull ByteBuffer byteBuffer) throws Exception;
 
         /**
@@ -288,7 +292,7 @@ public abstract class UrlRequest {
          * @param request Request that succeeded.
          * @param info Response information.
          */
-        public abstract void onSucceeded(
+         void onSucceeded(
                 @NonNull UrlRequest request, @NonNull UrlResponseInfo info);
 
         /**
@@ -301,7 +305,7 @@ public abstract class UrlRequest {
          *         received.
          * @param error information about error.
          */
-        public abstract void onFailed(@NonNull UrlRequest request,
+        void onFailed(@NonNull UrlRequest request,
                 @Nullable UrlResponseInfo info, @NonNull HttpException error);
 
         /**
@@ -313,7 +317,7 @@ public abstract class UrlRequest {
          * @param info Response information. May be {@code null} if no response was
          *         received.
          */
-        public void onCanceled(@NonNull UrlRequest request, @Nullable UrlResponseInfo info) {}
+        void onCanceled(@NonNull UrlRequest request, @Nullable UrlResponseInfo info);
     }
 
     /** @hide */
@@ -463,6 +467,53 @@ public abstract class UrlRequest {
     }
 
     /**
+     * See {@link UrlRequest.Builder#setHttpMethod(String)}.
+     */
+    @Nullable
+    public abstract String getHttpMethod();
+
+    /**
+     * See {@link UrlRequest.Builder#addHeader(String, String)}
+     */
+    @NonNull
+    public abstract HeaderBlock getHeaders();
+
+    /**
+     * See {@link Builder#setCacheDisabled(boolean)}
+     */
+    public abstract boolean isCacheDisabled();
+
+    /**
+     * See {@link UrlRequest.Builder#setDirectExecutorAllowed(boolean)}
+     */
+    public abstract boolean isDirectExecutorAllowed();
+
+    /**
+     * See {@link Builder#setPriority(int)}
+     */
+    public abstract int getPriority();
+
+    /**
+     * See {@link Builder#setTrafficStatsTag(int)}
+     */
+    public abstract boolean hasTrafficStatsTag();
+
+    /**
+     * See {@link Builder#setTrafficStatsTag(int)}
+     */
+    public abstract int getTrafficStatsTag();
+
+    /**
+     * See {@link Builder#setTrafficStatsUid(int)}
+     */
+    public abstract boolean hasTrafficStatsUid();
+
+    /**
+     * See {@link Builder#setTrafficStatsUid(int)}
+     */
+    public abstract int getTrafficStatsUid();
+
+    /**
      * Starts the request, all callbacks go to {@link Callback}. May only be called
      * once. May not be called if {@link #cancel} has been called.
      */
@@ -530,6 +581,9 @@ public abstract class UrlRequest {
      * @param listener a {@link StatusListener} that will be invoked with
      *         the request's current status.
      */
+    // SuppressLint: The listener will be invoked back on the Executor passed in when the request
+    // was created.
+    @SuppressLint("ExecutorRegistration")
     public abstract void getStatus(@NonNull final StatusListener listener);
 
     // Note:  There are deliberately no accessors for the results of the request

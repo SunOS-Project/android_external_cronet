@@ -286,7 +286,7 @@ public class CronetHttpURLConnection extends HttpURLConnection {
         for (Pair<String, String> requestHeader : mRequestHeaders) {
             requestBuilder.addHeader(requestHeader.first, requestHeader.second);
         }
-        requestBuilder.setDisableCache(!getUseCaches());
+        requestBuilder.setCacheDisabled(!getUseCaches());
         // Set HTTP method.
         requestBuilder.setHttpMethod(method);
         if (checkTrafficStatsTag()) {
@@ -521,7 +521,7 @@ public class CronetHttpURLConnection extends HttpURLConnection {
         return -1;
     }
 
-    private class CronetUrlRequestCallback extends UrlRequest.Callback {
+    private class CronetUrlRequestCallback implements UrlRequest.Callback {
         public CronetUrlRequestCallback() {}
 
         @Override
