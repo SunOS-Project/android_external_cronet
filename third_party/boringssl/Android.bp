@@ -96,8 +96,13 @@ cc_object {
     sanitize: {
         address: false,
         hwaddress: false,
-        // TODO(b/271098677): Uncomment once automerger to tm-mainline-prod is gone.
-        // memtag_stack: false,
+        // This is a placeholder
+        // to help prevent
+        // merge conflicts.
+        memtag_stack: false,
+        // This is a placeholder
+        // to help prevent
+        // merge conflicts.
         fuzzer: false,
     },
     target: {
