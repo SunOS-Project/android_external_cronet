@@ -12,6 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+package {
+    // See: http://go/android-license-faq
+    // A large-scale-change added 'default_applicable_licenses' to import
+    // all of the 'license_kinds' from "external_cronet_license"
+    // to get the below license kinds:
+    //   SPDX-license-identifier-Apache-2.0
+    default_applicable_licenses: ["external_cronet_license"],
+}
+
 java_test_host {
     name: "net_unittests_tester",
     srcs: ["src/**/*.java"],
@@ -23,12 +32,15 @@ java_test_host {
     defaults: [
         "CronetTestJavaDefaults",
     ],
+    required: [
+        "cronet_net_tester_app",
+    ],
     data: [
-        ":cronet_net_tester_app",
         ":net_unittests_data",
     ],
     test_suites: [
         "general-tests",
+        "mts-tethering",
     ],
     // It will get build error if just set enabled to true. It fails with "windows_common"
     // depends on some disabled modules that are used by this test and it looks like set
@@ -53,11 +65,12 @@ java_test_host {
     defaults: [
         "CronetTestJavaDefaults",
     ],
-    data: [
-        ":cronet_tester_app",
+    required: [
+        "cronet_tester_app",
     ],
     test_suites: [
         "general-tests",
+        "mts-tethering",
     ],
     // It will get build error if just set enabled to true. It fails with "windows_common"
     // depends on some disabled modules that are used by this test and it looks like set
