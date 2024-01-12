@@ -1,7 +1,7 @@
-From b8180ae81faec53248473263c98a67b9db7408d5 Mon Sep 17 00:00:00 2001
+From 53f307b6e210d28e802c34290dd4bf32d5b5c24b Mon Sep 17 00:00:00 2001
 From: Patrick Rohr <prohr@google.com>
 Date: Thu, 27 Apr 2023 13:14:09 -0700
-Subject: [PATCH] cronet import: remove perfetto from unit tests
+Subject: [PATCH 1/1] cronet import: remove perfetto from unit tests
 
 DO NOT SUBMIT.
 
@@ -12,10 +12,10 @@ Change-Id: Iaafc68df47a54759c347201ff863b23fab4fd534
  1 file changed, 2 insertions(+), 3 deletions(-)
 
 diff --git a/net/BUILD.gn b/net/BUILD.gn
-index 5b41b07ecace2..4acbee343bca8 100644
+index f314372cd790f..bc58713d7e75e 100644
 --- a/net/BUILD.gn
 +++ b/net/BUILD.gn
-@@ -2906,13 +2906,12 @@ test("net_unittests") {
+@@ -2961,14 +2961,13 @@ test("net_unittests") {
      deps += [ "//net/server:tests" ]
    }
  
@@ -27,10 +27,11 @@ index 5b41b07ecace2..4acbee343bca8 100644
        ":extras",
        "//components/sqlite_proto",
        "//sql",
+       "//sql:test_support",
 +      "//third_party/perfetto/include/perfetto/test:test_support",
      ]
    }
  
 -- 
-2.40.1.495.gc816e09b53d-goog
+2.41.0.694.ge786442a9b-goog
 

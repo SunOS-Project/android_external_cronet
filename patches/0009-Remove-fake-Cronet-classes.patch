@@ -1,20 +1,20 @@
-From 29644724dd0a671de9c6028d35b87b4cc7f8177d Mon Sep 17 00:00:00 2001
+From 0a2227ed7f16937950d0c122c66923f8e39d01af Mon Sep 17 00:00:00 2001
 From: Dan Stahr <danstahr@google.com>
 Date: Tue, 10 Jan 2023 10:31:27 +0000
-Subject: [PATCH] Remove fake Cronet classes.
+Subject: [PATCH 1/1] Remove fake Cronet classes.
 
 Test: m
 
 Change-Id: I6a2641acd3ee9d09b72ed24ec2479364542a034e
 ---
- components/cronet/android/BUILD.gn | 69 ------------------------------
- 1 file changed, 69 deletions(-)
+ components/cronet/android/BUILD.gn | 72 ------------------------------
+ 1 file changed, 72 deletions(-)
 
 diff --git a/components/cronet/android/BUILD.gn b/components/cronet/android/BUILD.gn
-index 294b350f5e12f..6fd694ec4bf66 100644
+index 0499fd46dbf8c..58dda0fcaf6b5 100644
 --- a/components/cronet/android/BUILD.gn
 +++ b/components/cronet/android/BUILD.gn
-@@ -331,27 +331,6 @@ android_library("cronet_impl_common_base_java") {
+@@ -328,27 +328,6 @@ android_library("cronet_impl_common_base_java") {
    srcjar_deps = cronet_impl_common_java_srcjar_deps
  }
  
@@ -42,7 +42,7 @@ index 294b350f5e12f..6fd694ec4bf66 100644
  android_library("cronet_urlconnection_impl_java") {
    sources = [
      "java/src/org/chromium/net/urlconnection/CronetBufferedOutputStream.java",
-@@ -567,15 +546,6 @@ android_java_prebuilt("package_impl_platform_java") {
+@@ -584,15 +563,6 @@ android_java_prebuilt("package_impl_platform_java") {
    ]
  }
  
@@ -58,7 +58,7 @@ index 294b350f5e12f..6fd694ec4bf66 100644
  template("jar_src") {
    action_with_pydeps(target_name) {
      _rebased_src_search_dirs =
-@@ -665,12 +635,6 @@ jar_src("jar_cronet_impl_common_java_source") {
+@@ -682,12 +652,6 @@ jar_src("jar_cronet_impl_common_java_source") {
    jar_path = "$_package_dir/cronet_impl_common_java-src.jar"
  }
  
@@ -71,7 +71,7 @@ index 294b350f5e12f..6fd694ec4bf66 100644
  jar_src("jar_cronet_impl_util_java_source") {
    src_search_dirs = [ "java/src" ]
    source_deps = [ ":cronet_impl_java_util_java" ]
-@@ -720,11 +684,6 @@ repackage_jars("repackage_api") {
+@@ -737,11 +701,6 @@ repackage_jars("repackage_api") {
    deps = [ ":cronet_api_java" ]
  }
  
@@ -83,7 +83,7 @@ index 294b350f5e12f..6fd694ec4bf66 100644
  repackage_jars("repackage_util") {
    output = "$_package_dir/cronet_impl_util_java.jar"
    deps = [ ":cronet_impl_java_util_java" ]
-@@ -959,32 +918,8 @@ android_library("cronet_common_javatests") {
+@@ -971,35 +930,8 @@ android_library("cronet_common_javatests") {
           ] + cronet_tests_androidx_common_srcs
  }
  
@@ -104,8 +104,11 @@ index 294b350f5e12f..6fd694ec4bf66 100644
 -           ":cronet_common_javatests",
 -           ":cronet_impl_common_base_java",
 -           ":cronet_impl_fake_base_java",
+-           ":cronet_test_apk_java",
 -           "//base:base_java_test_support",
+-           "//third_party/android_deps:guava_android_java",
 -           "//third_party/android_sdk:android_test_base_java",
+-           "//third_party/google-truth:google_truth_java",
 -           "//third_party/junit",
 -         ] + cronet_tests_androidx_common_srcs
 -}
@@ -116,7 +119,7 @@ index 294b350f5e12f..6fd694ec4bf66 100644
    ":cronet_test_apk_java",
    "//base:base_java",
    "//base:jni_java",
-@@ -1473,7 +1408,6 @@ copy("cronet_package_copy") {
+@@ -1531,7 +1463,6 @@ copy("cronet_package_copy") {
      "//AUTHORS",
      "//chrome/VERSION",
      "cronet_impl_common_proguard.cfg",
@@ -124,7 +127,7 @@ index 294b350f5e12f..6fd694ec4bf66 100644
      "cronet_impl_platform_proguard.cfg",
      "implementation_api_version.txt",
      "interface_api_version.txt",
-@@ -1484,7 +1418,6 @@ copy("cronet_package_copy") {
+@@ -1542,7 +1473,6 @@ copy("cronet_package_copy") {
      ":cronet_api_java",
      ":cronet_combine_proguard_flags",
      ":cronet_impl_common_base_java",
@@ -132,7 +135,7 @@ index 294b350f5e12f..6fd694ec4bf66 100644
    ]
  }
  
-@@ -1672,13 +1605,11 @@ group("cronet_package_android") {
+@@ -1730,13 +1660,11 @@ group("cronet_package_android") {
        ":generate_licenses",
        ":jar_cronet_api_source",
        ":jar_cronet_impl_common_java_source",
@@ -147,5 +150,5 @@ index 294b350f5e12f..6fd694ec4bf66 100644
        ":repackage_platform",
      ]
 -- 
-2.41.0.rc0.172.g3f132b7071-goog
+2.41.0.694.ge786442a9b-goog
 
