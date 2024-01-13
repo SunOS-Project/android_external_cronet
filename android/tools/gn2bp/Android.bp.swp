@@ -4103,7 +4103,6 @@ java_library {
 java_library {
     name: "cronet_aml_base_base_java_test_support__testing",
     srcs: [
-        "base/test/android/java/src/org/chromium/base/multidex/ChromiumMultiDexInstaller.java",
         "base/test/android/javatests/src/org/chromium/base/test/BaseActivityTestRule.java",
         "base/test/android/javatests/src/org/chromium/base/test/BaseChromiumAndroidJUnitRunner.java",
         "base/test/android/javatests/src/org/chromium/base/test/BaseJUnit4ClassRunner.java",
@@ -4197,7 +4196,6 @@ java_library {
     ],
     min_sdk_version: "30",
     libs: [
-        "android-support-multidex",
         "android.test.base",
         "android.test.mock",
         "androidx.annotation_annotation-nodeps",

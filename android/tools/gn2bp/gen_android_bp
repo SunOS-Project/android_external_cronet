@@ -292,7 +292,8 @@ def add_android_test_mock_java_deps(module, arch):
   module.libs.add("android.test.mock")
 
 def add_androidx_multidex_java_deps(module, arch):
-  module.libs.add("android-support-multidex")
+  # Androidx-multidex is disabled on unbundled branches.
+  pass
 
 def add_androidx_test_monitor_java_deps(module, arch):
   module.libs.add("androidx.test.monitor")

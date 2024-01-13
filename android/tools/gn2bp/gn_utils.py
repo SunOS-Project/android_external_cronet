@@ -49,7 +49,9 @@ JAVA_FILES_TO_IGNORE = (
   "//components/cronet/android/test/javatests/src/org/chromium/net/apihelpers/ContentTypeParametersParserTest.java",
   # Netty does not exist currently in AOSP so those classes won't compile. We replace with stubs.
   "//components/cronet/android/test/src/org/chromium/net/Http2TestHandler.java",
-  "//components/cronet/android/test/src/org/chromium/net/Http2TestServer.java"
+  "//components/cronet/android/test/src/org/chromium/net/Http2TestServer.java",
+  # androidx-multidex is disabled on unbundled branches.
+  "//base/test/android/java/src/org/chromium/base/multidex/ChromiumMultiDexInstaller.java",
 )
 RESPONSE_FILE = '{{response_file_name}}'
 TESTING_SUFFIX = "__testing"
