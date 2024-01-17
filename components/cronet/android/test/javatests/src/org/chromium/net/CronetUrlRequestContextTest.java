@@ -1030,6 +1030,9 @@ public class CronetUrlRequestContextTest {
     @Test
     @SmallTest
     @SkipPresubmit(reason = "b/293141085 flaky test")
+    @IgnoreFor(
+        implementations = {CronetImplementation.AOSP_PLATFORM},
+        reason = "ActiveRequestCount is not available in AOSP")
     public void testGetActiveRequestCountWithError() throws Exception {
         final String badUrl = "www.unreachable-url.com";
         ExperimentalCronetEngine cronetEngine = mTestRule.getTestFramework().startEngine();
