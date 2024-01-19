@@ -26,6 +26,7 @@ import org.chromium.net.CronetTestRule.IgnoreFor;
 import org.chromium.net.CronetTestRule.RequiresMinAndroidApi;
 import org.chromium.net.CronetTestRule.RequiresMinApi;
 import org.chromium.net.impl.CronetUrlRequestContext;
+import org.chromium.net.impl.JavaCronetEngine;
 
 /** Tests features of CronetTestRule. */
 @RunWith(AndroidJUnit4.class)
@@ -84,6 +85,34 @@ public class CronetTestRuleTest {
      */
     @Test
     @SmallTest
+    public void testAllImplsMustRun() {
+        assertThat(mTestWasRun).isFalse();
+        mTestWasRun = true;
+        mNumberOfReruns++;
+        assertThat(mNumberOfReruns).isLessThan(4);
+        switch (mTestRule.implementationUnderTest()) {
+            case STATICALLY_LINKED:
+                assertThat(mNativeImplWasRun).isFalse();
+                mNativeImplWasRun = true;
+                break;
+            case FALLBACK:
+                assertThat(mFallbackImplWasRun).isFalse();
+                mFallbackImplWasRun = true;
+                break;
+            case AOSP_PLATFORM:
+                assertThat(mPlatformImplWasRun).isFalse();
+                mPlatformImplWasRun = true;
+                break;
+        }
+        if (mNumberOfReruns == 3) {
+            assertThat(mFallbackImplWasRun).isTrue();
+            assertThat(mPlatformImplWasRun).isTrue();
+            assertThat(mNativeImplWasRun).isTrue();
+        }
+    }
+
+    @Test
+    @SmallTest
     @IgnoreFor(
             implementations = {CronetImplementation.FALLBACK, CronetImplementation.AOSP_PLATFORM},
             reason = "Testing the rule")
@@ -95,5 +124,42 @@ public class CronetTestRuleTest {
         mTestWasRun = true;
         assertThat(mTestRule.getTestFramework().getEngine())
                 .isInstanceOf(CronetUrlRequestContext.class);
+    }
+
+    @Test
+    @SmallTest
+    @IgnoreFor(
+            implementations = {
+                CronetImplementation.STATICALLY_LINKED,
+                CronetImplementation.AOSP_PLATFORM
+            },
+            reason = "Testing the rule")
+    public void testRunOnlyJavaMustRun() {
+        assertThat(mTestRule.testingJavaImpl()).isTrue();
+        assertThat(mTestRule.implementationUnderTest()).isEqualTo(CronetImplementation.FALLBACK);
+        assertThat(mTestWasRun).isFalse();
+        mTestWasRun = true;
+        assertThat(mTestRule.getTestFramework().getEngine()).isInstanceOf(JavaCronetEngine.class);
+    }
+
+    @Test
+    @SmallTest
+    @IgnoreFor(
+            implementations = {
+                CronetImplementation.STATICALLY_LINKED,
+                CronetImplementation.FALLBACK
+            },
+            reason = "Testing the rule")
+    @RequiresMinAndroidApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
+    public void testRunOnlyAospPlatformMustRun() {
+        assertThat(mTestRule.testingJavaImpl()).isFalse();
+        assertThat(mTestRule.implementationUnderTest())
+                .isEqualTo(CronetImplementation.AOSP_PLATFORM);
+        assertThat(mTestWasRun).isFalse();
+        mTestWasRun = true;
+        assertThat(mTestRule.getTestFramework().getEngine())
+                .isNotInstanceOf(JavaCronetEngine.class);
+        assertThat(mTestRule.getTestFramework().getEngine())
+                .isNotInstanceOf(CronetUrlRequestContext.class);
     }
 }

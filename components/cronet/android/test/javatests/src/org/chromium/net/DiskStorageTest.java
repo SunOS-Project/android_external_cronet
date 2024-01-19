@@ -13,7 +13,6 @@ import static org.chromium.net.truth.UrlResponseInfoSubject.assertThat;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.SmallTest;
-
 import com.android.testutils.SkipPresubmit;
 
 import org.junit.After;
@@ -22,7 +21,6 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
-import org.chromium.base.FileUtils;
 import org.chromium.base.PathUtils;
 import org.chromium.base.test.util.DoNotBatch;
 import org.chromium.net.CronetTestRule.CronetImplementation;
@@ -57,7 +55,7 @@ public class DiskStorageTest {
     @After
     public void tearDown() throws Exception {
         if (mReadOnlyStoragePath != null) {
-            FileUtils.recursivelyDeleteFile(new File(mReadOnlyStoragePath), FileUtils.DELETE_ALL);
+            FileUtils.recursivelyDeleteFile(new File(mReadOnlyStoragePath));
         }
         NativeTestServer.shutdownNativeTestServer();
     }

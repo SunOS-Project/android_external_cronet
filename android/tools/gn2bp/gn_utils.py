@@ -39,17 +39,8 @@ JAVA_FILES_TO_IGNORE = (
   "//components/cronet/android/api/src/org/chromium/net/apihelpers/StringCronetCallback.java",
   "//components/cronet/android/api/src/org/chromium/net/apihelpers/UrlRequestCallbacks.java",
   "//components/cronet/android/test/javatests/src/org/chromium/net/CronetEngineBuilderTest.java",
-  # The following tests are currently not included in the tests because they
-  # depends on H2 test server.
-  "//components/cronet/android/test/javatests/src/org/chromium/net/BidirectionalStreamTest.java",
-  "//components/cronet/android/test/javatests/src/org/chromium/net/MockCertVerifierTest.java",
-  "//components/cronet/android/test/javatests/src/org/chromium/net/NetworkErrorLoggingTest.java",
-  "//components/cronet/android/test/javatests/src/org/chromium/net/PkpTest.java",
   # Api helpers does not exist downstream, hence the tests shouldn't be collected.
   "//components/cronet/android/test/javatests/src/org/chromium/net/apihelpers/ContentTypeParametersParserTest.java",
-  # Netty does not exist currently in AOSP so those classes won't compile. We replace with stubs.
-  "//components/cronet/android/test/src/org/chromium/net/Http2TestHandler.java",
-  "//components/cronet/android/test/src/org/chromium/net/Http2TestServer.java",
   # androidx-multidex is disabled on unbundled branches.
   "//base/test/android/java/src/org/chromium/base/multidex/ChromiumMultiDexInstaller.java",
 )
@@ -211,6 +202,9 @@ class GnParser(object):
       # Deps for JNI Registration. Those are not added to deps so that
       # the generated module would not depend on those deps.
       self.jni_registration_java_deps = set()
+      # Path to the java jar path. This is used if the java library is
+      # an import of a JAR like `android_java_prebuilt` targets in GN
+      self.jar_path = ""
 
     # Properties to forward access to common arch.
     # TODO: delete these after the transition has been completed.
@@ -464,6 +458,11 @@ class GnParser(object):
         if not java_source.startswith("//out") and java_source not in JAVA_FILES_TO_IGNORE:
           sources.add(java_source)
       target.sources.update(sources)
+      # Metadata attributes must be list, for jar_path, it is always a list
+      # of size one, the first element is an empty string if `jar_path` is not
+      # defined otherwise it is a path.
+      if metadata.get("jar_path", [""])[0]:
+        target.jar_path = label_to_path(metadata["jar_path"][0])
       deps = metadata.get("all_deps", {})
       log.info('Found Java Target %s', target.name)
     elif target.script == "//build/android/gyp/aidl.py":
