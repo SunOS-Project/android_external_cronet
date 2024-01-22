@@ -8,7 +8,7 @@ import android.text.TextUtils;
 import android.util.Log;
 import android.util.Patterns;
 
-import org.chromium.base.annotations.CalledByNative;
+import org.jni_zero.CalledByNative;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
