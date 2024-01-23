@@ -67,26 +67,6 @@ function setup_chromium_src_repo() (
 )
 
 #######################################
-# Apply patches in external/cronet/patches.
-# Globals:
-#   ANDROID_BUILD_TOP
-# Arguments:
-#   chromium_dir, string
-#######################################
-function apply_patches() (
-  local -r chromium_dir=$1
-  local -r patches_dir="${ANDROID_BUILD_TOP}/external/cronet/patches"
-
-  cd "${chromium_dir}"
-
-  local -r patches=$(ls "${patches_dir}")
-  local patch
-  for patch in ${patches}; do
-    git am --3way "${patches_dir}/${patch}"
-  done
-)
-
-#######################################
 # Generate desc.json for a specified architecture.
 # Globals:
 #   ANDROID_BUILD_TOP
@@ -106,7 +86,7 @@ function gn_desc() (
     "use_partition_alloc = false"
     "include_transport_security_state_preload_list = false"
     "use_platform_icu_alternatives = true"
-    "default_min_sdk_version = 19"
+    "default_min_sdk_version = 21"
     "enable_reporting = true"
     "use_hashed_jni_names = true"
     "enable_base_tracing = false"
@@ -120,6 +100,8 @@ function gn_desc() (
     "enable_resource_allowlist_generation=false"
     "exclude_unwind_tables=true"
     "symbol_level=1"
+    "enable_rust=false"
+    "is_cronet_for_aosp_build=true"
   )
   gn_args+=("target_cpu = \"${target_cpu}\"")
 
@@ -159,8 +141,13 @@ if [ -z "${rev}" ]; then
   usage
 fi
 
+if [ -z "${ANDROID_BUILD_TOP}" ]; then
+    echo "ANDROID_BUILD_TOP is not set. Please run source build/envsetup.h && lunch"
+    exit 1
+fi
+
+
 setup_chromium_src_repo "${rev}" "${chromium_dir}" "${force_reset}"
-apply_patches "${chromium_dir}"
 gn_desc x86 "${chromium_dir}"
 gn_desc x64 "${chromium_dir}"
 gn_desc arm "${chromium_dir}"

@@ -113,13 +113,12 @@ public final class Http2TestServer {
         throw new UnsupportedOperationException("This is a stub class");
     }
 
-    public static boolean startHttp2TestServer(
-            Context context, String certFileName, String keyFileName) throws Exception {
+    public static boolean startHttp2TestServer(Context context) throws Exception {
         return true;
     }
 
-    public static boolean startHttp2TestServer(Context context, String certFileName,
-            String keyFileName, CountDownLatch hangingUrlLatch) throws Exception {
+    public static boolean startHttp2TestServer(Context context, CountDownLatch hangingUrlLatch)
+            throws Exception {
         return true;
     }
 
