@@ -68,8 +68,8 @@ public class RequestFinishedInfoTest {
 
     @Before
     public void setUp() throws Exception {
-        assertThat(NativeTestServer.startNativeTestServer(mTestRule.getTestFramework().getContext())).isTrue();
-        mUrl = NativeTestServer.getSuccessURL();
+        NativeTestServer.startNativeTestServer(mTestRule.getTestFramework().getContext());
+        mUrl = NativeTestServer.getFileURL("/echo?status=200");
     }
 
     @After

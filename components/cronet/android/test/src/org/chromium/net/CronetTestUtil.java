@@ -5,8 +5,6 @@
 package org.chromium.net;
 
 import android.net.Network;
-import org.chromium.net.CronetEngine;
-import org.chromium.net.UrlRequest;
 
 import org.jni_zero.JNINamespace;
 import org.jni_zero.NativeMethods;
@@ -92,11 +90,11 @@ public class CronetTestUtil {
     }
 
     public static void setMockCertVerifierForTesting(
-             ExperimentalCronetEngine.Builder builder, long mockCertVerifier) {
+            ExperimentalCronetEngine.Builder builder, long mockCertVerifier) {
         getCronetEngineBuilderImpl(builder).setMockCertVerifierForTesting(mockCertVerifier);
     }
 
-    public static CronetEngineBuilderImpl getCronetEngineBuilderImpl(
+    static CronetEngineBuilderImpl getCronetEngineBuilderImpl(
             ExperimentalCronetEngine.Builder builder) {
         return (CronetEngineBuilderImpl) ((ExperimentalOptionsTranslatingCronetEngineBuilder)
                                                   builder.getBuilderDelegate())

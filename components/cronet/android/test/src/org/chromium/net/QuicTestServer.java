@@ -33,10 +33,8 @@ public final class QuicTestServer {
             throw new IllegalStateException("Quic server is already running");
         }
         TestFilesInstaller.installIfNeeded(context);
-        String test_dir = TestFilesInstaller.getInstalledPath(context);
-        // TestFilesInstaller implementation changed such that the test files and test data dir
-        // are now the same. See aosp/2475670
-        QuicTestServerJni.get().startQuicTestServer(test_dir, test_dir);
+        QuicTestServerJni.get().startQuicTestServer(
+                TestFilesInstaller.getInstalledPath(context), UrlUtils.getIsolatedTestRoot());
         sServerRunning = true;
     }
 

@@ -15,7 +15,6 @@ import androidx.test.filters.SmallTest;
 
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -51,15 +50,13 @@ public class BrotliTest {
                                         builder, QuicTestServer.createMockCertVerifier());
                             });
         }
-        assertThat(NativeTestServer.startNativeTestServer(mTestRule.getTestFramework().getContext())).isTrue();
+        assertThat(Http2TestServer.startHttp2TestServer(mTestRule.getTestFramework().getContext()))
+                .isTrue();
     }
 
     @After
     public void tearDown() throws Exception {
-        NativeTestServer.shutdownNativeTestServer();
-        if (mCronetEngine != null) {
-            mCronetEngine.shutdown();
-        }
+        assertThat(Http2TestServer.shutdownHttp2TestServer()).isTrue();
     }
 
     @Test
@@ -73,17 +70,17 @@ public class BrotliTest {
                         });
 
         mCronetEngine = mTestRule.getTestFramework().startEngine();
-        String url = NativeTestServer.getEchoAllHeadersURL();
+        String url = Http2TestServer.getEchoAllHeadersUrl();
         TestUrlRequestCallback callback = startAndWaitForComplete(url);
         assertThat(callback.getResponseInfoWithChecks()).hasHttpStatusCodeThat().isEqualTo(200);
-        assertThat(callback.mResponseAsString).contains("Accept-Encoding: gzip, deflate, br");
+        assertThat(callback.mResponseAsString).contains("accept-encoding: gzip, deflate, br");
     }
 
     @Test
     @SmallTest
     public void testBrotliNotAdvertised() throws Exception {
         mCronetEngine = mTestRule.getTestFramework().startEngine();
-        String url = NativeTestServer.getEchoAllHeadersURL();
+        String url = Http2TestServer.getEchoAllHeadersUrl();
         TestUrlRequestCallback callback = startAndWaitForComplete(url);
         assertThat(callback.getResponseInfoWithChecks()).hasHttpStatusCodeThat().isEqualTo(200);
         assertThat(callback.mResponseAsString).doesNotContain("br");
@@ -91,7 +88,6 @@ public class BrotliTest {
 
     @Test
     @SmallTest
-    @Ignore // TODO(danstahr): Add test server support for setting the Brotli header
     public void testBrotliDecoded() throws Exception {
         mTestRule
                 .getTestFramework()

@@ -60,6 +60,8 @@ DEFAULT_TESTS = [
   '//testing/android/native_test:native_test_java',
   '//net/android:net_test_support_provider_java',
   '//net/android:net_tests_java',
+  '//third_party/netty-tcnative:netty-tcnative-so',
+  '//third_party/netty4:netty_all_java',
 ]
 
 EXTRAS_ANDROID_BP_FILE = "Android.extras.bp"
@@ -183,10 +185,6 @@ additional_args = {
         }),
     ],
     'cronet_aml_components_cronet_android_cronet_javatests__testing': [
-        # There's no HTTP2 test server in AOSP, replace with stub.
-        ('srcs', {
-            'components/cronet/android/test/javatests/src/org/chromium/net/Http2TestServer.java',
-        }),
         # Needed to @SkipPresubmit annotations
         ('static_libs', {
             'net-tests-utils',
@@ -209,7 +207,17 @@ additional_args = {
 // look like two different outputs from the build system perspective.
 // However, Cronet does not ship to Tethering APEX for RISCV64 which
 // raises the conflict. Once we start shipping Cronet for RISCV64,
-// this can be removed.""")
+// this can be removed."""),
+      ],
+    'cronet_aml_third_party_netty_tcnative_netty_tcnative_so__testing': [
+        ('cflags', {
+            "-Wno-error=pointer-bool-conversion"
+        })
+    ],
+    'cronet_aml_third_party_apache_portable_runtime_apr__testing': [
+        ('cflags', {
+            "-Wno-incompatible-pointer-types-discards-qualifiers",
+        })
     ]
 }
 
@@ -372,8 +380,6 @@ _builtin_deps = {
         add_androidx_ui_automator_java_deps,
     '//third_party/hamcrest:hamcrest_java':
         add_hamcrest_java_deps,
-    '//third_party/netty4:netty_all_java':
-        always_disable,
     '//third_party/androidx:androidx_activity_activity_java':
         add_androidx_activity_activity,
     '//third_party/androidx:androidx_fragment_fragment_java':
@@ -573,6 +579,7 @@ class Module(object):
     self.visibility = set()
     self.gn_type = None
     self.jarjar_rules = ""
+    self.jars = set()
 
   def to_string(self, output):
     if self.comment:
@@ -628,6 +635,7 @@ class Module(object):
     self._output_field(output, 'default_visibility')
     self._output_field(output, 'visibility')
     self._output_field(output, 'jarjar_rules')
+    self._output_field(output, 'jars')
     if self.rtti:
       self._output_field(output, 'rtti')
 
@@ -671,7 +679,7 @@ class Module(object):
     return self.type == "cc_genrule"
 
   def has_input_files(self):
-    if self.type == "java_library":
+    if self.type in ["java_library", "java_import"]:
         return True
     if len(self.srcs) > 0:
       return True
@@ -1632,14 +1640,18 @@ def create_modules_from_target(blueprint, gn, gn_target_name, is_descendant_of_j
     # leaf node.
     return None
   elif target.type == 'java_library':
-    module = Module('java_library', bp_module_name, gn_target_name)
-    # Don't remove GEN_JNI from those modules as they have the real GEN_JNI that we want to include
-    if gn_target_name not in ['//components/cronet/android:cronet_jni_registration_java',
-                              '//components/cronet/android:cronet_jni_registration_java__testing',
-                              '//components/cronet/android:cronet_tests_jni_registration_java__testing']:
-        module.jarjar_rules = REMOVE_GEN_JNI_JARJAR_RULES_FILE
-    module.min_sdk_version = 30
-    module.apex_available = [tethering_apex]
+    if target.jar_path:
+      module = Module('java_import', bp_module_name, gn_target_name)
+      module.jars.add(target.jar_path)
+    else:
+      module = Module('java_library', bp_module_name, gn_target_name)
+      # Don't remove GEN_JNI from those modules as they have the real GEN_JNI that we want to include
+      if gn_target_name not in ['//components/cronet/android:cronet_jni_registration_java',
+                                '//components/cronet/android:cronet_jni_registration_java__testing',
+                                '//components/cronet/android:cronet_tests_jni_registration_java__testing']:
+          module.jarjar_rules = REMOVE_GEN_JNI_JARJAR_RULES_FILE
+      module.min_sdk_version = 30
+      module.apex_available = [tethering_apex]
   else:
     raise Exception('Unknown target %s (%s)' % (target.name, target.type))
 
@@ -1719,9 +1731,13 @@ def create_modules_from_target(blueprint, gn, gn_target_name, is_descendant_of_j
     # So setting the output name based on the output_name from the desc.json
     module.stem = 'libmainline' + target.output_name
   elif module.is_test() and module.type == 'cc_library_shared':
-    # Tests output should be a shared library in the format of 'lib[module_name]'
-    module.stem = 'lib' + target.get_target_name()[
-                          :target.get_target_name().find(gn_utils.TESTING_SUFFIX)]
+    if target.output_name:
+      # If we have an output name already declared, use it.
+      module.stem = 'lib' + target.output_name
+    else:
+      # Tests output should be a shared library in the format of 'lib[module_name]'
+      module.stem = 'lib' + target.get_target_name()[
+                            :target.get_target_name().find(gn_utils.TESTING_SUFFIX)]
 
   # dep_name is an unmangled GN target name (e.g. //foo:bar(toolchain)).
   all_deps = [(dep_name, 'common') for dep_name in target.proto_deps]
@@ -1785,7 +1801,7 @@ def create_modules_from_target(blueprint, gn, gn_target_name, is_descendant_of_j
       module_target.srcs.update(dep_module.genrule_srcs)
       module_target.shared_libs.update(dep_module.genrule_shared_libs)
       module_target.header_libs.update(dep_module.genrule_header_libs)
-    elif dep_module.type == 'java_library':
+    elif dep_module.type in ['java_library', 'java_import']:
       if module.type not in ["cc_library_static"]:
         # This is needed to go around the case where `url` component depends
         # on `url_java`.
