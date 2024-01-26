@@ -13,7 +13,6 @@ import static org.chromium.net.truth.UrlResponseInfoSubject.assertThat;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.LargeTest;
 import androidx.test.filters.SmallTest;
-
 import com.android.testutils.SkipPresubmit;
 
 import org.json.JSONObject;

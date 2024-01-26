@@ -25,7 +25,6 @@ import androidx.test.filters.SmallTest;
 import org.jni_zero.NativeMethods;
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -1014,47 +1013,6 @@ public class CronetUrlRequestTest {
         assertThat(((NetworkException) callback.mError).getCronetInternalErrorCode())
                 .isEqualTo(-201);
         assertThat(callback.mResponseStep).isEqualTo(ResponseStep.ON_FAILED);
-    }
-
-    /**
-     * Tests that an SSL cert error with upload will be reported via {@link
-     * UrlRequest.Callback#onFailed}.
-     */
-    @Test
-    @SmallTest
-    @Ignore ("b/267353182 "
-            + "Figure out why EmbeddedTestServer was used instead of MockUrlForSSLCertificateError"
-            + "since this is similar test to one above")
-    @IgnoreFor(
-            implementations = {CronetImplementation.FALLBACK},
-            reason = "crbug.com/1495320: Refactor error checking")
-    public void testSSLCertificateError() throws Exception {
-        // EmbeddedTestServer sslServer = EmbeddedTestServer.createAndStartHTTPSServer(
-             //   mTestRule.getTestFramework().getContext(), ServerCertificate.CERT_EXPIRED);
-
-        TestUrlRequestCallback callback = new TestUrlRequestCallback();
-        UrlRequest.Builder builder = mTestRule.getTestFramework().getEngine().newUrlRequestBuilder(
-                /* sslServer.getURL("/") */ null, callback, callback.getExecutor());
-
-        TestUploadDataProvider dataProvider =
-                new TestUploadDataProvider(
-                        TestUploadDataProvider.SuccessCallbackMode.SYNC, callback.getExecutor());
-        dataProvider.addRead("test".getBytes());
-        builder.setUploadDataProvider(dataProvider, callback.getExecutor());
-        builder.addHeader("Content-Type", "useless/string");
-        builder.build().start();
-        callback.blockForDone();
-        dataProvider.assertClosed();
-
-        assertThat(callback.getResponseInfo()).isNull();
-        assertThat(callback.mOnErrorCalled).isTrue();
-        assertThat(callback.mError)
-                .hasMessageThat()
-                .contains("Exception in CronetUrlRequest: net::ERR_CERT_DATE_INVALID");
-        mTestRule.assertCronetInternalErrorCode((NetworkException) callback.mError, -201);
-        assertThat(callback.mResponseStep).isEqualTo(ResponseStep.ON_FAILED);
-
-        // sslServer.stopAndDestroyServer();
     }
 
     /** Checks that the buffer is updated correctly, when starting at an offset. */

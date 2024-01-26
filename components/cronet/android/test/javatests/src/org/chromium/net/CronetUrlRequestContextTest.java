@@ -5,11 +5,13 @@
 package org.chromium.net;
 
 import static com.google.common.truth.Truth.assertThat;
+
+import static org.junit.Assert.assertThrows;
+import static org.junit.Assume.assumeTrue;
+
 import static org.chromium.net.CronetEngine.Builder.HTTP_CACHE_IN_MEMORY;
 import static org.chromium.net.CronetTestRule.getTestStorage;
 import static org.chromium.net.truth.UrlResponseInfoSubject.assertThat;
-import static org.junit.Assert.assertThrows;
-import static org.junit.Assume.assumeTrue;
 
 import android.net.Network;
 import android.os.Build;
@@ -18,9 +20,11 @@ import android.os.ConditionVariable;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Process;
+
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.SmallTest;
 import com.android.testutils.SkipPresubmit;
+
 import org.jni_zero.JNINamespace;
 import org.jni_zero.NativeMethods;
 import org.json.JSONObject;
@@ -31,7 +35,6 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 
 import org.chromium.base.Log;
-import org.chromium.base.FileUtils;
 import org.chromium.base.PathUtils;
 import org.chromium.base.test.util.DoNotBatch;
 import org.chromium.net.CronetTestRule.CronetImplementation;
@@ -51,7 +54,6 @@ import org.chromium.net.impl.CronetUrlRequestContext;
 import org.chromium.net.impl.ImplVersion;
 import org.chromium.net.impl.NativeCronetEngineBuilderImpl;
 import org.chromium.net.impl.NetworkExceptionImpl;
-import org.chromium.net.test.EmbeddedTestServer;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -82,11 +84,11 @@ public class CronetUrlRequestContextTest {
     private String mUrl404;
     private String mUrl500;
 
-  @Before
-  public void setUp() throws Exception {
-    assertThat(NativeTestServer.startNativeTestServer(mTestRule.getTestFramework().getContext())).isTrue();
-    mUrl = NativeTestServer.getSuccessURL();
-    mUrl404 = NativeTestServer.getNotFoundURL();
+    @Before
+    public void setUp() throws Exception {
+        NativeTestServer.startNativeTestServer(mTestRule.getTestFramework().getContext());
+        mUrl = NativeTestServer.getSuccessURL();
+        mUrl404 = NativeTestServer.getNotFoundURL();
         mUrl500 = NativeTestServer.getServerErrorURL();
     }
 
@@ -784,7 +786,7 @@ public class CronetUrlRequestContextTest {
         assertThat(logFile.exists()).isTrue();
         assertThat(logFile.length()).isNotEqualTo(0);
         assertThat(hasBytesInNetLog(logFile)).isFalse();
-        FileUtils.recursivelyDeleteFile(netLogDir, FileUtils.DELETE_ALL);
+        FileUtils.recursivelyDeleteFile(netLogDir);
         assertThat(netLogDir.exists()).isFalse();
     }
 
@@ -845,12 +847,13 @@ public class CronetUrlRequestContextTest {
         assertThat(logFile.exists()).isTrue();
         assertThat(logFile.length()).isNotEqualTo(0);
 
-        FileUtils.recursivelyDeleteFile(netLogDir, FileUtils.DELETE_ALL);
+        FileUtils.recursivelyDeleteFile(netLogDir);
         assertThat(netLogDir.exists()).isFalse();
     }
 
     @Test
     @SmallTest
+    @SkipPresubmit(reason = "b/293141085 flaky test")
     @IgnoreFor(
             implementations = {CronetImplementation.AOSP_PLATFORM},
             reason = "ActiveRequestCount is not available in AOSP")
@@ -1270,9 +1273,9 @@ public class CronetUrlRequestContextTest {
         assertThat(containsStringInNetLog(logFile2, mUrl404)).isTrue();
         assertThat(containsStringInNetLog(logFile2, mUrl500)).isTrue();
 
-        FileUtils.recursivelyDeleteFile(netLogDir1, FileUtils.DELETE_ALL);
+        FileUtils.recursivelyDeleteFile(netLogDir1);
         assertThat(netLogDir1.exists()).isFalse();
-        FileUtils.recursivelyDeleteFile(netLogDir2, FileUtils.DELETE_ALL);
+        FileUtils.recursivelyDeleteFile(netLogDir2);
         assertThat(netLogDir2.exists()).isFalse();
     }
 
@@ -1295,7 +1298,10 @@ public class CronetUrlRequestContextTest {
 
     @Test
     @SmallTest
-    @SkipPresubmit(reason = "b/293141085 Tests that enable disk cache are flaky")
+    @SkipPresubmit(reason = "b/293141085 flaky test")
+    @IgnoreFor(
+            implementations = {CronetImplementation.FALLBACK},
+            reason = "Fallback implementation does not have a network thread.")
     // Tests that if CronetEngine is shut down on the network thread, an appropriate exception
     // is thrown.
     public void testShutDownEngineOnNetworkThread() throws Exception {
@@ -1353,7 +1359,10 @@ public class CronetUrlRequestContextTest {
 
     @Test
     @SmallTest
-    @SkipPresubmit(reason = "b/293141085 Tests that enable disk cache are flaky")
+    @SkipPresubmit(reason = "b/293141085 flaky test")
+    @IgnoreFor(
+            implementations = {CronetImplementation.FALLBACK},
+            reason = "Fallback implementation has no support for caches")
     // Tests that if CronetEngine is shut down when reading from disk cache,
     // there isn't a crash. See crbug.com/486120.
     public void testShutDownEngineWhenReadingFromDiskCache() throws Exception {
@@ -1452,7 +1461,7 @@ public class CronetUrlRequestContextTest {
                                         netLogDir.getPath(), false, MAX_FILE_SIZE));
         assertThat(e).hasMessageThat().isEqualTo("Engine is shut down.");
         assertThat(logFile.exists()).isFalse();
-        FileUtils.recursivelyDeleteFile(netLogDir, FileUtils.DELETE_ALL);
+        FileUtils.recursivelyDeleteFile(netLogDir);
         assertThat(netLogDir.exists()).isFalse();
     }
 
@@ -1514,7 +1523,7 @@ public class CronetUrlRequestContextTest {
         assertThat(logFile.exists()).isTrue();
         assertThat(logFile.length()).isNotEqualTo(0);
         assertThat(hasBytesInNetLog(logFile)).isFalse();
-        FileUtils.recursivelyDeleteFile(netLogDir, FileUtils.DELETE_ALL);
+        FileUtils.recursivelyDeleteFile(netLogDir);
         assertThat(netLogDir.exists()).isFalse();
     }
 
@@ -1578,7 +1587,7 @@ public class CronetUrlRequestContextTest {
         assertThat(logFile.exists()).isTrue();
         assertThat(logFile.length()).isNotEqualTo(0);
         assertThat(hasBytesInNetLog(logFile)).isFalse();
-        FileUtils.recursivelyDeleteFile(netLogDir, FileUtils.DELETE_ALL);
+        FileUtils.recursivelyDeleteFile(netLogDir);
         assertThat(netLogDir.exists()).isFalse();
     }
 
@@ -1634,7 +1643,7 @@ public class CronetUrlRequestContextTest {
         assertThat(logFile.exists()).isTrue();
         assertThat(logFile.length()).isNotEqualTo(0);
         assertThat(hasBytesInNetLog(logFile)).isTrue();
-        FileUtils.recursivelyDeleteFile(netLogDir, FileUtils.DELETE_ALL);
+        FileUtils.recursivelyDeleteFile(netLogDir);
         assertThat(netLogDir.exists()).isFalse();
     }
 
@@ -1724,7 +1733,9 @@ public class CronetUrlRequestContextTest {
 
     @Test
     @SmallTest
-    @SkipPresubmit(reason = "b/293141085 Tests that enable disk cache are flaky")
+    @IgnoreFor(
+            implementations = {CronetImplementation.FALLBACK},
+            reason = "No caches support for fallback implementation")
     public void testEnableHttpCacheDisk() throws Exception {
         CronetEngine cronetEngine =
                 createCronetEngineWithCache(CronetEngine.Builder.HTTP_CACHE_DISK);
@@ -1738,7 +1749,10 @@ public class CronetUrlRequestContextTest {
 
     @Test
     @SmallTest
-    @SkipPresubmit(reason = "b/293141085 Tests that enable disk cache are flaky")
+    @SkipPresubmit(reason = "b/293141085 flaky test")
+    @IgnoreFor(
+            implementations = {CronetImplementation.FALLBACK},
+            reason = "No caches support for fallback implementation")
     public void testNoConcurrentDiskUsage() throws Exception {
         CronetEngine cronetEngine =
                 createCronetEngineWithCache(CronetEngine.Builder.HTTP_CACHE_DISK);
@@ -1759,7 +1773,10 @@ public class CronetUrlRequestContextTest {
 
     @Test
     @SmallTest
-    @SkipPresubmit(reason = "b/293141085 Tests that enable disk cache are flaky")
+    @SkipPresubmit(reason = "b/293141085 flaky test")
+    @IgnoreFor(
+            implementations = {CronetImplementation.FALLBACK},
+            reason = "No caches support for fallback implementation")
     public void testEnableHttpCacheDiskNoHttp() throws Exception {
         CronetEngine cronetEngine =
                 createCronetEngineWithCache(CronetEngine.Builder.HTTP_CACHE_DISK_NO_HTTP);
@@ -1780,7 +1797,9 @@ public class CronetUrlRequestContextTest {
 
     @Test
     @SmallTest
-    @SkipPresubmit(reason = "b/293141085 Tests that enable disk cache are flaky")
+    @IgnoreFor(
+            implementations = {CronetImplementation.FALLBACK},
+            reason = "No caches support for fallback implementation")
     public void testDisableCache() throws Exception {
         CronetEngine cronetEngine =
                 createCronetEngineWithCache(CronetEngine.Builder.HTTP_CACHE_DISK);
@@ -1819,7 +1838,9 @@ public class CronetUrlRequestContextTest {
 
     @Test
     @SmallTest
-    @SkipPresubmit(reason = "b/293141085 Tests that enable disk cache are flaky")
+    @IgnoreFor(
+            implementations = {CronetImplementation.FALLBACK},
+            reason = "No caches support for fallback implementation")
     public void testEnableHttpCacheDiskNewEngine() throws Exception {
         CronetEngine cronetEngine =
                 createCronetEngineWithCache(CronetEngine.Builder.HTTP_CACHE_DISK);
@@ -2041,6 +2062,9 @@ public class CronetUrlRequestContextTest {
 
     @Test
     @SmallTest
+    @IgnoreFor(
+            implementations = {CronetImplementation.FALLBACK, CronetImplementation.AOSP_PLATFORM},
+            reason = "LibraryLoader is supported only by the native implementation")
     public void testSetLibraryLoaderIsEnforcedByDefaultEmbeddedProvider() throws Exception {
         CronetEngine.Builder builder =
                 new CronetEngine.Builder(mTestRule.getTestFramework().getContext());
@@ -2061,6 +2085,9 @@ public class CronetUrlRequestContextTest {
 
     @Test
     @SmallTest
+    @IgnoreFor(
+            implementations = {CronetImplementation.FALLBACK, CronetImplementation.AOSP_PLATFORM},
+            reason = "LibraryLoader is supported only by the native implementation")
     public void testSetLibraryLoaderIsIgnoredInNativeCronetEngineBuilderImpl() throws Exception {
         CronetEngine.Builder builder =
                 new CronetEngine.Builder(

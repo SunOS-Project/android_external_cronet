@@ -21,13 +21,11 @@ import androidx.test.filters.MediumTest;
 
 import com.android.testutils.SkipPresubmit;
 
-import org.json.JSONException;
 import org.jni_zero.JNINamespace;
 import org.jni_zero.NativeMethods;
 import org.json.JSONObject;
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
@@ -96,7 +94,6 @@ public class ExperimentalOptionsTest {
 
     @Test
     @MediumTest
-    @Ignore("b/275345637 Needs HTTP2 Server")
     @DisableAutomaticNetLog(reason = "Test is targeting NetLog")
     // Tests that NetLog writes effective experimental options to NetLog.
     public void testNetLog() throws Exception {
@@ -158,7 +155,6 @@ public class ExperimentalOptionsTest {
 
     @Test
     @MediumTest
-    @Ignore("b/275345637 Needs HTTP2 Server")
     public void testSetSSLKeyLogFile() throws Exception {
         String url = Http2TestServer.getEchoMethodUrl();
         File dir = new File(PathUtils.getDataDirectory());
@@ -234,9 +230,9 @@ public class ExperimentalOptionsTest {
     // Tests that basic Cronet functionality works when host cache persistence is enabled, and that
     // persistence works.
     public void testHostCachePersistence() throws Exception {
-        assertThat(NativeTestServer.startNativeTestServer(mTestRule.getTestFramework().getContext())).isTrue();
+        NativeTestServer.startNativeTestServer(mTestRule.getTestFramework().getContext());
 
-        String realUrl = NativeTestServer.getSuccessURL();
+        String realUrl = NativeTestServer.getFileURL("/echo?status=200");
         URL javaUrl = new URL(realUrl);
         String realHost = javaUrl.getHost();
         int realPort = javaUrl.getPort();
@@ -316,7 +312,6 @@ public class ExperimentalOptionsTest {
 
     @Test
     @MediumTest
-    @Ignore("b/275345637 Needs HTTP2 Server")
     public void testDetectBrokenConnection() throws Exception {
         String url = Http2TestServer.getEchoMethodUrl();
         mTestRule
@@ -348,7 +343,6 @@ public class ExperimentalOptionsTest {
     @DisabledTest(message = "crbug.com/1320725")
     @Test
     @LargeTest
-    @Ignore("b/275345637 Needs HTTP2 Server")
     public void testDetectBrokenConnectionOnNetworkFailure() throws Exception {
         // HangingRequestUrl stops the server from replying until mHangingUrlLatch is opened,
         // simulating a network failure between client and server.

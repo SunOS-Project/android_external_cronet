@@ -87,6 +87,8 @@ cronet_origin_files = glob(
         # Note: Only used for tests.
         "third_party/anonymous_tokens/**",
         "third_party/ashmem/**",
+        # Note: Only used for tests.
+        "third_party/apache-portable-runtime/**",
         "third_party/boringssl/**",
         "third_party/brotli/**",
         # Note: Only used for tests.
@@ -107,6 +109,10 @@ cronet_origin_files = glob(
         "third_party/lss/**",
         "third_party/metrics_proto/**",
         "third_party/modp_b64/**",
+        # Note: Only used for tests.
+        "third_party/netty4/**",
+        # Note: Only used for tests.
+        "third_party/netty-tcnative/**",
         "third_party/protobuf/**",
         # Note: Only used for tests.
         "third_party/quic_trace/**",

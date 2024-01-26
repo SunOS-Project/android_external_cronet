@@ -7,7 +7,6 @@ package org.chromium.net;
 import org.jni_zero.JNINamespace;
 import org.jni_zero.NativeMethods;
 
-import org.chromium.base.ContextUtils;
 import org.chromium.base.test.util.UrlUtils;
 
 /**
@@ -26,8 +25,8 @@ public class MockCertVerifier {
      * @return a pointer to the newly created net::MockCertVerifier.
      */
     public static long createMockCertVerifier(String[] certs, boolean knownRoot) {
-        return MockCertVerifierJni.get().createMockCertVerifier(certs, knownRoot,
-                TestFilesInstaller.getInstalledPath(ContextUtils.getApplicationContext()));
+        return MockCertVerifierJni.get().createMockCertVerifier(
+                certs, knownRoot, UrlUtils.getIsolatedTestRoot());
     }
 
     /**
@@ -40,7 +39,7 @@ public class MockCertVerifier {
     }
 
     @NativeMethods("cronet_tests")
-    public interface Natives {
+    interface Natives {
         long createMockCertVerifier(String[] certs, boolean knownRoot, String testDataDir);
         long createFreeForAllMockCertVerifier();
     }

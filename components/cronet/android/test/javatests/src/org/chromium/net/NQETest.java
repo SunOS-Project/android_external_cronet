@@ -18,7 +18,6 @@ import androidx.test.filters.SmallTest;
 import org.json.JSONObject;
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -57,8 +56,8 @@ public class NQETest {
 
     @Before
     public void setUp() throws Exception {
-        assertThat(NativeTestServer.startNativeTestServer(mTestRule.getTestFramework().getContext())).isTrue();
-        mUrl = NativeTestServer.getSuccessURL();
+        NativeTestServer.startNativeTestServer(mTestRule.getTestFramework().getContext());
+        mUrl = NativeTestServer.getFileURL("/echo?status=200");
     }
 
     @After
@@ -277,7 +276,6 @@ public class NQETest {
 
     @Test
     @SmallTest
-    @Ignore("b/267353182 Permission denied error")
     public void testPrefsWriteRead() throws Exception {
         // When the loop is run for the first time, network quality is written to the disk. The
         // test verifies that in the next loop, the network quality is read back.

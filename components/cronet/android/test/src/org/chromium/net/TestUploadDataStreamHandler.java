@@ -7,7 +7,6 @@ package org.chromium.net;
 import static com.google.common.truth.Truth.assertThat;
 
 import android.content.Context;
-import org.chromium.net.CronetEngine;
 import android.os.ConditionVariable;
 
 import org.jni_zero.CalledByNative;
