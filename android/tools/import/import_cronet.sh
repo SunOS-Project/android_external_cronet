@@ -121,7 +121,7 @@ do_run_copybara() {
 
     /google/bin/releases/copybara/public/copybara/copybara \
         "${flags[@]}" \
-        "${ANDROID_BUILD_TOP}/packages/modules/Connectivity/Cronet/tools/import/copy.bara.sky" \
+        "${ANDROID_BUILD_TOP}/external/cronet/android/tools/import/copy.bara.sky" \
         import_cronet "${COPYBARA_FOLDER_ORIGIN}/src"
 }
 
