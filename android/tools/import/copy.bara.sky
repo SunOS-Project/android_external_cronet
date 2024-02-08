@@ -116,6 +116,8 @@ cronet_origin_files = glob(
         "third_party/protobuf/**",
         # Note: Only used for tests.
         "third_party/quic_trace/**",
+        # Note: Only used for tests.
+        "third_party/re2/**",
         # Note: Cronet currently uses Android's zlib
         # "third_party/zlib/**",
         "url/third_party/mozilla/**",
