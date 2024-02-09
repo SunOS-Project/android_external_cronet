@@ -5,7 +5,6 @@
 package org.chromium.base;
 
 import android.text.TextUtils;
-import android.util.Log;
 import android.util.Patterns;
 
 import org.jni_zero.CalledByNative;
