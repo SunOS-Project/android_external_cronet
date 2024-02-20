@@ -142,7 +142,7 @@ if [ -z "${rev}" ]; then
 fi
 
 if [ -z "${ANDROID_BUILD_TOP}" ]; then
-    echo "ANDROID_BUILD_TOP is not set. Please run source build/envsetup.h && lunch"
+    echo "ANDROID_BUILD_TOP is not set. Please run source build/envsetup.sh && lunch"
     exit 1
 fi
 
@@ -152,4 +152,4 @@ gn_desc x86 "${chromium_dir}"
 gn_desc x64 "${chromium_dir}"
 gn_desc arm "${chromium_dir}"
 gn_desc arm64 "${chromium_dir}"
-
+gn_desc riscv64 "${chromium_dir}"
