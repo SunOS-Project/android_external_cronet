@@ -67,6 +67,27 @@ function setup_chromium_src_repo() (
 )
 
 #######################################
+# Imports intermediate CLs for correct generation of desc_*.json
+# Arguments:
+#   chromium_dir, string
+#######################################
+function cherry_pick_chromium_cls() (
+  cd "${chromium_dir}"
+  # Remove once 121.0.6131.0 is imported
+  git fetch https://chromium.googlesource.com/chromium/src refs/changes/25/5033625/2 && git cherry-pick FETCH_HEAD
+  # Remove once 121.0.6160.0 is imported
+  git fetch https://chromium.googlesource.com/chromium/src refs/changes/01/5075001/2 && git cherry-pick FETCH_HEAD
+  # Remove once 122.0.6168.0 is imported
+  git fetch https://chromium.googlesource.com/chromium/src refs/changes/32/5083632/4 && git cherry-pick FETCH_HEAD
+  git fetch https://chromium.googlesource.com/chromium/src refs/changes/14/5094514/5 && git cherry-pick FETCH_HEAD
+  # Remove once 122.0.6183.0 is imported
+  git fetch https://chromium.googlesource.com/chromium/src refs/changes/87/5088887/9 && git cherry-pick FETCH_HEAD
+  # Remove once 122.0.6240.0 is imported
+  git fetch https://chromium.googlesource.com/chromium/src refs/changes/35/5184435/4 && git cherry-pick FETCH_HEAD
+  # Remove once 123.0.6272.0 is imported
+  git fetch https://chromium.googlesource.com/chromium/src refs/changes/93/5164293/3 && git cherry-pick FETCH_HEAD
+)
+#######################################
 # Generate desc.json for a specified architecture.
 # Globals:
 #   ANDROID_BUILD_TOP
@@ -148,6 +169,7 @@ fi
 
 
 setup_chromium_src_repo "${rev}" "${chromium_dir}" "${force_reset}"
+cherry_pick_chromium_cls "${chromium_dir}"
 gn_desc x86 "${chromium_dir}"
 gn_desc x64 "${chromium_dir}"
 gn_desc arm "${chromium_dir}"
