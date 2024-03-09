@@ -13,9 +13,7 @@ import org.chromium.base.PathUtils;
 import org.chromium.base.PowerMonitor;
 import org.chromium.base.library_loader.LibraryLoader;
 
-/**
- * A helper for running native unit tests (i.e., not browser tests)
- */
+/** A helper for running native unit tests (i.e., not browser tests) */
 public class NativeUnitTest extends NativeTest {
     private static final String TAG = "NativeTest";
 

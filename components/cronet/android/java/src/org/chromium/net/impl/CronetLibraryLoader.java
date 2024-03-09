@@ -25,9 +25,7 @@ import org.chromium.net.httpflags.Flags;
 import org.chromium.net.httpflags.HttpFlagsLoader;
 import org.chromium.net.httpflags.ResolvedFlags;
 
-/**
- * CronetLibraryLoader loads and initializes native library on init thread.
- */
+/** CronetLibraryLoader loads and initializes native library on init thread. */
 @JNINamespace("cronet")
 @VisibleForTesting
 public class CronetLibraryLoader {
@@ -51,8 +49,7 @@ public class CronetLibraryLoader {
     private static final ConditionVariable sHttpFlagsLoaded = new ConditionVariable();
     private static ResolvedFlags sHttpFlags;
 
-    @VisibleForTesting
-    public static final String LOG_FLAG_NAME = "Cronet_log_me";
+    @VisibleForTesting public static final String LOG_FLAG_NAME = "Cronet_log_me";
 
     /**
      * Ensure that native library is loaded and initialized. Can be called from
@@ -66,17 +63,28 @@ public class CronetLibraryLoader {
                 if (!sInitThread.isAlive()) {
                     sInitThread.start();
                 }
-                postToInitThread(CronetLibraryLoader::ensureInitializedOnInitThread);
+                postToInitThread(
+                        new Runnable() {
+                            @Override
+                            public void run() {
+                                ensureInitializedOnInitThread();
+                            }
+                        });
             }
             if (!sLibraryLoaded) {
                 System.loadLibrary(LIBRARY_NAME);
                 String implVersion = ImplVersion.getCronetVersion();
                 if (!implVersion.equals(CronetLibraryLoaderJni.get().getCronetVersion())) {
-                    throw new RuntimeException(String.format("Expected Cronet version number %s, "
-                                    + "actual version number %s.",
-                            implVersion, CronetLibraryLoaderJni.get().getCronetVersion()));
+                    throw new RuntimeException(
+                            String.format(
+                                    "Expected Cronet version number %s, "
+                                            + "actual version number %s.",
+                                    implVersion, CronetLibraryLoaderJni.get().getCronetVersion()));
                 }
-                Log.i(TAG, "Cronet version: %s, arch: %s", implVersion,
+                Log.i(
+                        TAG,
+                        "Cronet version: %s, arch: %s",
+                        implVersion,
                         System.getProperty("os.arch"));
                 setNativeLoggingLevel();
                 sLibraryLoaded = true;
@@ -105,9 +113,7 @@ public class CronetLibraryLoader {
         CronetLibraryLoaderJni.get().setMinLogLevel(loggingLevel);
     }
 
-    /**
-     * Returns {@code true} if running on the initialization thread.
-     */
+    /** Returns {@code true} if running on the initialization thread. */
     private static boolean onInitThread() {
         return sInitThread.getLooper() == Looper.myLooper();
     }
@@ -128,8 +134,11 @@ public class CronetLibraryLoader {
         assert sHttpFlags == null;
         Context applicationContext = ContextUtils.getApplicationContext();
         Flags flags = HttpFlagsLoader.load(applicationContext);
-        sHttpFlags = ResolvedFlags.resolve(flags != null ? flags : Flags.newBuilder().build(),
-                applicationContext.getPackageName(), ImplVersion.getCronetVersion());
+        sHttpFlags =
+                ResolvedFlags.resolve(
+                        flags != null ? flags : Flags.newBuilder().build(),
+                        applicationContext.getPackageName(),
+                        ImplVersion.getCronetVersion());
         sHttpFlagsLoaded.open();
         ResolvedFlags.Value logMe = sHttpFlags.flags().get(LOG_FLAG_NAME);
         if (logMe != null) {
@@ -159,9 +168,7 @@ public class CronetLibraryLoader {
         sInitThreadInitDone = true;
     }
 
-    /**
-     * Run {@code r} on the initialization thread.
-     */
+    /** Run {@code r} on the initialization thread. */
     public static void postToInitThread(Runnable r) {
         if (onInitThread()) {
             r.run();

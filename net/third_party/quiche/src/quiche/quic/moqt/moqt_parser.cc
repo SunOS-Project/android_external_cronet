@@ -8,12 +8,12 @@
 #include <cstdint>
 #include <cstring>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "absl/cleanup/cleanup.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 #include "quiche/quic/core/quic_data_reader.h"
 #include "quiche/quic/core/quic_time.h"
 #include "quiche/quic/moqt/moqt_messages.h"
@@ -52,7 +52,7 @@ void MoqtParser::ProcessData(absl::string_view data, bool fin) {
       return;
     }
   }
-  absl::optional<quic::QuicDataReader> reader = absl::nullopt;
+  std::optional<quic::QuicDataReader> reader = std::nullopt;
   size_t original_buffer_size = buffered_message_.size();
   // There are three cases: the parser has already delivered an OBJECT header
   // and is now delivering payload; part of a message is in the buffer; or
@@ -304,7 +304,10 @@ size_t MoqtParser::ProcessServerSetup(quic::QuicDataReader& reader) {
 
 size_t MoqtParser::ProcessSubscribeRequest(quic::QuicDataReader& reader) {
   MoqtSubscribeRequest subscribe_request;
-  if (!reader.ReadStringPieceVarInt62(&subscribe_request.full_track_name)) {
+  if (!reader.ReadStringPieceVarInt62(&subscribe_request.track_namespace)) {
+    return 0;
+  }
+  if (!reader.ReadStringPieceVarInt62(&subscribe_request.track_name)) {
     return 0;
   }
   if (!ReadLocation(reader, subscribe_request.start_group)) {
@@ -558,14 +561,14 @@ bool MoqtParser::ReadVarIntPieceVarInt62(quic::QuicDataReader& reader,
 }
 
 bool MoqtParser::ReadLocation(quic::QuicDataReader& reader,
-                              absl::optional<MoqtSubscribeLocation>& loc) {
+                              std::optional<MoqtSubscribeLocation>& loc) {
   uint64_t ui64;
   if (!reader.ReadVarInt62(&ui64)) {
     return false;
   }
   auto mode = static_cast<MoqtSubscribeLocationMode>(ui64);
   if (mode == MoqtSubscribeLocationMode::kNone) {
-    loc = absl::nullopt;
+    loc = std::nullopt;
     return true;
   }
   if (!reader.ReadVarInt62(&ui64)) {

@@ -42,6 +42,7 @@
 
 using testing::_;
 using testing::Invoke;
+using testing::Return;
 
 namespace quic {
 namespace test {
@@ -352,7 +353,7 @@ bool NoOpFramerVisitor::OnAckTimestamp(QuicPacketNumber /*packet_number*/,
 
 bool NoOpFramerVisitor::OnAckFrameEnd(
     QuicPacketNumber /*start*/,
-    const absl::optional<QuicEcnCounts>& /*ecn_counts*/) {
+    const std::optional<QuicEcnCounts>& /*ecn_counts*/) {
   return true;
 }
 
@@ -449,7 +450,10 @@ bool NoOpFramerVisitor::IsValidStatelessResetToken(
   return false;
 }
 
-MockQuicConnectionVisitor::MockQuicConnectionVisitor() {}
+MockQuicConnectionVisitor::MockQuicConnectionVisitor() {
+  ON_CALL(*this, GetFlowControlSendWindowSize(_))
+      .WillByDefault(Return(std::numeric_limits<QuicByteCount>::max()));
+}
 
 MockQuicConnectionVisitor::~MockQuicConnectionVisitor() {}
 
@@ -632,7 +636,7 @@ void MockQuicSession::SetCryptoStream(QuicCryptoStream* crypto_stream) {
 QuicConsumedData MockQuicSession::ConsumeData(
     QuicStreamId id, size_t write_length, QuicStreamOffset offset,
     StreamSendingState state, TransmissionType /*type*/,
-    absl::optional<EncryptionLevel> /*level*/) {
+    std::optional<EncryptionLevel> /*level*/) {
   if (write_length > 0) {
     auto buf = std::make_unique<char[]>(write_length);
     QuicStream* stream = GetOrCreateStream(id);
@@ -709,7 +713,7 @@ void MockQuicSpdySession::SetCryptoStream(QuicCryptoStream* crypto_stream) {
 QuicConsumedData MockQuicSpdySession::ConsumeData(
     QuicStreamId id, size_t write_length, QuicStreamOffset offset,
     StreamSendingState state, TransmissionType /*type*/,
-    absl::optional<EncryptionLevel> /*level*/) {
+    std::optional<EncryptionLevel> /*level*/) {
   if (write_length > 0) {
     auto buf = std::make_unique<char[]>(write_length);
     QuicStream* stream = GetOrCreateStream(id);
@@ -757,7 +761,7 @@ TestQuicSpdyClientSession::TestQuicSpdyClientSession(
     QuicConnection* connection, const QuicConfig& config,
     const ParsedQuicVersionVector& supported_versions,
     const QuicServerId& server_id, QuicCryptoClientConfig* crypto_config,
-    absl::optional<QuicSSLConfig> ssl_config)
+    std::optional<QuicSSLConfig> ssl_config)
     : QuicSpdyClientSessionBase(connection, nullptr, config,
                                 supported_versions),
       ssl_config_(std::move(ssl_config)) {
@@ -1480,7 +1484,7 @@ bool ParseClientVersionNegotiationProbePacket(
   QuicVersionLabel version_label;
   ParsedQuicVersion parsed_version = ParsedQuicVersion::Unsupported();
   QuicConnectionId destination_connection_id, source_connection_id;
-  absl::optional<absl::string_view> retry_token;
+  std::optional<absl::string_view> retry_token;
   std::string detailed_error;
   QuicErrorCode error = QuicFramer::ParsePublicHeaderDispatcher(
       encrypted_packet,
