@@ -28,7 +28,9 @@ public class NetStringUtil {
      * @return: Unicode string on success, null on failure.
      */
     @CalledByNative
-    private static String convertToUnicode(ByteBuffer text, String charsetName) {
+    private static String convertToUnicode(
+            ByteBuffer text,
+            String charsetName) {
         try {
             Charset charset = Charset.forName(charsetName);
             CharsetDecoder decoder = charset.newDecoder();
@@ -47,7 +49,9 @@ public class NetStringUtil {
      * @return: Unicode string on success, null on failure.
      */
     @CalledByNative
-    private static String convertToUnicodeAndNormalize(ByteBuffer text, String charsetName) {
+    private static String convertToUnicodeAndNormalize(
+            ByteBuffer text,
+            String charsetName) {
         String unicodeString = convertToUnicode(text, charsetName);
         if (unicodeString == null) return null;
         return Normalizer.normalize(unicodeString, Normalizer.Form.NFC);
@@ -62,7 +66,9 @@ public class NetStringUtil {
      * @return: Unicode string on success, null on failure.
      */
     @CalledByNative
-    private static String convertToUnicodeWithSubstitutions(ByteBuffer text, String charsetName) {
+    private static String convertToUnicodeWithSubstitutions(
+            ByteBuffer text,
+            String charsetName) {
         try {
             Charset charset = Charset.forName(charsetName);
 

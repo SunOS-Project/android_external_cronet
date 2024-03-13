@@ -85,7 +85,7 @@ class QuicWriteBlockedListTest : public QuicTest {
   }
 
  private:
-  std::optional<QuicWriteBlockedList> write_blocked_list_;
+  absl::optional<QuicWriteBlockedList> write_blocked_list_;
 };
 
 TEST_F(QuicWriteBlockedListTest, PriorityOrder) {

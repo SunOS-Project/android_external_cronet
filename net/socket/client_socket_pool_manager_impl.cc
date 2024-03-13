@@ -100,20 +100,15 @@ base::Value ClientSocketPoolManagerImpl::SocketPoolInfoToValue() const {
   for (const auto& socket_pool : socket_pools_) {
     // TODO(menke): Is this really needed?
     const char* type;
-    // Note that it's actually the last proxy that determines the type of socket
-    // pool, although for SOCKS proxy chains, multi-proxy chains aren't
-    // supported.
-    const ProxyChain& proxy_chain = socket_pool.first;
-    if (proxy_chain.is_direct()) {
+    if (socket_pool.first.is_direct()) {
       type = "transport_socket_pool";
-    } else if (proxy_chain.GetProxyServer(proxy_chain.length() - 1)
-                   .is_socks()) {
+    } else if (socket_pool.first.proxy_server().is_socks()) {
       type = "socks_socket_pool";
     } else {
       type = "http_proxy_socket_pool";
     }
-    list.Append(
-        socket_pool.second->GetInfoAsValue(proxy_chain.ToDebugString(), type));
+    list.Append(socket_pool.second->GetInfoAsValue(
+        ProxyServerToProxyUri(socket_pool.first.proxy_server()), type));
   }
 
   return base::Value(std::move(list));

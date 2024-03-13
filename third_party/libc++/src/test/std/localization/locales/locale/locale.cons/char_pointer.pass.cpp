@@ -81,25 +81,21 @@ int main(int, char**)
         assert(!(loc == loc3));
         assert(loc != loc3);
 #ifndef TEST_HAS_NO_EXCEPTIONS
-        try {
+        try
+        {
             std::locale((const char*)0);
             assert(false);
-        } catch (std::runtime_error&) {
-            // pass
         }
-
-        try {
-            std::locale(nullptr);
-            assert(false);
-        } catch (std::runtime_error&) {
-            // pass
+        catch (std::runtime_error&)
+        {
         }
-
-        try {
+        try
+        {
             std::locale("spazbot");
             assert(false);
-        } catch (std::runtime_error&) {
-            // pass
+        }
+        catch (std::runtime_error&)
+        {
         }
 #endif
         std::locale ok("");

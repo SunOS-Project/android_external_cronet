@@ -6,8 +6,6 @@
 
 #include <stdint.h>
 
-#include <string_view>
-
 #include "base/check.h"
 #include "base/numerics/safe_conversions.h"
 #include "base/process/memory.h"
@@ -18,7 +16,7 @@ namespace win {
 
 namespace {
 
-BSTR AllocBstrOrDie(std::wstring_view non_bstr) {
+BSTR AllocBstrOrDie(WStringPiece non_bstr) {
   BSTR result = ::SysAllocStringLen(non_bstr.data(),
                                     checked_cast<UINT>(non_bstr.length()));
   if (!result) {
@@ -37,7 +35,7 @@ BSTR AllocBstrBytesOrDie(size_t bytes) {
 
 }  // namespace
 
-ScopedBstr::ScopedBstr(std::wstring_view non_bstr)
+ScopedBstr::ScopedBstr(WStringPiece non_bstr)
     : bstr_(AllocBstrOrDie(non_bstr)) {}
 
 ScopedBstr::~ScopedBstr() {
@@ -70,7 +68,7 @@ BSTR* ScopedBstr::Receive() {
   return &bstr_;
 }
 
-BSTR ScopedBstr::Allocate(std::wstring_view str) {
+BSTR ScopedBstr::Allocate(WStringPiece str) {
   Reset(AllocBstrOrDie(str));
   return bstr_;
 }

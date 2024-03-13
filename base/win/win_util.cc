@@ -34,7 +34,6 @@
 
 #include <limits>
 #include <memory>
-#include <string_view>
 #include <utility>
 
 #include "base/base_switches.h"
@@ -741,7 +740,7 @@ std::wstring GetWindowObjectName(HANDLE handle) {
   return object_name;
 }
 
-bool IsRunningUnderDesktopName(std::wstring_view desktop_name) {
+bool IsRunningUnderDesktopName(WStringPiece desktop_name) {
   HDESK thread_desktop = ::GetThreadDesktop(::GetCurrentThreadId());
   if (!thread_desktop)
     return false;

@@ -14,6 +14,8 @@ namespace base::android::features {
 
 // Alphabetical:
 BASE_DECLARE_FEATURE(kBrowserProcessMemoryPurge);
+BASE_DECLARE_FEATURE(kCrashBrowserOnChildMismatchIfBrowserChanged);
+BASE_DECLARE_FEATURE(kCrashBrowserOnAnyChildMismatch);
 
 }  // namespace base::android::features
 

@@ -8,10 +8,10 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
-#include <optional>
 #include <vector>
 
 #include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 #include "absl/types/variant.h"
 #include "quiche/quic/core/quic_data_reader.h"
 #include "quiche/quic/core/quic_data_writer.h"
@@ -149,7 +149,7 @@ class QUICHE_NO_EXPORT ObjectMessage : public TestMessageBase {
       /*group_sequence=*/5,
       /*object_sequence=*/6,
       /*object_send_order=*/7,
-      /*payload_length=*/std::nullopt,
+      /*payload_length=*/absl::nullopt,
   };
 };
 
@@ -183,7 +183,7 @@ class QUICHE_NO_EXPORT ObjectMessageWithLength : public ObjectMessage {
       0x00, 0x04, 0x05, 0x06, 0x07,  // varints
       0x03, 0x66, 0x6f, 0x6f,        // payload = "foo"
   };
-  std::optional<uint64_t> payload_length_ = 3;
+  absl::optional<uint64_t> payload_length_ = 3;
 };
 
 class QUICHE_NO_EXPORT ObjectMessageWithoutLength : public ObjectMessage {
@@ -195,7 +195,7 @@ class QUICHE_NO_EXPORT ObjectMessageWithoutLength : public ObjectMessage {
 
   bool EqualFieldValues(MessageStructuredData& values) const override {
     auto cast = std::get<MoqtObject>(values);
-    if (cast.payload_length != std::nullopt) {
+    if (cast.payload_length != absl::nullopt) {
       QUIC_LOG(INFO) << "OBJECT Payload Length mismatch";
       return false;
     }
@@ -223,7 +223,7 @@ class QUICHE_NO_EXPORT ClientSetupMessage : public TestMessageBase {
       : TestMessageBase(MoqtMessageType::kClientSetup) {
     if (webtrans) {
       // Should not send PATH.
-      client_setup_.path = std::nullopt;
+      client_setup_.path = absl::nullopt;
       raw_packet_[5] = 0x01;  // only one parameter
       SetWireImage(raw_packet_, sizeof(raw_packet_) - 5);
     } else {
@@ -321,7 +321,7 @@ class QUICHE_NO_EXPORT ServerSetupMessage : public TestMessageBase {
   };
   MoqtServerSetup server_setup_ = {
       /*selected_version=*/static_cast<MoqtVersion>(1),
-      /*role=*/std::nullopt,
+      /*role=*/absl::nullopt,
   };
 };
 
@@ -334,12 +334,8 @@ class QUICHE_NO_EXPORT SubscribeRequestMessage : public TestMessageBase {
 
   bool EqualFieldValues(MessageStructuredData& values) const override {
     auto cast = std::get<MoqtSubscribeRequest>(values);
-    if (cast.track_namespace != subscribe_request_.track_namespace) {
-      QUIC_LOG(INFO) << "SUBSCRIBE REQUEST track namespace mismatch";
-      return false;
-    }
-    if (cast.track_name != subscribe_request_.track_name) {
-      QUIC_LOG(INFO) << "SUBSCRIBE REQUEST track name mismatch";
+    if (cast.full_track_name != subscribe_request_.full_track_name) {
+      QUIC_LOG(INFO) << "SUBSCRIBE REQUEST full track name mismatch";
       return false;
     }
     if (cast.start_group != subscribe_request_.start_group) {
@@ -365,16 +361,15 @@ class QUICHE_NO_EXPORT SubscribeRequestMessage : public TestMessageBase {
     return true;
   }
 
-  void ExpandVarints() override { ExpandVarintsImpl("vv---v----vvvvvvvvv---"); }
+  void ExpandVarints() override { ExpandVarintsImpl("vv---vvvvvvvvv---"); }
 
   MessageStructuredData structured_data() const override {
     return TestMessageBase::MessageStructuredData(subscribe_request_);
   }
 
  private:
-  uint8_t raw_packet_[22] = {
-      0x03, 0x03, 0x66, 0x6f, 0x6f,  // track_namespace = "foo"
-      0x04, 0x61, 0x62, 0x63, 0x64,  // track_name = "abcd"
+  uint8_t raw_packet_[17] = {
+      0x03, 0x03, 0x66, 0x6f, 0x6f,  // track_name = "foo"
       0x02, 0x04,                    // start_group = 4 (relative previous)
       0x01, 0x01,                    // start_object = 1 (absolute)
       0x00,                          // end_group = none
@@ -384,12 +379,11 @@ class QUICHE_NO_EXPORT SubscribeRequestMessage : public TestMessageBase {
   };
 
   MoqtSubscribeRequest subscribe_request_ = {
-      /*track_namespace=*/"foo",
-      /*track_name=*/"abcd",
+      /*full_track_name=*/"foo",
       /*start_group=*/MoqtSubscribeLocation(false, (int64_t)(-4)),
       /*start_object=*/MoqtSubscribeLocation(true, (uint64_t)1),
-      /*end_group=*/std::nullopt,
-      /*end_object=*/std::nullopt,
+      /*end_group=*/absl::nullopt,
+      /*end_object=*/absl::nullopt,
       /*authorization_info=*/"bar",
   };
 };

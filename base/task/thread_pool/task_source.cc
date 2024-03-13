@@ -86,9 +86,7 @@ TaskSource::Transaction TaskSource::BeginTransaction() {
 
 void TaskSource::ClearForTesting() {
   auto task = Clear(nullptr);
-  if (task) {
-    std::move(task->task).Run();
-  }
+  std::move(task.task).Run();
 }
 
 RegisteredTaskSource::RegisteredTaskSource() = default;
@@ -155,8 +153,7 @@ Task RegisteredTaskSource::TakeTask(TaskSource::Transaction* transaction) {
   return task_source_->TakeTask(transaction);
 }
 
-absl::optional<Task> RegisteredTaskSource::Clear(
-    TaskSource::Transaction* transaction) {
+Task RegisteredTaskSource::Clear(TaskSource::Transaction* transaction) {
   DCHECK(!transaction || transaction->task_source() == get());
   return task_source_->Clear(transaction);
 }

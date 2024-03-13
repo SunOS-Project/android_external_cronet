@@ -46,21 +46,19 @@ void SSLClientAuthCache::Clear() {
 }
 
 base::flat_set<HostPortPair> SSLClientAuthCache::GetCachedServers() const {
-  // TODO(mattm): If views become permitted by Chromium style maybe we could
-  // avoid the intermediate vector by using:
+  // TODO(mattm): in c++20 maybe could avoid the intermediate vector by using:
   // auto keys = std::views::keys(m);
   // base::flat_set<HostPortPair>(base::sorted_unique, keys.begin(),
   //                              keys.end());
 
-  // Use the flat_set underlying container type (currently a std::vector), so we
-  // can move the keys into the set instead of copying them.
-  base::flat_set<HostPortPair>::container_type keys;
+  std::vector<HostPortPair> keys;
   keys.reserve(cache_.size());
   for (const auto& [key, _] : cache_) {
     keys.push_back(key);
   }
   // `cache_` is a std::map, so the keys are already sorted.
-  return base::flat_set<HostPortPair>(base::sorted_unique, std::move(keys));
+  return base::flat_set<HostPortPair>(base::sorted_unique, keys.begin(),
+                                      keys.end());
 }
 
 }  // namespace net

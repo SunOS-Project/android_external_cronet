@@ -6,7 +6,6 @@
 
 #include "base/metrics/metrics_hashes.h"
 #include "base/threading/platform_thread.h"
-#include "build/build_config.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
 namespace base {
@@ -56,13 +55,7 @@ TEST(SampleMetadataTest, ScopedSampleMetadataWithKey) {
                     .GetItems(&items));
 }
 
-// Test is flaky on iOS. crbug.com/1494111
-#if BUILDFLAG(IS_IOS)
-#define MAYBE_SampleMetadata DISABLED_SampleMetadata
-#else
-#define MAYBE_SampleMetadata SampleMetadata
-#endif
-TEST(SampleMetadataTest, MAYBE_SampleMetadata) {
+TEST(SampleMetadataTest, SampleMetadata) {
   MetadataRecorder::ItemArray items;
   ASSERT_EQ(0u, MetadataRecorder::MetadataProvider(GetSampleMetadataRecorder(),
                                                    PlatformThread::CurrentId())
@@ -83,13 +76,7 @@ TEST(SampleMetadataTest, MAYBE_SampleMetadata) {
                     .GetItems(&items));
 }
 
-// Test is flaky on iOS. crbug.com/1494111
-#if BUILDFLAG(IS_IOS)
-#define MAYBE_SampleMetadataWithKey DISABLED_SampleMetadataWithKey
-#else
-#define MAYBE_SampleMetadataWithKey SampleMetadataWithKey
-#endif
-TEST(SampleMetadataTest, MAYBE_SampleMetadataWithKey) {
+TEST(SampleMetadataTest, SampleMetadataWithKey) {
   MetadataRecorder::ItemArray items;
   ASSERT_EQ(0u, MetadataRecorder::MetadataProvider(GetSampleMetadataRecorder(),
                                                    PlatformThread::CurrentId())
@@ -111,13 +98,7 @@ TEST(SampleMetadataTest, MAYBE_SampleMetadataWithKey) {
                     .GetItems(&items));
 }
 
-// Test is flaky on iOS. crbug.com/1494111
-#if BUILDFLAG(IS_IOS)
-#define MAYBE_SampleMetadataWithThreadId DISABLED_SampleMetadataWithThreadId
-#else
-#define MAYBE_SampleMetadataWithThreadId SampleMetadataWithThreadId
-#endif
-TEST(SampleMetadataTest, MAYBE_SampleMetadataWithThreadId) {
+TEST(SampleMetadataTest, SampleMetadataWithThreadId) {
   MetadataRecorder::ItemArray items;
   ASSERT_EQ(0u, MetadataRecorder::MetadataProvider(GetSampleMetadataRecorder(),
                                                    PlatformThread::CurrentId())

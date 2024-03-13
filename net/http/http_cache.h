@@ -184,8 +184,7 @@ class NET_EXPORT HttpCache : public HttpTransactionFactory {
   disk_cache::Backend* GetCurrentBackend() const;
 
   // Given a header data blob, convert it to a response info object.
-  static bool ParseResponseInfo(const char* data,
-                                int len,
+  static bool ParseResponseInfo(const char* data, int len,
                                 HttpResponseInfo* response_info,
                                 bool* response_truncated);
 
@@ -496,7 +495,7 @@ class NET_EXPORT HttpCache : public HttpTransactionFactory {
 
   // Destroys an ActiveEntry (active or doomed). Should only be called if
   // entry->SafeToDestroy() returns true.
-  bool IsSafeToDestroyAndDestroyEntry(ActiveEntry* entry);
+  void DestroyEntry(ActiveEntry* entry);
 
   // Adds a transaction to an ActiveEntry. This method returns ERR_IO_PENDING
   // and the transaction will be notified about completion via a callback to

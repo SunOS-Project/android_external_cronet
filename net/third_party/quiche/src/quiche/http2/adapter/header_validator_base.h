@@ -1,12 +1,11 @@
 #ifndef QUICHE_HTTP2_ADAPTER_HEADER_VALIDATOR_BASE_H_
 #define QUICHE_HTTP2_ADAPTER_HEADER_VALIDATOR_BASE_H_
 
-#include <cstddef>
 #include <cstdint>
-#include <optional>
 #include <string>
 
 #include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 #include "quiche/common/platform/api/quiche_export.h"
 
 namespace http2 {
@@ -32,7 +31,7 @@ class QUICHE_EXPORT HeaderValidatorBase {
 
   virtual void StartHeaderBlock() {
     status_.clear();
-    content_length_ = std::nullopt;
+    content_length_ = absl::nullopt;
   }
 
   enum HeaderStatus {
@@ -50,7 +49,7 @@ class QUICHE_EXPORT HeaderValidatorBase {
   // For responses, returns the value of the ":status" header, if present.
   absl::string_view status_header() const { return status_; }
 
-  std::optional<size_t> content_length() const { return content_length_; }
+  absl::optional<size_t> content_length() const { return content_length_; }
 
   void SetMaxFieldSize(uint32_t field_size) { max_field_size_ = field_size; }
   void SetObsTextOption(ObsTextOption option) { obs_text_option_ = option; }
@@ -70,8 +69,8 @@ class QUICHE_EXPORT HeaderValidatorBase {
 
  protected:
   std::string status_;
-  std::optional<size_t> max_field_size_;
-  std::optional<size_t> content_length_;
+  absl::optional<size_t> max_field_size_;
+  absl::optional<size_t> content_length_;
   ObsTextOption obs_text_option_ = ObsTextOption::kDisallow;
   bool allow_extended_connect_ = false;
   bool validate_path_ = false;

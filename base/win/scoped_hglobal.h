@@ -36,9 +36,6 @@ class ScopedHGlobal {
 
   Ptr release() { return std::exchange(data_, nullptr); }
 
-  Ptr begin() { return data(); }
-  Ptr end() { return data() + size(); }
-
  private:
   HGLOBAL glob_;
 

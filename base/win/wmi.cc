@@ -8,8 +8,6 @@
 
 #include <objbase.h>
 #include <stdint.h>
-
-#include <string_view>
 #include <utility>
 
 #include "base/location.h"
@@ -134,8 +132,8 @@ ComPtr<IWbemServices> CreateWmiConnection(bool set_blanket,
 }
 
 bool CreateWmiClassMethodObject(IWbemServices* wmi_services,
-                                std::wstring_view class_name,
-                                std::wstring_view method_name,
+                                WStringPiece class_name,
+                                WStringPiece method_name,
                                 ComPtr<IWbemClassObject>* class_instance) {
   // We attempt to instantiate a COM object that represents a WMI object plus
   // a method rolled into one entity.

@@ -5,7 +5,6 @@
 #include "net/base/isolation_info.h"
 
 #include <cstddef>
-#include <optional>
 
 #include "base/check_op.h"
 #include "base/unguessable_token.h"
@@ -14,6 +13,7 @@
 #include "net/base/isolation_info.pb.h"
 #include "net/base/network_anonymization_key.h"
 #include "net/base/proxy_server.h"
+#include "third_party/abseil-cpp/absl/types/optional.h"
 
 namespace net {
 
@@ -45,10 +45,10 @@ bool ValidateSameSite(const url::Origin& origin,
 // descriptions of consistent sets of values. Also allows values used by the
 // 0-argument constructor.
 bool IsConsistent(IsolationInfo::RequestType request_type,
-                  const std::optional<url::Origin>& top_frame_origin,
-                  const std::optional<url::Origin>& frame_origin,
+                  const absl::optional<url::Origin>& top_frame_origin,
+                  const absl::optional<url::Origin>& frame_origin,
                   const SiteForCookies& site_for_cookies,
-                  const std::optional<base::UnguessableToken>& nonce) {
+                  const absl::optional<base::UnguessableToken>& nonce) {
   // Check for the default-constructed case.
   if (!top_frame_origin) {
     return request_type == IsolationInfo::RequestType::kOther &&
@@ -92,10 +92,10 @@ bool IsConsistent(IsolationInfo::RequestType request_type,
 
 IsolationInfo::IsolationInfo()
     : IsolationInfo(RequestType::kOther,
-                    /*top_frame_origin=*/std::nullopt,
-                    /*frame_origin=*/std::nullopt,
+                    /*top_frame_origin=*/absl::nullopt,
+                    /*frame_origin=*/absl::nullopt,
                     SiteForCookies(),
-                    /*nonce=*/std::nullopt) {}
+                    /*nonce=*/absl::nullopt) {}
 
 IsolationInfo::IsolationInfo(const IsolationInfo&) = default;
 IsolationInfo::IsolationInfo(IsolationInfo&&) = default;
@@ -107,26 +107,26 @@ IsolationInfo IsolationInfo::CreateForInternalRequest(
     const url::Origin& top_frame_origin) {
   return IsolationInfo(RequestType::kOther, top_frame_origin, top_frame_origin,
                        SiteForCookies::FromOrigin(top_frame_origin),
-                       /*nonce=*/std::nullopt);
+                       /*nonce=*/absl::nullopt);
 }
 
 IsolationInfo IsolationInfo::CreateTransient() {
   url::Origin opaque_origin;
   return IsolationInfo(RequestType::kOther, opaque_origin, opaque_origin,
-                       SiteForCookies(), /*nonce=*/std::nullopt);
+                       SiteForCookies(), /*nonce=*/absl::nullopt);
 }
 
-std::optional<IsolationInfo> IsolationInfo::Deserialize(
+absl::optional<IsolationInfo> IsolationInfo::Deserialize(
     const std::string& serialized) {
   proto::IsolationInfo proto;
   if (!proto.ParseFromString(serialized))
-    return std::nullopt;
+    return absl::nullopt;
 
-  std::optional<url::Origin> top_frame_origin;
+  absl::optional<url::Origin> top_frame_origin;
   if (proto.has_top_frame_origin())
     top_frame_origin = url::Origin::Create(GURL(proto.top_frame_origin()));
 
-  std::optional<url::Origin> frame_origin;
+  absl::optional<url::Origin> frame_origin;
   if (proto.has_frame_origin())
     frame_origin = url::Origin::Create(GURL(proto.frame_origin()));
 
@@ -134,7 +134,7 @@ std::optional<IsolationInfo> IsolationInfo::Deserialize(
       static_cast<RequestType>(proto.request_type()),
       std::move(top_frame_origin), std::move(frame_origin),
       SiteForCookies::FromUrl(GURL(proto.site_for_cookies())),
-      /*nonce=*/std::nullopt);
+      /*nonce=*/absl::nullopt);
 }
 
 IsolationInfo IsolationInfo::Create(
@@ -142,7 +142,7 @@ IsolationInfo IsolationInfo::Create(
     const url::Origin& top_frame_origin,
     const url::Origin& frame_origin,
     const SiteForCookies& site_for_cookies,
-    const std::optional<base::UnguessableToken>& nonce) {
+    const absl::optional<base::UnguessableToken>& nonce) {
   return IsolationInfo(request_type, top_frame_origin, frame_origin,
                        site_for_cookies, nonce);
 }
@@ -156,7 +156,7 @@ IsolationInfo IsolationInfo::DoNotUseCreatePartialFromNak(
   url::Origin top_frame_origin =
       network_anonymization_key.GetTopFrameSite()->site_as_origin_;
 
-  std::optional<url::Origin> frame_origin;
+  absl::optional<url::Origin> frame_origin;
   if (network_anonymization_key.IsCrossSite()) {
     // If we know that the origin is cross site to the top level site, create an
     // empty origin to use as the frame origin for the isolation info. This
@@ -168,7 +168,7 @@ IsolationInfo IsolationInfo::DoNotUseCreatePartialFromNak(
     frame_origin = top_frame_origin;
   }
 
-  const std::optional<base::UnguessableToken>& nonce =
+  const absl::optional<base::UnguessableToken>& nonce =
       network_anonymization_key.GetNonce();
 
   auto isolation_info = IsolationInfo::Create(
@@ -178,15 +178,15 @@ IsolationInfo IsolationInfo::DoNotUseCreatePartialFromNak(
   return isolation_info;
 }
 
-std::optional<IsolationInfo> IsolationInfo::CreateIfConsistent(
+absl::optional<IsolationInfo> IsolationInfo::CreateIfConsistent(
     RequestType request_type,
-    const std::optional<url::Origin>& top_frame_origin,
-    const std::optional<url::Origin>& frame_origin,
+    const absl::optional<url::Origin>& top_frame_origin,
+    const absl::optional<url::Origin>& frame_origin,
     const SiteForCookies& site_for_cookies,
-    const std::optional<base::UnguessableToken>& nonce) {
+    const absl::optional<base::UnguessableToken>& nonce) {
   if (!IsConsistent(request_type, top_frame_origin, frame_origin,
                     site_for_cookies, nonce)) {
-    return std::nullopt;
+    return absl::nullopt;
   }
   return IsolationInfo(request_type, top_frame_origin, frame_origin,
                        site_for_cookies, nonce);
@@ -207,11 +207,11 @@ IsolationInfo IsolationInfo::CreateForRedirect(
                        SiteForCookies::FromOrigin(new_origin), nonce_);
 }
 
-const std::optional<url::Origin>& IsolationInfo::frame_origin() const {
+const absl::optional<url::Origin>& IsolationInfo::frame_origin() const {
   return frame_origin_;
 }
 
-const std::optional<url::Origin>& IsolationInfo::frame_origin_for_testing()
+const absl::optional<url::Origin>& IsolationInfo::frame_origin_for_testing()
     const {
   return frame_origin_;
 }
@@ -295,9 +295,9 @@ std::string IsolationInfo::DebugString() const {
 
 NetworkAnonymizationKey
 IsolationInfo::CreateNetworkAnonymizationKeyForIsolationInfo(
-    const std::optional<url::Origin>& top_frame_origin,
-    const std::optional<url::Origin>& frame_origin,
-    const std::optional<base::UnguessableToken>& nonce) const {
+    const absl::optional<url::Origin>& top_frame_origin,
+    const absl::optional<url::Origin>& frame_origin,
+    const absl::optional<base::UnguessableToken>& nonce) const {
   if (!top_frame_origin) {
     return NetworkAnonymizationKey();
   }
@@ -308,11 +308,12 @@ IsolationInfo::CreateNetworkAnonymizationKeyForIsolationInfo(
                                                       frame_site, nonce);
 }
 
-IsolationInfo::IsolationInfo(RequestType request_type,
-                             const std::optional<url::Origin>& top_frame_origin,
-                             const std::optional<url::Origin>& frame_origin,
-                             const SiteForCookies& site_for_cookies,
-                             const std::optional<base::UnguessableToken>& nonce)
+IsolationInfo::IsolationInfo(
+    RequestType request_type,
+    const absl::optional<url::Origin>& top_frame_origin,
+    const absl::optional<url::Origin>& frame_origin,
+    const SiteForCookies& site_for_cookies,
+    const absl::optional<base::UnguessableToken>& nonce)
     : request_type_(request_type),
       top_frame_origin_(top_frame_origin),
       frame_origin_(frame_origin),

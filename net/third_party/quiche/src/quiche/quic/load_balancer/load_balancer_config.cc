@@ -6,9 +6,9 @@
 
 #include <cstdint>
 #include <cstring>
-#include <optional>
 
 #include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 #include "absl/types/span.h"
 #include "openssl/aes.h"
 #include "quiche/quic/core/quic_connection_id.h"
@@ -37,19 +37,19 @@ bool CommonValidation(const uint8_t config_id, const uint8_t server_id_len,
 }
 
 // Initialize the key in the constructor
-std::optional<AES_KEY> BuildKey(absl::string_view key, bool encrypt) {
+absl::optional<AES_KEY> BuildKey(absl::string_view key, bool encrypt) {
   if (key.empty()) {
-    return std::optional<AES_KEY>();
+    return absl::optional<AES_KEY>();
   }
   AES_KEY raw_key;
   if (encrypt) {
     if (AES_set_encrypt_key(reinterpret_cast<const uint8_t *>(key.data()),
                             key.size() * 8, &raw_key) < 0) {
-      return std::optional<AES_KEY>();
+      return absl::optional<AES_KEY>();
     }
   } else if (AES_set_decrypt_key(reinterpret_cast<const uint8_t *>(key.data()),
                                  key.size() * 8, &raw_key) < 0) {
-    return std::optional<AES_KEY>();
+    return absl::optional<AES_KEY>();
   }
   return raw_key;
 }
@@ -116,17 +116,17 @@ void CiphertextXorWithRight(const uint8_t *from, const uint8_t plaintext_len,
 
 }  // namespace
 
-std::optional<LoadBalancerConfig> LoadBalancerConfig::Create(
+absl::optional<LoadBalancerConfig> LoadBalancerConfig::Create(
     const uint8_t config_id, const uint8_t server_id_len,
     const uint8_t nonce_len, const absl::string_view key) {
   //  Check for valid parameters.
   if (key.size() != kLoadBalancerKeyLen) {
     QUIC_BUG(quic_bug_433862549_02)
         << "Invalid LoadBalancerConfig Key Length: " << key.size();
-    return std::optional<LoadBalancerConfig>();
+    return absl::optional<LoadBalancerConfig>();
   }
   if (!CommonValidation(config_id, server_id_len, nonce_len)) {
-    return std::optional<LoadBalancerConfig>();
+    return absl::optional<LoadBalancerConfig>();
   }
   auto new_config =
       LoadBalancerConfig(config_id, server_id_len, nonce_len, key);
@@ -134,18 +134,18 @@ std::optional<LoadBalancerConfig> LoadBalancerConfig::Create(
     // Something went wrong in assigning the key!
     QUIC_BUG(quic_bug_433862549_03) << "Something went wrong in initializing "
                                        "the load balancing key.";
-    return std::optional<LoadBalancerConfig>();
+    return absl::optional<LoadBalancerConfig>();
   }
   return new_config;
 }
 
 // Creates an unencrypted config.
-std::optional<LoadBalancerConfig> LoadBalancerConfig::CreateUnencrypted(
+absl::optional<LoadBalancerConfig> LoadBalancerConfig::CreateUnencrypted(
     const uint8_t config_id, const uint8_t server_id_len,
     const uint8_t nonce_len) {
   return CommonValidation(config_id, server_id_len, nonce_len)
              ? LoadBalancerConfig(config_id, server_id_len, nonce_len, "")
-             : std::optional<LoadBalancerConfig>();
+             : absl::optional<LoadBalancerConfig>();
 }
 
 bool LoadBalancerConfig::EncryptionPass(absl::Span<uint8_t> target,
@@ -201,6 +201,6 @@ LoadBalancerConfig::LoadBalancerConfig(const uint8_t config_id,
       key_(BuildKey(key, /* encrypt = */ true)),
       block_decrypt_key_((server_id_len + nonce_len == kLoadBalancerBlockSize)
                              ? BuildKey(key, /* encrypt = */ false)
-                             : std::optional<AES_KEY>()) {}
+                             : absl::optional<AES_KEY>()) {}
 
 }  // namespace quic

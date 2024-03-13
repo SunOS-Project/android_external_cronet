@@ -263,8 +263,12 @@ class IDMap final {
       return *this;
     }
     KeyIterator operator++(int) { return KeyIterator(iter_++); }
-
-    friend bool operator==(const KeyIterator&, const KeyIterator&) = default;
+    bool operator==(const KeyIterator& other) const {
+      return iter_ == other.iter_;
+    }
+    bool operator!=(const KeyIterator& other) const {
+      return iter_ != other.iter_;
+    }
   };
 
   KeyType AddInternal(V data) {

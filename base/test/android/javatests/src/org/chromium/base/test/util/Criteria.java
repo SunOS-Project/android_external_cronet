@@ -45,8 +45,7 @@ public final class Criteria {
         if (!TextUtils.isEmpty(reason)) {
             description.appendText(reason).appendText(System.lineSeparator());
         }
-        description
-                .appendText("Expected: ")
+        description.appendText("Expected: ")
                 .appendDescriptionOf(matcher)
                 .appendText(System.lineSeparator())
                 .appendText("     but: ");

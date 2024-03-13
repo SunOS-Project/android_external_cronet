@@ -1153,7 +1153,9 @@ TEST_P(QuicSpdySessionTestServer, SendHttp3GoAway) {
 }
 
 TEST_P(QuicSpdySessionTestServer, SendHttp3GoAwayAndNoMoreMaxStreams) {
-  if (!VersionUsesHttp3(transport_version())) {
+  if (!VersionUsesHttp3(transport_version()) ||
+      !GetQuicReloadableFlag(
+          quic_do_not_increase_max_streams_after_h3_goaway)) {
     return;
   }
 
@@ -1319,7 +1321,7 @@ TEST_P(QuicSpdySessionTestServer, RstStreamBeforeHeadersDecompressed) {
   // In HTTP/3, Qpack stream will send data on stream reset and cause packet to
   // be flushed.
   if (VersionUsesHttp3(transport_version()) &&
-      !GetQuicRestartFlag(quic_opport_bundle_qpack_decoder_data2)) {
+      !GetQuicRestartFlag(quic_opport_bundle_qpack_decoder_data)) {
     EXPECT_CALL(*writer_, WritePacket(_, _, _, _, _, _))
         .WillOnce(Return(WriteResult(WRITE_STATUS_OK, 0)));
   }
@@ -1556,7 +1558,7 @@ TEST_P(QuicSpdySessionTestServer,
     // the STOP_SENDING, so set up the EXPECT there.
     EXPECT_CALL(*connection_, OnStreamReset(stream->id(), _));
     EXPECT_CALL(*connection_, SendControlFrame(_));
-  } else if (!GetQuicRestartFlag(quic_opport_bundle_qpack_decoder_data2)) {
+  } else if (!GetQuicRestartFlag(quic_opport_bundle_qpack_decoder_data)) {
     EXPECT_CALL(*writer_, WritePacket(_, _, _, _, _, _))
         .WillOnce(Return(WriteResult(WRITE_STATUS_OK, 0)));
   }
@@ -3603,7 +3605,7 @@ TEST_P(QuicSpdySessionTestClient, WebTransportSettingVersionMismatch) {
   ReceiveWebTransportSettings(
       WebTransportHttp3VersionSet({WebTransportHttp3Version::kDraft02}));
   EXPECT_FALSE(session_.SupportsWebTransport());
-  EXPECT_EQ(session_.SupportedWebTransportVersion(), std::nullopt);
+  EXPECT_EQ(session_.SupportedWebTransportVersion(), absl::nullopt);
 }
 
 TEST_P(QuicSpdySessionTestClient, WebTransportSettingSetToZero) {

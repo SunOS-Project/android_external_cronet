@@ -11,7 +11,6 @@
 #include <cstdint>
 #include <list>
 #include <memory>
-#include <optional>
 #include <ostream>
 #include <string>
 #include <utility>
@@ -22,6 +21,7 @@
 #include "absl/container/flat_hash_set.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 #include "quiche/quic/core/chlo_extractor.h"
 #include "quiche/quic/core/connection_id_generator.h"
 #include "quiche/quic/core/crypto/crypto_handshake_message.h"
@@ -142,11 +142,6 @@ class PacketCollector : public QuicPacketCreator::DelegateInterface,
   }
 
   void MaybeBundleOpportunistically() override { QUICHE_DCHECK(false); }
-
-  QuicByteCount GetFlowControlSendWindowSize(QuicStreamId /*id*/) override {
-    QUICHE_DCHECK(false);
-    return std::numeric_limits<QuicByteCount>::max();
-  }
 
   SerializedPacketFate GetSerializedPacketFate(
       bool /*is_mtu_discovery*/,
@@ -1192,7 +1187,7 @@ void QuicDispatcher::BufferEarlyPacket(const ReceivedPacketInfo& packet_info) {
       packet_info.destination_connection_id,
       packet_info.form != GOOGLE_QUIC_PACKET, packet_info.packet,
       packet_info.self_address, packet_info.peer_address, packet_info.version,
-      /*parsed_chlo=*/std::nullopt, /*connection_id_generator=*/nullptr);
+      /*parsed_chlo=*/absl::nullopt, /*connection_id_generator=*/nullptr);
   if (rs != EnqueuePacketResult::SUCCESS) {
     OnBufferPacketFailure(rs, packet_info.destination_connection_id);
   }
@@ -1296,7 +1291,7 @@ std::shared_ptr<QuicSession> QuicDispatcher::CreateSessionFromChlo(
   if (connection_id_generator == nullptr) {
     connection_id_generator = &ConnectionIdGenerator();
   }
-  std::optional<QuicConnectionId> server_connection_id =
+  absl::optional<QuicConnectionId> server_connection_id =
       connection_id_generator->MaybeReplaceConnectionId(original_connection_id,
                                                         version);
   const bool replaced_connection_id = server_connection_id.has_value();

@@ -23,14 +23,7 @@
 #include <shlobj.h>
 #endif
 
-#define ENABLE_BEHAVIOUR_OVERRIDE_PROVIDER                                    \
-  ((BUILDFLAG(IS_POSIX) && !BUILDFLAG(IS_APPLE) && !BUILDFLAG(IS_ANDROID)) || \
-   BUILDFLAG(IS_WIN))
-
 namespace base {
-
-// Custom behaviour providers.
-bool EnvOverridePathProvider(int key, FilePath* result);
 
 bool PathProvider(int key, FilePath* result);
 
@@ -75,16 +68,15 @@ Provider base_provider = {PathProvider, nullptr,
                           true};
 
 #if BUILDFLAG(IS_WIN)
-Provider win_provider = {PathProviderWin, &base_provider,
+Provider base_provider_win = {
+  PathProviderWin,
+  &base_provider,
 #ifndef NDEBUG
-                         PATH_WIN_START, PATH_WIN_END,
+  PATH_WIN_START,
+  PATH_WIN_END,
 #endif
-                         true};
-Provider base_provider_win = {EnvOverridePathProvider, &win_provider,
-#ifndef NDEBUG
-                              PATH_START, PATH_END,
-#endif
-                              true};
+  true
+};
 #endif
 
 #if BUILDFLAG(IS_MAC)
@@ -132,16 +124,15 @@ Provider base_provider_fuchsia = {PathProviderFuchsia, &base_provider,
 #endif
 
 #if BUILDFLAG(IS_POSIX) && !BUILDFLAG(IS_APPLE) && !BUILDFLAG(IS_ANDROID)
-Provider posix_provider = {PathProviderPosix, &base_provider,
+Provider base_provider_posix = {
+  PathProviderPosix,
+  &base_provider,
 #ifndef NDEBUG
-                           PATH_POSIX_START, PATH_POSIX_END,
+  PATH_POSIX_START,
+  PATH_POSIX_END,
 #endif
-                           true};
-Provider base_provider_posix = {EnvOverridePathProvider, &posix_provider,
-#ifndef NDEBUG
-                                PATH_START, PATH_END,
-#endif
-                                true};
+  true
+};
 #endif
 
 

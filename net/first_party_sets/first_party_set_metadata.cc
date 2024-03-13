@@ -25,10 +25,15 @@ FirstPartySetMetadata& FirstPartySetMetadata::operator=(
 FirstPartySetMetadata::~FirstPartySetMetadata() = default;
 
 bool FirstPartySetMetadata::operator==(
-    const FirstPartySetMetadata& other) const = default;
+    const FirstPartySetMetadata& other) const {
+  return std::tie(frame_entry_, top_frame_entry_) ==
+         std::tie(other.frame_entry_, other.top_frame_entry_);
+}
 
 bool FirstPartySetMetadata::operator!=(
-    const FirstPartySetMetadata& other) const = default;
+    const FirstPartySetMetadata& other) const {
+  return !(*this == other);
+}
 
 std::ostream& operator<<(std::ostream& os,
                          const FirstPartySetMetadata& metadata) {

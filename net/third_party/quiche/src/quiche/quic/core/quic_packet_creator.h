@@ -17,12 +17,12 @@
 
 #include <cstddef>
 #include <memory>
-#include <optional>
 #include <utility>
 #include <vector>
 
 #include "absl/base/attributes.h"
 #include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 #include "quiche/quic/core/frames/quic_stream_frame.h"
 #include "quiche/quic/core/quic_coalesced_packet.h"
 #include "quiche/quic/core/quic_connection_id.h"
@@ -63,14 +63,6 @@ class QUICHE_EXPORT QuicPacketCreator {
     // Called when there is data to be sent. Gives delegate a chance to bundle
     // anything with to-be-sent data.
     virtual void MaybeBundleOpportunistically() = 0;
-
-    // When sending flow controlled data, this will be called after
-    // MaybeBundleOpportunistically(). If the returned flow control send window
-    // is smaller than data's write_length, write_length will be adjusted
-    // acccordingly.
-    // If the delegate has no notion of flow control, it should return
-    // std::numeric_limit<QuicByteCount>::max().
-    virtual QuicByteCount GetFlowControlSendWindowSize(QuicStreamId id) = 0;
 
     // Returns the packet fate for serialized packets which will be handed over
     // to delegate via OnSerializedPacket(). Called when a packet is about to be
@@ -496,9 +488,9 @@ class QUICHE_EXPORT QuicPacketCreator {
   };
 
   // Attempts to build a data packet with chaos protection. If this packet isn't
-  // supposed to be protected or if serialization fails then std::nullopt is
+  // supposed to be protected or if serialization fails then absl::nullopt is
   // returned. Otherwise returns the serialized length.
-  std::optional<size_t> MaybeBuildDataPacketWithChaosProtection(
+  absl::optional<size_t> MaybeBuildDataPacketWithChaosProtection(
       const QuicPacketHeader& header, char* buffer);
 
   // Creates a stream frame which fits into the current open packet. If

@@ -30,7 +30,9 @@ import javax.annotation.concurrent.NotThreadSafe;
  */
 @NotThreadSafe
 public class ObserverList<E> implements Iterable<E> {
-    /** Extended iterator interface that provides rewind functionality. */
+    /**
+     * Extended iterator interface that provides rewind functionality.
+     */
     public interface RewindableIterator<E> extends Iterator<E> {
         /**
          * Rewind the iterator back to the beginning.
@@ -166,7 +168,9 @@ public class ObserverList<E> implements Iterable<E> {
         return mCount;
     }
 
-    /** Returns true if the ObserverList contains no observers. */
+    /**
+     * Returns true if the ObserverList contains no observers.
+     */
     public boolean isEmpty() {
         if (mEnableThreadAsserts) mThreadChecker.assertOnValidThread();
 

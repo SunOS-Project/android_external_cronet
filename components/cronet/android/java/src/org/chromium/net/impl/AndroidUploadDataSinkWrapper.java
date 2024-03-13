@@ -4,12 +4,9 @@
 
 package org.chromium.net.impl;
 
-import static org.chromium.net.impl.HttpEngineNativeProvider.EXT_API_LEVEL;
-import static org.chromium.net.impl.HttpEngineNativeProvider.EXT_VERSION;
+import androidx.annotation.RequiresApi;
 
-import androidx.annotation.RequiresExtension;
-
-@RequiresExtension(extension = EXT_API_LEVEL, version = EXT_VERSION)
+@RequiresApi(api = 34)
 class AndroidUploadDataSinkWrapper extends org.chromium.net.UploadDataSink {
     private final android.net.http.UploadDataSink mBackend;
 

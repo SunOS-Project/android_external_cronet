@@ -19,9 +19,8 @@ public class MultiprocessTestClientService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
-        mService =
-                new ChildProcessService(
-                        new MultiprocessTestClientServiceDelegate(), this, getApplicationContext());
+        mService = new ChildProcessService(
+                new MultiprocessTestClientServiceDelegate(), this, getApplicationContext());
         mService.onCreate();
     }
 

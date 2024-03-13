@@ -30,6 +30,9 @@ ContentStabilityMetricsProvider::ContentStabilityMetricsProvider(
     : helper_(local_state), extensions_helper_(std::move(extensions_helper)) {
   BrowserChildProcessObserver::Add(this);
 
+  registrar_.Add(this, content::NOTIFICATION_LOAD_START,
+                 content::NotificationService::AllSources());
+
 #if BUILDFLAG(IS_ANDROID)
   auto* crash_manager = crash_reporter::CrashMetricsReporter::GetInstance();
   DCHECK(crash_manager);
@@ -38,6 +41,7 @@ ContentStabilityMetricsProvider::ContentStabilityMetricsProvider(
 }
 
 ContentStabilityMetricsProvider::~ContentStabilityMetricsProvider() {
+  registrar_.RemoveAll();
   BrowserChildProcessObserver::Remove(this);
 }
 
@@ -86,6 +90,22 @@ void ContentStabilityMetricsProvider::RenderProcessHostDestroyed(
   host_observation_.RemoveObservation(host);
 }
 
+void ContentStabilityMetricsProvider::Observe(
+    int type,
+    const content::NotificationSource& source,
+    const content::NotificationDetails& details) {
+  switch (type) {
+    case content::NOTIFICATION_LOAD_START: {
+      helper_.LogLoadStarted();
+      break;
+    }
+
+    default:
+      NOTREACHED();
+      break;
+  }
+}
+
 void ContentStabilityMetricsProvider::BrowserChildProcessCrashed(
     const content::ChildProcessData& data,
     const content::ChildProcessTerminationInfo& info) {
@@ -130,9 +150,5 @@ void ContentStabilityMetricsProvider::OnCrashDumpProcessed(
   }
 }
 #endif  // BUILDFLAG(IS_ANDROID)
-
-void ContentStabilityMetricsProvider::OnPageLoadStarted() {
-  helper_.LogLoadStarted();
-}
 
 }  // namespace metrics

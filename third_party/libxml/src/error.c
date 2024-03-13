@@ -939,7 +939,7 @@ xmlResetLastError(void)
  *
  * Returns NULL if no error occurred or a pointer to the error
  */
-const xmlError *
+xmlErrorPtr
 xmlCtxtGetLastError(void *ctx)
 {
     xmlParserCtxtPtr ctxt = (xmlParserCtxtPtr) ctx;

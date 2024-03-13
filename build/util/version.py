@@ -95,29 +95,25 @@ def SubstFile(file_name, values):
 
   This is like SubstTemplate, except it operates on a file.
   """
-  with open(file_name, 'r') as f:
-    template = f.read()
+  template = open(file_name, 'r').read()
   return SubstTemplate(template, values)
 
 
-def WriteIfChanged(file_name, contents, mode):
+def WriteIfChanged(file_name, contents):
   """
   Writes the specified contents to the specified file_name.
 
   Does nothing if the contents aren't different than the current contents.
   """
   try:
-    with open(file_name, 'r') as f:
-      old_contents = f.read()
+    old_contents = open(file_name, 'r').read()
   except EnvironmentError:
     pass
   else:
-    if contents == old_contents and mode == os.lstat(file_name).st_mode:
+    if contents == old_contents:
       return
     os.unlink(file_name)
-  with open(file_name, 'w') as f:
-    f.write(contents)
-  os.chmod(file_name, mode)
+  open(file_name, 'w').write(contents)
 
 
 def BuildParser():
@@ -131,11 +127,6 @@ def BuildParser():
                       help='Write substituted strings to FILE.')
   parser.add_argument('-t', '--template', default=None,
                       help='Use TEMPLATE as the strings to substitute.')
-  parser.add_argument('-x',
-                      '--executable',
-                      default=False,
-                      action='store_true',
-                      help='Set the executable bit on the output (on POSIX).')
   parser.add_argument(
       '-e',
       '--eval',
@@ -240,18 +231,6 @@ OFFICIAL_BUILD=%(OFFICIAL_BUILD)s
 """ % values
 
 
-def GenerateOutputMode(options):
-  """Construct output mode (e.g. from template).
-
-  Arguments:
-  options -- argparse parsed arguments
-  """
-  if options.executable:
-    return 0o755
-  else:
-    return 0o644
-
-
 def BuildOutput(args):
   """Gets all input and output values needed for writing output."""
   # Build argparse parser with arguments
@@ -266,18 +245,17 @@ def BuildOutput(args):
 
   # Get the raw values that will be used the generate the output
   values = GenerateValues(options, evals)
-  # Get the output string and mode
+  # Get the output string
   contents = GenerateOutputContents(options, values)
-  mode = GenerateOutputMode(options)
 
-  return {'options': options, 'contents': contents, 'mode': mode}
+  return {'options': options, 'contents': contents}
 
 
-def main(args):
-  output = BuildOutput(args)
+def main():
+  output = BuildOutput(sys.argv[1:])
 
   if output['options'].output is not None:
-    WriteIfChanged(output['options'].output, output['contents'], output['mode'])
+    WriteIfChanged(output['options'].output, output['contents'])
   else:
     print(output['contents'])
 
@@ -285,4 +263,4 @@ def main(args):
 
 
 if __name__ == '__main__':
-  sys.exit(main(sys.argv[1:]))
+  sys.exit(main())

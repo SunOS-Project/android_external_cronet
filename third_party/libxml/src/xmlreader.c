@@ -3973,10 +3973,10 @@ xmlTextReaderValidityWarningRelay(void *ctx, const char *msg, ...)
 }
 
 static void
-xmlTextReaderStructuredError(void *ctxt, const xmlError *error);
+  xmlTextReaderStructuredError(void *ctxt, xmlErrorPtr error);
 
 static void
-xmlTextReaderValidityStructuredRelay(void *userData, const xmlError *error)
+xmlTextReaderValidityStructuredRelay(void *userData, xmlErrorPtr error)
 {
     xmlTextReaderPtr reader = (xmlTextReaderPtr) userData;
 
@@ -4707,7 +4707,7 @@ xmlTextReaderGenericError(void *ctxt, xmlParserSeverities severity,
 }
 
 static void
-xmlTextReaderStructuredError(void *ctxt, const xmlError *error)
+xmlTextReaderStructuredError(void *ctxt, xmlErrorPtr error)
 {
     xmlParserCtxtPtr ctx = (xmlParserCtxtPtr) ctxt;
 

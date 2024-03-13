@@ -244,12 +244,6 @@ def _AddFiles(apk, details):
                                       alignment=alignment)
 
 
-def _GetAbiAlignment(android_abi):
-  if '64' in android_abi:
-    return 0x4000  # 16k alignment
-  return 0x1000  # 4k alignment
-
-
 def _GetNativeLibrariesToAdd(native_libs, android_abi, fast_align,
                              lib_always_compress):
   """Returns the list of file_detail tuples for native libraries in the apk.
@@ -268,10 +262,7 @@ def _GetNativeLibrariesToAdd(native_libs, android_abi, fast_align,
       lib_android_abi = 'arm64-v8a-hwasan'
 
     apk_path = 'lib/%s/%s' % (lib_android_abi, basename)
-    if compress and not fast_align:
-      alignment = 0
-    else:
-      alignment = _GetAbiAlignment(android_abi)
+    alignment = 0 if compress and not fast_align else 0x1000
     libraries_to_add.append((apk_path, path, compress, alignment))
 
   return libraries_to_add
@@ -306,8 +297,7 @@ def main(args):
   # Python's zip implementation duplicates file comments in the central
   # directory, whereas zipalign does not, so use zipalign for official builds.
   requires_alignment = options.format == 'apk'
-  # TODO(crbug.com/1495851): Re-enable zipalign once we are using Android V SDK.
-  run_zipalign = requires_alignment and options.best_compression and False
+  run_zipalign = requires_alignment and options.best_compression
   fast_align = bool(requires_alignment and not run_zipalign)
 
   native_libs = sorted(options.native_libs)
@@ -486,16 +476,14 @@ def main(args):
         # with stale builds when the only change is adding/removing
         # placeholders).
         apk_path = 'lib/%s/%s' % (options.android_abi, name)
-        alignment = _GetAbiAlignment(options.android_abi)
-        add_to_zip(apk_path, '', alignment=alignment)
+        add_to_zip(apk_path, '', alignment=0x1000)
 
       for name in sorted(secondary_native_lib_placeholders):
         # Note: Empty libs files are ignored by md5check (can cause issues
         # with stale builds when the only change is adding/removing
         # placeholders).
         apk_path = 'lib/%s/%s' % (options.secondary_android_abi, name)
-        alignment = _GetAbiAlignment(options.secondary_android_abi)
-        add_to_zip(apk_path, '', alignment=alignment)
+        add_to_zip(apk_path, '', alignment=0x1000)
 
       # 5. Resources
       logging.debug('Adding res/')

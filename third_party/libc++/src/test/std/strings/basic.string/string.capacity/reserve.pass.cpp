@@ -8,9 +8,9 @@
 
 // <string>
 
-// void reserve(); // Deprecated in C++20, removed in C++26.
+// void reserve(); // Deprecated in C++20.
 
-// ADDITIONAL_COMPILE_FLAGS: -D_LIBCPP_DISABLE_DEPRECATION_WARNINGS -D_LIBCPP_ENABLE_CXX26_REMOVED_STRING_RESERVE
+// ADDITIONAL_COMPILE_FLAGS: -D_LIBCPP_DISABLE_DEPRECATION_WARNINGS
 
 #include <string>
 #include <stdexcept>

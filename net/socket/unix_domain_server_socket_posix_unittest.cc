@@ -114,7 +114,8 @@ TEST_F(UnixDomainServerSocketTest, AcceptWithForbiddenUser) {
 
   // Try to read from the socket.
   const int read_buffer_size = 10;
-  auto read_buffer = base::MakeRefCounted<IOBufferWithSize>(read_buffer_size);
+  scoped_refptr<IOBuffer> read_buffer =
+      base::MakeRefCounted<IOBuffer>(read_buffer_size);
   TestCompletionCallback read_callback;
   rv = read_callback.GetResult(client_socket.Read(
       read_buffer.get(), read_buffer_size, read_callback.callback()));

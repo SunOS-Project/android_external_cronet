@@ -78,7 +78,8 @@ class NET_EXPORT CookieInclusionStatus {
     // Cookie was set with an invalid __Host- or __Secure- prefix.
     EXCLUDE_INVALID_PREFIX = 15,
     /// Cookie was set with an invalid Partitioned attribute, which is only
-    // valid if the cookie has a __Host- prefix.
+    // valid if the cookie has a __Host- prefix and does not have the SameParty
+    // attribute.
     EXCLUDE_INVALID_PARTITIONED = 16,
     // Cookie exceeded the name/value pair size limit.
     EXCLUDE_NAME_VALUE_PAIR_EXCEEDS_MAX_SIZE = 17,
@@ -378,7 +379,9 @@ class NET_EXPORT CookieInclusionStatus {
 
   // Returns true if the cookie was excluded because of user preferences.
   // HasOnlyExclusionReason(EXCLUDE_USER_PREFERENCES) will not return true for
-  // third-party cookies blocked in sites in the same First-Party Set. See
+  // third-party cookies blocked in sites in the same First-Party Set (note:
+  // this is not the same as the cookie being blocked in a same-party context,
+  // which takes the entire ancestor chain into account). See
   // https://crbug.com/1366868.
   bool ExcludedByUserPreferences() const;
 
@@ -391,11 +394,6 @@ class NET_EXPORT CookieInclusionStatus {
   // Returns the `exclusion_reasons_` with the given `reasons` unset.
   ExclusionReasonBitset ExclusionReasonsWithout(
       const std::vector<ExclusionReason>& reasons) const;
-
-  // If the cookie would have been excluded by reasons that are not
-  // Third-party cookie phaseout related, clear the Third-party cookie phaseout
-  // warning/exclusion reason in this case.
-  void MaybeClearThirdPartyPhaseoutReason();
 
   // A bit vector of the applicable exclusion reasons.
   ExclusionReasonBitset exclusion_reasons_;

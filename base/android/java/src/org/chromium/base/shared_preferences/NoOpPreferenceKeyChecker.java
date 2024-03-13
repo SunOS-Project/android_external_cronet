@@ -4,7 +4,9 @@
 
 package org.chromium.base.shared_preferences;
 
-/** A placeholder key checker that never throws exceptions. Used in production builds. */
+/**
+ * A placeholder key checker that never throws exceptions. Used in production builds.
+ */
 class NoOpPreferenceKeyChecker implements PreferenceKeyChecker {
     @Override
     public void checkIsKeyInUse(String key) {

@@ -39,7 +39,7 @@ class QUICHE_EXPORT QuicBatchWriterBase : public QuicPacketWriter {
 
   void SetWritable() final { write_blocked_ = false; }
 
-  std::optional<int> MessageTooBigErrorCode() const override {
+  absl::optional<int> MessageTooBigErrorCode() const override {
     return EMSGSIZE;
   }
 

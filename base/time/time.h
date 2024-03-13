@@ -65,7 +65,6 @@
 #include <stdint.h>
 #include <time.h>
 
-#include <compare>
 #include <iosfwd>
 #include <limits>
 #include <ostream>
@@ -316,9 +315,24 @@ class BASE_EXPORT TimeDelta {
   }
 
   // Comparison operators.
-  friend constexpr bool operator==(TimeDelta, TimeDelta) = default;
-  friend constexpr std::strong_ordering operator<=>(TimeDelta,
-                                                    TimeDelta) = default;
+  constexpr bool operator==(TimeDelta other) const {
+    return delta_ == other.delta_;
+  }
+  constexpr bool operator!=(TimeDelta other) const {
+    return delta_ != other.delta_;
+  }
+  constexpr bool operator<(TimeDelta other) const {
+    return delta_ < other.delta_;
+  }
+  constexpr bool operator<=(TimeDelta other) const {
+    return delta_ <= other.delta_;
+  }
+  constexpr bool operator>(TimeDelta other) const {
+    return delta_ > other.delta_;
+  }
+  constexpr bool operator>=(TimeDelta other) const {
+    return delta_ >= other.delta_;
+  }
 
   // Returns this delta, ceiled/floored/rounded-away-from-zero to the nearest
   // multiple of |interval|.
@@ -468,9 +482,24 @@ class TimeBase {
   }
 
   // Comparison operators
-  friend constexpr bool operator==(const TimeBase&, const TimeBase&) = default;
-  friend constexpr std::strong_ordering operator<=>(const TimeBase&,
-                                                    const TimeBase&) = default;
+  constexpr bool operator==(const TimeBase<TimeClass>& other) const {
+    return us_ == other.us_;
+  }
+  constexpr bool operator!=(const TimeBase<TimeClass>& other) const {
+    return us_ != other.us_;
+  }
+  constexpr bool operator<(const TimeBase<TimeClass>& other) const {
+    return us_ < other.us_;
+  }
+  constexpr bool operator<=(const TimeBase<TimeClass>& other) const {
+    return us_ <= other.us_;
+  }
+  constexpr bool operator>(const TimeBase<TimeClass>& other) const {
+    return us_ > other.us_;
+  }
+  constexpr bool operator>=(const TimeBase<TimeClass>& other) const {
+    return us_ >= other.us_;
+  }
 
  protected:
   constexpr explicit TimeBase(int64_t us) : us_(us) {}

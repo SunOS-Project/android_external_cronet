@@ -4,6 +4,9 @@
 
 #include "net/first_party_sets/global_first_party_sets.h"
 
+#include <set>
+#include <string>
+
 #include "base/containers/flat_map.h"
 #include "base/version.h"
 #include "net/base/schemeful_site.h"
@@ -11,8 +14,6 @@
 #include "net/first_party_sets/first_party_set_entry_override.h"
 #include "net/first_party_sets/first_party_set_metadata.h"
 #include "net/first_party_sets/first_party_sets_context_config.h"
-#include "net/first_party_sets/local_set_declaration.h"
-#include "net/first_party_sets/sets_mutation.h"
 #include "testing/gmock/include/gmock/gmock-matchers.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
@@ -100,9 +101,7 @@ TEST_F(GlobalFirstPartySetsTest, Clone) {
                             /*entries=*/
                             {{example, entry}, {member1, member1_entry}},
                             /*aliases=*/{{example_cctld, example}});
-  sets.ApplyManuallySpecifiedSet(LocalSetDeclaration(
-      /*set_entries=*/{{foo, foo_entry}, {member2, member2_entry}},
-      /*aliases=*/{}));
+  sets.ApplyManuallySpecifiedSet({{foo, foo_entry}, {member2, member2_entry}});
 
   EXPECT_EQ(sets, sets.Clone());
 }
@@ -267,15 +266,11 @@ TEST_F(GlobalFirstPartySetsTest, Empty_NonemptyEntries) {
 
 TEST_F(GlobalFirstPartySetsTest, Empty_NonemptyManualSet) {
   GlobalFirstPartySets sets;
-  sets.ApplyManuallySpecifiedSet(LocalSetDeclaration(
-      /*set_entries=*/
-      {
-          {kPrimary,
-           FirstPartySetEntry(kPrimary, SiteType::kPrimary, absl::nullopt)},
-          {kAssociated4,
-           FirstPartySetEntry(kPrimary, SiteType::kAssociated, 0)},
-      },
-      /*aliases=*/{}));
+  sets.ApplyManuallySpecifiedSet({
+      {kPrimary,
+       FirstPartySetEntry(kPrimary, SiteType::kPrimary, absl::nullopt)},
+      {kAssociated4, FirstPartySetEntry(kPrimary, SiteType::kAssociated, 0)},
+  });
   EXPECT_FALSE(sets.empty());
 }
 
@@ -290,15 +285,11 @@ TEST_F(GlobalFirstPartySetsTest, InvalidPublicSetsVersion_NonemptyManualSet) {
       },
       /*aliases=*/{});
   ASSERT_TRUE(sets.empty());
-  sets.ApplyManuallySpecifiedSet(LocalSetDeclaration(
-      /*set_entries=*/
-      {
-          {kPrimary,
-           FirstPartySetEntry(kPrimary, SiteType::kPrimary, absl::nullopt)},
-          {kAssociated4,
-           FirstPartySetEntry(kPrimary, SiteType::kAssociated, 0)},
-      },
-      /*aliases=*/{}));
+  sets.ApplyManuallySpecifiedSet({
+      {kPrimary,
+       FirstPartySetEntry(kPrimary, SiteType::kPrimary, absl::nullopt)},
+      {kAssociated4, FirstPartySetEntry(kPrimary, SiteType::kAssociated, 0)},
+  });
 
   // The manual set should still be available, even though the component was
   // invalid.
@@ -316,21 +307,16 @@ TEST_F(GlobalFirstPartySetsTest, InvalidPublicSetsVersion_NonemptyManualSet) {
 TEST_F(GlobalFirstPartySetsTest,
        ForEachEffectiveSetEntry_ManualSetAndConfig_FullIteration) {
   GlobalFirstPartySets global_sets;
-  global_sets.ApplyManuallySpecifiedSet(LocalSetDeclaration(
-      /*set_entries=*/
-      {
-          {kPrimary,
-           FirstPartySetEntry(kPrimary, SiteType::kPrimary, absl::nullopt)},
-          {kAssociated4,
-           FirstPartySetEntry(kPrimary, SiteType::kAssociated, 0)},
-          {kAssociated5,
-           FirstPartySetEntry(kPrimary, SiteType::kAssociated, 1)},
-      },
-      /*aliases=*/{}));
+  global_sets.ApplyManuallySpecifiedSet({
+      {kPrimary,
+       FirstPartySetEntry(kPrimary, SiteType::kPrimary, absl::nullopt)},
+      {kAssociated4, FirstPartySetEntry(kPrimary, SiteType::kAssociated, 0)},
+      {kAssociated5, FirstPartySetEntry(kPrimary, SiteType::kAssociated, 1)},
+  });
 
   // Modify kPrimary's set by removing kAssociated5 and modifying kAssociated4,
   // via policy.
-  FirstPartySetsContextConfig config = global_sets.ComputeConfig(SetsMutation(
+  FirstPartySetsContextConfig config = global_sets.ComputeConfig(
       /*replacement_sets=*/
       {
           {
@@ -347,7 +333,7 @@ TEST_F(GlobalFirstPartySetsTest,
                FirstPartySetEntry(kPrimary, SiteType::kService, absl::nullopt)},
           },
       },
-      /*addition_sets=*/{}));
+      /*addition_sets=*/{});
 
   // Note that since the policy sets take precedence over the manual set,
   // kAssociated5 is no longer in an FPS.
@@ -403,15 +389,11 @@ TEST_F(PopulatedGlobalFirstPartySetsTest,
        ApplyManuallySpecifiedSet_DeduplicatesPrimaryPrimary) {
   // kPrimary overlaps as primary of both sets, so the existing set should be
   // wiped out.
-  global_sets().ApplyManuallySpecifiedSet(LocalSetDeclaration(
-      /*set_entries=*/
-      {
-          {kPrimary,
-           FirstPartySetEntry(kPrimary, SiteType::kPrimary, absl::nullopt)},
-          {kAssociated4,
-           FirstPartySetEntry(kPrimary, SiteType::kAssociated, 0)},
-      },
-      /*aliases=*/{}));
+  global_sets().ApplyManuallySpecifiedSet({
+      {kPrimary,
+       FirstPartySetEntry(kPrimary, SiteType::kPrimary, absl::nullopt)},
+      {kAssociated4, FirstPartySetEntry(kPrimary, SiteType::kAssociated, 0)},
+  });
 
   EXPECT_THAT(
       global_sets().FindEntries(
@@ -435,14 +417,11 @@ TEST_F(PopulatedGlobalFirstPartySetsTest,
        ApplyManuallySpecifiedSet_DeduplicatesPrimaryNonprimary) {
   // kPrimary overlaps as a primary of the public set and non-primary of the CLI
   // set, so the existing set should be wiped out.
-  global_sets().ApplyManuallySpecifiedSet(LocalSetDeclaration(
-      /*set_entries=*/
-      {
-          {kPrimary3,
-           FirstPartySetEntry(kPrimary3, SiteType::kPrimary, absl::nullopt)},
-          {kPrimary, FirstPartySetEntry(kPrimary3, SiteType::kAssociated, 0)},
-      },
-      /*aliases=*/{}));
+  global_sets().ApplyManuallySpecifiedSet({
+      {kPrimary3,
+       FirstPartySetEntry(kPrimary3, SiteType::kPrimary, absl::nullopt)},
+      {kPrimary, FirstPartySetEntry(kPrimary3, SiteType::kAssociated, 0)},
+  });
 
   EXPECT_THAT(
       global_sets().FindEntries(
@@ -468,15 +447,12 @@ TEST_F(PopulatedGlobalFirstPartySetsTest,
   // kAssociated1 overlaps as a non-primary of the public set and primary of the
   // CLI set, so the CLI set should steal it and wipe out its alias, but
   // otherwise leave the set intact.
-  global_sets().ApplyManuallySpecifiedSet(LocalSetDeclaration(
-      /*set_entries=*/
-      {
-          {kAssociated1,
-           FirstPartySetEntry(kAssociated1, SiteType::kPrimary, absl::nullopt)},
-          {kAssociated4,
-           FirstPartySetEntry(kAssociated1, SiteType::kAssociated, 0)},
-      },
-      /*aliases=*/{}));
+  global_sets().ApplyManuallySpecifiedSet({
+      {kAssociated1,
+       FirstPartySetEntry(kAssociated1, SiteType::kPrimary, absl::nullopt)},
+      {kAssociated4,
+       FirstPartySetEntry(kAssociated1, SiteType::kAssociated, 0)},
+  });
 
   EXPECT_THAT(
       global_sets().FindEntries(
@@ -508,15 +484,11 @@ TEST_F(PopulatedGlobalFirstPartySetsTest,
        ApplyManuallySpecifiedSet_DeduplicatesNonprimaryNonprimary) {
   // kAssociated1 overlaps as a non-primary of the public set and non-primary of
   // the CLI set, so the CLI set should steal it and wipe out its alias.
-  global_sets().ApplyManuallySpecifiedSet(LocalSetDeclaration(
-      /*set_entries=*/
-      {
-          {kPrimary3,
-           FirstPartySetEntry(kPrimary3, SiteType::kPrimary, absl::nullopt)},
-          {kAssociated1,
-           FirstPartySetEntry(kPrimary3, SiteType::kAssociated, 0)},
-      },
-      /*aliases=*/{}));
+  global_sets().ApplyManuallySpecifiedSet({
+      {kPrimary3,
+       FirstPartySetEntry(kPrimary3, SiteType::kPrimary, absl::nullopt)},
+      {kAssociated1, FirstPartySetEntry(kPrimary3, SiteType::kAssociated, 0)},
+  });
 
   EXPECT_THAT(
       global_sets().FindEntries(
@@ -547,15 +519,11 @@ TEST_F(PopulatedGlobalFirstPartySetsTest,
        ApplyManuallySpecifiedSet_PrunesInducedSingletons) {
   // Steal kAssociated3, so that kPrimary2 becomes a singleton, and verify that
   // kPrimary2 is no longer considered in a set.
-  global_sets().ApplyManuallySpecifiedSet(LocalSetDeclaration(
-      /*set_entries=*/
-      {
-          {kPrimary3,
-           FirstPartySetEntry(kPrimary3, SiteType::kPrimary, absl::nullopt)},
-          {kAssociated3,
-           FirstPartySetEntry(kPrimary3, SiteType::kAssociated, 0)},
-      },
-      /*aliases=*/{}));
+  global_sets().ApplyManuallySpecifiedSet({
+      {kPrimary3,
+       FirstPartySetEntry(kPrimary3, SiteType::kPrimary, absl::nullopt)},
+      {kAssociated3, FirstPartySetEntry(kPrimary3, SiteType::kAssociated, 0)},
+  });
 
   EXPECT_THAT(
       global_sets().FindEntries({kPrimary2}, FirstPartySetsContextConfig()),
@@ -567,17 +535,13 @@ TEST_F(PopulatedGlobalFirstPartySetsTest,
   // Both the public sets and the locally-defined set define an alias for
   // kAssociated1, but both define a different set for that site too.  Only the
   // locally-defined alias should be observable.
-  global_sets().ApplyManuallySpecifiedSet(LocalSetDeclaration(
-      /*set_entries=*/
-      {
-          {kPrimary3,
-           FirstPartySetEntry(kPrimary3, SiteType::kPrimary, absl::nullopt)},
-          {kAssociated1,
-           FirstPartySetEntry(kPrimary3, SiteType::kAssociated, 0)},
-      },
-      /*aliases=*/{
-          {kAssociated1Cctld2, kAssociated1},
-      }));
+  global_sets().ApplyManuallySpecifiedSet({
+      {kPrimary3,
+       FirstPartySetEntry(kPrimary3, SiteType::kPrimary, absl::nullopt)},
+      {kAssociated1, FirstPartySetEntry(kPrimary3, SiteType::kAssociated, 0)},
+      {kAssociated1Cctld2,
+       FirstPartySetEntry(kPrimary3, SiteType::kAssociated, 0)},
+  });
 
   EXPECT_THAT(
       global_sets().FindEntries(
@@ -639,15 +603,11 @@ TEST_F(PopulatedGlobalFirstPartySetsTest,
        ForEachEffectiveSetEntry_PublicSetsWithManualSet_FullIteration) {
   // Replace kPrimary's set (including the alias and service site) with just
   // {kPrimary, kAssociated4}.
-  global_sets().ApplyManuallySpecifiedSet(LocalSetDeclaration(
-      /*set_entries=*/
-      {
-          {kPrimary,
-           FirstPartySetEntry(kPrimary, SiteType::kPrimary, absl::nullopt)},
-          {kAssociated4,
-           FirstPartySetEntry(kPrimary, SiteType::kAssociated, 0)},
-      },
-      /*aliases=*/{}));
+  global_sets().ApplyManuallySpecifiedSet({
+      {kPrimary,
+       FirstPartySetEntry(kPrimary, SiteType::kPrimary, absl::nullopt)},
+      {kAssociated4, FirstPartySetEntry(kPrimary, SiteType::kAssociated, 0)},
+  });
 
   EXPECT_THAT(
       CollectEffectiveSetEntries(global_sets(), FirstPartySetsContextConfig()),
@@ -666,7 +626,7 @@ TEST_F(PopulatedGlobalFirstPartySetsTest,
        ForEachEffectiveSetEntry_PublicSetsWithConfig_FullIteration) {
   // Modify kPrimary's set by removing kAssociated2 and adding kAssociated4, via
   // policy.
-  FirstPartySetsContextConfig config = global_sets().ComputeConfig(SetsMutation(
+  FirstPartySetsContextConfig config = global_sets().ComputeConfig(
       /*replacement_sets=*/
       {
           {
@@ -683,7 +643,7 @@ TEST_F(PopulatedGlobalFirstPartySetsTest,
                FirstPartySetEntry(kPrimary, SiteType::kService, absl::nullopt)},
           },
       },
-      /*addition_sets=*/{}));
+      /*addition_sets=*/{});
 
   EXPECT_THAT(
       CollectEffectiveSetEntries(global_sets(), config),
@@ -710,21 +670,16 @@ TEST_F(
     ForEachEffectiveSetEntry_PublicSetsWithManualSetAndConfig_FullIteration) {
   // Replace kPrimary's set (including the alias and service site) with just
   // {kPrimary, kAssociated4, kAssociated5}.
-  global_sets().ApplyManuallySpecifiedSet(LocalSetDeclaration(
-      /*set_entries=*/
-      {
-          {kPrimary,
-           FirstPartySetEntry(kPrimary, SiteType::kPrimary, absl::nullopt)},
-          {kAssociated4,
-           FirstPartySetEntry(kPrimary, SiteType::kAssociated, 0)},
-          {kAssociated5,
-           FirstPartySetEntry(kPrimary, SiteType::kAssociated, 1)},
-      },
-      /*aliases=*/{}));
+  global_sets().ApplyManuallySpecifiedSet({
+      {kPrimary,
+       FirstPartySetEntry(kPrimary, SiteType::kPrimary, absl::nullopt)},
+      {kAssociated4, FirstPartySetEntry(kPrimary, SiteType::kAssociated, 0)},
+      {kAssociated5, FirstPartySetEntry(kPrimary, SiteType::kAssociated, 1)},
+  });
 
   // Modify kPrimary's set by removing kAssociated2 and adding kAssociated4, via
   // policy.
-  FirstPartySetsContextConfig config = global_sets().ComputeConfig(SetsMutation(
+  FirstPartySetsContextConfig config = global_sets().ComputeConfig(
       /*replacement_sets=*/
       {
           {
@@ -741,7 +696,7 @@ TEST_F(
                FirstPartySetEntry(kPrimary, SiteType::kService, absl::nullopt)},
           },
       },
-      /*addition_sets=*/{}));
+      /*addition_sets=*/{});
 
   // Note that since the policy sets take precedence over the manual set,
   // kAssociated5 is no longer in an FPS.
@@ -763,46 +718,6 @@ TEST_F(
                                              absl::nullopt)),
           Pair(kService, FirstPartySetEntry(kPrimary, SiteType::kService,
                                             absl::nullopt))));
-}
-
-TEST_F(
-    PopulatedGlobalFirstPartySetsTest,
-    ForEachEffectiveSetEntry_PublicSetsWithManualSetAndConfig_ManualAliasOverlap) {
-  global_sets().ApplyManuallySpecifiedSet(LocalSetDeclaration(
-      /*set_entries=*/
-      {
-          {kPrimary,
-           FirstPartySetEntry(kPrimary, SiteType::kPrimary, absl::nullopt)},
-          {kAssociated1,
-           FirstPartySetEntry(kPrimary, SiteType::kAssociated, 0)},
-      },
-      /*aliases=*/{
-          {kAssociated1Cctld2, kAssociated1},
-      }));
-
-  FirstPartySetsContextConfig config = global_sets().ComputeConfig(SetsMutation(
-      /*replacement_sets=*/
-      {
-          {
-              {kPrimary2, FirstPartySetEntry(kPrimary2, SiteType::kPrimary,
-                                             absl::nullopt)},
-              {kAssociated1,
-               FirstPartySetEntry(kPrimary2, SiteType::kAssociated,
-                                  absl::nullopt)},
-          },
-      },
-      /*addition_sets=*/{}));
-
-  EXPECT_THAT(
-      CollectEffectiveSetEntries(global_sets(), config),
-      UnorderedElementsAre(
-          Pair(kAssociated1,
-               FirstPartySetEntry(kPrimary2, SiteType::kAssociated,
-                                  absl::nullopt)),
-          Pair(kPrimary,
-               FirstPartySetEntry(kPrimary, SiteType::kPrimary, absl::nullopt)),
-          Pair(kPrimary2, FirstPartySetEntry(kPrimary2, SiteType::kPrimary,
-                                             absl::nullopt))));
 }
 
 TEST_F(PopulatedGlobalFirstPartySetsTest, ComputeMetadata) {
@@ -845,7 +760,7 @@ TEST_F(GlobalFirstPartySetsTest, ComputeConfig_Empty) {
                      FirstPartySetEntry(kPrimary, SiteType::kAssociated, 0)},
                 },
                 /*aliases=*/{})
-                .ComputeConfig(SetsMutation({}, {})),
+                .ComputeConfig({}, {}),
             FirstPartySetsContextConfig());
 }
 
@@ -861,7 +776,7 @@ TEST_F(GlobalFirstPartySetsTest,
            FirstPartySetEntry(kPrimary, SiteType::kAssociated, 0)},
       },
       /*aliases=*/{});
-  FirstPartySetsContextConfig config = sets.ComputeConfig(SetsMutation(
+  FirstPartySetsContextConfig config = sets.ComputeConfig(
       /*replacement_sets=*/
       {
           {
@@ -872,7 +787,7 @@ TEST_F(GlobalFirstPartySetsTest,
                                   absl::nullopt)},
           },
       },
-      /*addition_sets=*/{}));
+      /*addition_sets=*/{});
   EXPECT_THAT(
       sets.FindEntries({kAssociated2, kPrimary2}, config),
       UnorderedElementsAre(
@@ -900,7 +815,7 @@ TEST_F(
            FirstPartySetEntry(kPrimary, SiteType::kAssociated, 1)},
       },
       /*aliases=*/{});
-  FirstPartySetsContextConfig config = sets.ComputeConfig(SetsMutation(
+  FirstPartySetsContextConfig config = sets.ComputeConfig(
       /*replacement_sets=*/
       {
           {
@@ -911,7 +826,7 @@ TEST_F(
                                   absl::nullopt)},
           },
       },
-      /*addition_sets=*/{}));
+      /*addition_sets=*/{});
   EXPECT_THAT(
       sets.FindEntries({kPrimary2, kAssociated2}, config),
       UnorderedElementsAre(
@@ -939,7 +854,7 @@ TEST_F(
            FirstPartySetEntry(kPrimary, SiteType::kAssociated, 1)},
       },
       /*aliases=*/{});
-  FirstPartySetsContextConfig config = sets.ComputeConfig(SetsMutation(
+  FirstPartySetsContextConfig config = sets.ComputeConfig(
       /*replacement_sets=*/
       {
           {
@@ -949,7 +864,7 @@ TEST_F(
                                                 absl::nullopt)},
           },
       },
-      /*addition_sets=*/{}));
+      /*addition_sets=*/{});
   EXPECT_THAT(
       sets.FindEntries({kAssociated3, kPrimary, kAssociated1, kAssociated2},
                        config),
@@ -975,7 +890,7 @@ TEST_F(
            FirstPartySetEntry(kPrimary, SiteType::kAssociated, 0)},
       },
       /*aliases=*/{});
-  FirstPartySetsContextConfig config = sets.ComputeConfig(SetsMutation(
+  FirstPartySetsContextConfig config = sets.ComputeConfig(
       /*replacement_sets=*/
       {
           {
@@ -986,7 +901,7 @@ TEST_F(
                                   absl::nullopt)},
           },
       },
-      /*addition_sets=*/{}));
+      /*addition_sets=*/{});
   EXPECT_THAT(
       sets.FindEntries({kAssociated1, kPrimary3, kPrimary}, config),
       UnorderedElementsAre(
@@ -1011,7 +926,7 @@ TEST_F(GlobalFirstPartySetsTest,
            FirstPartySetEntry(kPrimary, SiteType::kAssociated, 0)},
       },
       /*aliases=*/{});
-  FirstPartySetsContextConfig config = sets.ComputeConfig(SetsMutation(
+  FirstPartySetsContextConfig config = sets.ComputeConfig(
       /*replacement_sets=*/{},
       /*addition_sets=*/{
           {
@@ -1021,7 +936,7 @@ TEST_F(GlobalFirstPartySetsTest,
                FirstPartySetEntry(kPrimary2, SiteType::kAssociated,
                                   absl::nullopt)},
           },
-      }));
+      });
   EXPECT_THAT(
       sets.FindEntries({kAssociated2, kPrimary2}, config),
       UnorderedElementsAre(
@@ -1048,7 +963,7 @@ TEST_F(
            FirstPartySetEntry(kPrimary, SiteType::kAssociated, 0)},
       },
       /*aliases=*/{});
-  FirstPartySetsContextConfig config = sets.ComputeConfig(SetsMutation(
+  FirstPartySetsContextConfig config = sets.ComputeConfig(
       /*replacement_sets=*/{},
       /*addition_sets=*/{
           {
@@ -1062,7 +977,7 @@ TEST_F(
                FirstPartySetEntry(kAssociated1, SiteType::kAssociated,
                                   absl::nullopt)},
           },
-      }));
+      });
   EXPECT_THAT(
       sets.FindEntries({kPrimary, kAssociated2, kAssociated3, kAssociated1},
                        config),
@@ -1098,14 +1013,14 @@ TEST_F(
            FirstPartySetEntry(kPrimary, SiteType::kAssociated, 1)},
       },
       /*aliases=*/{});
-  FirstPartySetsContextConfig config = sets.ComputeConfig(SetsMutation(
+  FirstPartySetsContextConfig config = sets.ComputeConfig(
       /*replacement_sets=*/{},
       /*addition_sets=*/{{
           {kPrimary,
            FirstPartySetEntry(kPrimary, SiteType::kPrimary, absl::nullopt)},
           {kAssociated2,
            FirstPartySetEntry(kPrimary, SiteType::kAssociated, absl::nullopt)},
-      }}));
+      }});
   EXPECT_THAT(
       sets.FindEntries({kAssociated1, kAssociated2, kAssociated3, kPrimary},
                        config),
@@ -1136,7 +1051,7 @@ TEST_F(
            FirstPartySetEntry(kPrimary, SiteType::kAssociated, 1)},
       },
       /*aliases=*/{});
-  FirstPartySetsContextConfig config = sets.ComputeConfig(SetsMutation(
+  FirstPartySetsContextConfig config = sets.ComputeConfig(
       /*replacement_sets=*/
       {
           {
@@ -1154,7 +1069,7 @@ TEST_F(
               {kAssociated3, FirstPartySetEntry(kPrimary, SiteType::kAssociated,
                                                 absl::nullopt)},
           },
-      }));
+      });
   EXPECT_THAT(
       sets.FindEntries(
           {kAssociated1, kAssociated2, kAssociated3, kPrimary, kPrimary2},
@@ -1195,7 +1110,7 @@ TEST_F(GlobalFirstPartySetsTest, TransitiveOverlap_TwoCommonPrimaries) {
           {primary2, FirstPartySetEntry(primary1, SiteType::kAssociated, 0)},
       },
       /*aliases=*/{});
-  FirstPartySetsContextConfig config = sets.ComputeConfig(SetsMutation(
+  FirstPartySetsContextConfig config = sets.ComputeConfig(
       /*replacement_sets=*/{},
       /*addition_sets=*/{
           {{primary0,
@@ -1218,7 +1133,7 @@ TEST_F(GlobalFirstPartySetsTest, TransitiveOverlap_TwoCommonPrimaries) {
            {associated_site42,
             FirstPartySetEntry(primary42, SiteType::kAssociated,
                                absl::nullopt)}},
-      }));
+      });
   EXPECT_THAT(
       sets.FindEntries(
           {
@@ -1277,7 +1192,7 @@ TEST_F(GlobalFirstPartySetsTest, TransitiveOverlap_TwoCommonAssociatedSites) {
           {primary1, FirstPartySetEntry(primary2, SiteType::kAssociated, 0)},
       },
       /*aliases=*/{});
-  FirstPartySetsContextConfig config = sets.ComputeConfig(SetsMutation(
+  FirstPartySetsContextConfig config = sets.ComputeConfig(
       /*replacement_sets=*/{},
       /*addition_sets=*/{
           {{primary0,
@@ -1300,7 +1215,7 @@ TEST_F(GlobalFirstPartySetsTest, TransitiveOverlap_TwoCommonAssociatedSites) {
            {associated_site42,
             FirstPartySetEntry(primary42, SiteType::kAssociated,
                                absl::nullopt)}},
-      }));
+      });
   EXPECT_THAT(
       sets.FindEntries(
           {
@@ -1349,7 +1264,7 @@ TEST_F(GlobalFirstPartySetsTest, InvalidPublicSetsVersion_ComputeConfig) {
       /*aliases=*/{});
   ASSERT_TRUE(sets.empty());
 
-  FirstPartySetsContextConfig config = sets.ComputeConfig(SetsMutation(
+  FirstPartySetsContextConfig config = sets.ComputeConfig(
       /*replacement_sets=*/
       {
           {
@@ -1360,7 +1275,7 @@ TEST_F(GlobalFirstPartySetsTest, InvalidPublicSetsVersion_ComputeConfig) {
                                   absl::nullopt)},
           },
       },
-      /*addition_sets=*/{}));
+      /*addition_sets=*/{});
 
   // The config should still be nonempty, even though the component was invalid.
   EXPECT_FALSE(config.empty());

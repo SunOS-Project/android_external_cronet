@@ -4,7 +4,6 @@
 
 #include "base/stack_canary_linux.h"
 
-#include "base/compiler_specific.h"
 #include "build/build_config.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
@@ -14,7 +13,7 @@ namespace base {
     (defined(ARCH_CPU_ARM_FAMILY) || defined(ARCH_CPU_X86_FAMILY))
 
 namespace {
-NOINLINE NOOPT void ResetCanaryAndReturn() {
+__attribute__((noinline, optnone)) void ResetCanaryAndReturn() {
   // Create a buffer >=8 bytes to force the stack protector on this function,
   // which should work as long as -fno-stack-protector isn't passed in the
   // default options. We compile this file with -fstack-protector-all, but it

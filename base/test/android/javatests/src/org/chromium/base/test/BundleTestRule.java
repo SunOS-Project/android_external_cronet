@@ -10,7 +10,9 @@ import org.junit.runners.model.Statement;
 
 import org.chromium.base.BundleUtils;
 
-/** Ensures that BundleUtils#isBundle returns true for the duration of the test. */
+/**
+ * Ensures that BundleUtils#isBundle returns true for the duration of the test.
+ */
 public class BundleTestRule implements TestRule {
     @Override
     public Statement apply(Statement base, Description description) {

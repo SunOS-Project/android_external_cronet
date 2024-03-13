@@ -6,6 +6,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include <__config>
+#ifndef _LIBCPP_HAS_NO_THREADS
+
 #include <__thread/timed_backoff_policy.h>
 #include <atomic>
 #include <climits>
@@ -216,3 +219,5 @@ void __libcpp_atomic_wait(__cxx_atomic_contention_t const volatile* __location, 
 }
 
 _LIBCPP_END_NAMESPACE_STD
+
+#endif //_LIBCPP_HAS_NO_THREADS

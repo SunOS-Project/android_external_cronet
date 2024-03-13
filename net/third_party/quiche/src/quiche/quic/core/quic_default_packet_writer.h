@@ -32,7 +32,7 @@ class QUICHE_EXPORT QuicDefaultPacketWriter : public QuicPacketWriter {
                           const QuicPacketWriterParams& params) override;
   bool IsWriteBlocked() const override;
   void SetWritable() override;
-  std::optional<int> MessageTooBigErrorCode() const override;
+  absl::optional<int> MessageTooBigErrorCode() const override;
   QuicByteCount GetMaxPacketSize(
       const QuicSocketAddress& peer_address) const override;
   bool SupportsReleaseTime() const override;

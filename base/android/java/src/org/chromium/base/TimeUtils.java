@@ -67,11 +67,8 @@ public class TimeUtils {
 
     interface FakeClock {
         long uptimeMillis();
-
         long elapsedRealtimeNanos();
-
         long currentThreadTimeMillis();
-
         long currentTimeMillis();
     }
 

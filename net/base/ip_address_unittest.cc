@@ -4,7 +4,6 @@
 
 #include "net/base/ip_address.h"
 
-#include <optional>
 #include <vector>
 
 #include "base/format_macros.h"
@@ -12,6 +11,7 @@
 #include "base/strings/stringprintf.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
+#include "third_party/abseil-cpp/absl/types/optional.h"
 
 using testing::Optional;
 

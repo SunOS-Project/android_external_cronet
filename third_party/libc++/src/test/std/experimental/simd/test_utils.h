@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LIBCXX_TEST_STD_EXPERIMENTAL_SIMD_TEST_UTILS_H
-#define LIBCXX_TEST_STD_EXPERIMENTAL_SIMD_TEST_UTILS_H
+#ifndef TEST_UTIL_H
+#define TEST_UTIL_H
 
 #include <algorithm>
 #include <array>
@@ -28,7 +28,7 @@ struct TestAllSimdAbiFunctor {
 
   template <class T, std::size_t... Ns>
   void instantiate_with_n(std::index_sequence<Ns...>) {
-    (types::for_each(sized_abis<T, Ns>{}, F<T, Ns>{}), ...);
+    (types::for_each(sized_abis<T, Ns + 1>{}, F<T, Ns + 1>{}), ...);
   }
 
   template <class T>
@@ -36,8 +36,7 @@ struct TestAllSimdAbiFunctor {
     using abis = types::type_list<ex::simd_abi::scalar, ex::simd_abi::native<T>, ex::simd_abi::compatible<T>>;
     types::for_each(abis{}, F<T, 1>());
 
-    instantiate_with_n<T>(
-        std::index_sequence<1, 2, 3, 4, 8, 16, max_simd_size - 2, max_simd_size - 1, max_simd_size>{});
+    instantiate_with_n<T>(std::make_index_sequence<max_simd_size - 1>{});
   }
 };
 
@@ -79,4 +78,4 @@ void assert_simd_mask_values_equal(const ex::simd_mask<T, SimdAbi>& origin_mask,
     assert(origin_mask[i] == expected_value[i]);
 }
 
-#endif // LIBCXX_TEST_STD_EXPERIMENTAL_SIMD_TEST_UTILS_H
+#endif // TEST_UTIL_H

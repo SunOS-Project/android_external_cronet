@@ -40,9 +40,6 @@ import("//build/util/lastchange.gni")
 #     doesn't attempt to link the result into a source set. This is for if
 #     you are processing the version as data only.
 #
-#   executable (optional, defaults to false)
-#     Sets the executable bit on the output file (POSIX only).
-#
 #   visibility (optional)
 #
 # Example:
@@ -93,10 +90,6 @@ template("process_version") {
           rebase_path(i, root_build_dir),
         ]
       }
-    }
-
-    if (defined(invoker.executable) && invoker.executable) {
-      args += [ "-x" ]
     }
 
     if (defined(invoker.extra_args)) {

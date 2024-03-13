@@ -5,7 +5,6 @@
 #ifndef BASE_TYPES_EXPECTED_MACROS_H_
 #define BASE_TYPES_EXPECTED_MACROS_H_
 
-#include <functional>
 #include <type_traits>
 #include <utility>
 

@@ -75,4 +75,6 @@ public class GtestListener extends RunListener {
         mCurrentTestPassed = false;
         mLogger.testFailed(f);
     }
+
 }
+

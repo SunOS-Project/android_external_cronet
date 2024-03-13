@@ -30,8 +30,8 @@ std::string AddBracketsIfIPv6(const IPAddress& ip_address) {
 // static
 std::unique_ptr<SchemeHostPortMatcherRule>
 SchemeHostPortMatcherRule::FromUntrimmedRawString(
-    std::string_view raw_untrimmed) {
-  std::string_view raw =
+    base::StringPiece raw_untrimmed) {
+  base::StringPiece raw =
       base::TrimWhitespaceASCII(raw_untrimmed, base::TRIM_ALL);
 
   // Extract any scheme-restriction.
@@ -90,7 +90,7 @@ SchemeHostPortMatcherRule::FromUntrimmedRawString(
   // Special-case hostnames that begin with a period.
   // For example, we remap ".google.com" --> "*.google.com".
   std::string hostname_pattern;
-  if (raw.starts_with(".")) {
+  if (base::StartsWith(raw, ".", base::CompareCase::SENSITIVE)) {
     hostname_pattern = base::StrCat({"*", raw});
   } else {
     hostname_pattern = std::string(raw);
@@ -157,7 +157,7 @@ bool SchemeHostPortMatcherHostnamePatternRule::IsHostnamePatternRule() const {
 
 std::unique_ptr<SchemeHostPortMatcherHostnamePatternRule>
 SchemeHostPortMatcherHostnamePatternRule::GenerateSuffixMatchingRule() const {
-  if (!hostname_pattern_.starts_with("*")) {
+  if (!base::StartsWith(hostname_pattern_, "*", base::CompareCase::SENSITIVE)) {
     return std::make_unique<SchemeHostPortMatcherHostnamePatternRule>(
         optional_scheme_, "*" + hostname_pattern_, optional_port_);
   }

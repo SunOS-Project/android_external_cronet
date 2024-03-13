@@ -4,16 +4,13 @@
 
 package org.chromium.net.impl;
 
-import static org.chromium.net.impl.HttpEngineNativeProvider.EXT_API_LEVEL;
-import static org.chromium.net.impl.HttpEngineNativeProvider.EXT_VERSION;
-
 import android.net.http.HttpException;
 
-import androidx.annotation.RequiresExtension;
+import androidx.annotation.RequiresApi;
 
 import org.chromium.net.CronetException;
 
-@RequiresExtension(extension = EXT_API_LEVEL, version = EXT_VERSION)
+@RequiresApi(api = 34)
 class AndroidHttpExceptionWrapper extends CronetException {
     AndroidHttpExceptionWrapper(HttpException e) {
         super(e.getMessage(), e);

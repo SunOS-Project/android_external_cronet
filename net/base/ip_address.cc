@@ -9,8 +9,6 @@
 #include <algorithm>
 #include <array>
 #include <climits>
-#include <optional>
-#include <string_view>
 
 #include "base/check_op.h"
 #include "base/debug/alias.h"
@@ -19,11 +17,13 @@
 #include "base/notreached.h"
 #include "base/ranges/algorithm.h"
 #include "base/strings/strcat.h"
+#include "base/strings/string_piece.h"
 #include "base/strings/string_split.h"
 #include "base/strings/stringprintf.h"
 #include "base/trace_event/memory_usage_estimator.h"
 #include "base/values.h"
 #include "net/base/parse_number.h"
+#include "third_party/abseil-cpp/absl/types/optional.h"
 #include "url/gurl.h"
 #include "url/url_canon_ip.h"
 
@@ -121,10 +121,11 @@ bool IsPubliclyRoutableIPv6(const IPAddressBytes& ip_address) {
   return false;
 }
 
-bool ParseIPLiteralToBytes(std::string_view ip_literal, IPAddressBytes* bytes) {
+bool ParseIPLiteralToBytes(base::StringPiece ip_literal,
+                           IPAddressBytes* bytes) {
   // |ip_literal| could be either an IPv4 or an IPv6 literal. If it contains
   // a colon however, it must be an IPv6 address.
-  if (ip_literal.find(':') != std::string_view::npos) {
+  if (ip_literal.find(':') != base::StringPiece::npos) {
     // GURL expects IPv6 hostnames to be surrounded with brackets.
     std::string host_brackets = base::StrCat({"[", ip_literal, "]"});
     url::Component host_comp(0, host_brackets.size());
@@ -192,19 +193,20 @@ size_t IPAddressBytes::EstimateMemoryUsage() const {
 }
 
 // static
-std::optional<IPAddress> IPAddress::FromValue(const base::Value& value) {
+absl::optional<IPAddress> IPAddress::FromValue(const base::Value& value) {
   if (!value.is_string()) {
-    return std::nullopt;
+    return absl::nullopt;
   }
 
   return IPAddress::FromIPLiteral(value.GetString());
 }
 
 // static
-std::optional<IPAddress> IPAddress::FromIPLiteral(std::string_view ip_literal) {
+absl::optional<IPAddress> IPAddress::FromIPLiteral(
+    base::StringPiece ip_literal) {
   IPAddress address;
   if (!address.AssignFromIPLiteral(ip_literal)) {
-    return std::nullopt;
+    return absl::nullopt;
   }
   DCHECK(address.IsValid());
   return address;
@@ -319,7 +321,7 @@ bool IPAddress::IsUniqueLocalIPv6() const {
   return IsIPv6() && ((ip_address_[0] & 0xFE) == 0xFC);
 }
 
-bool IPAddress::AssignFromIPLiteral(std::string_view ip_literal) {
+bool IPAddress::AssignFromIPLiteral(base::StringPiece ip_literal) {
   bool success = ParseIPLiteralToBytes(ip_literal, &ip_address_);
   if (!success)
     ip_address_.Resize(0);
@@ -464,14 +466,14 @@ bool IPAddressMatchesPrefix(const IPAddress& ip_address,
                               prefix_length_in_bits);
 }
 
-bool ParseCIDRBlock(std::string_view cidr_literal,
+bool ParseCIDRBlock(base::StringPiece cidr_literal,
                     IPAddress* ip_address,
                     size_t* prefix_length_in_bits) {
   // We expect CIDR notation to match one of these two templates:
   //   <IPv4-literal> "/" <number of bits>
   //   <IPv6-literal> "/" <number of bits>
 
-  std::vector<std::string_view> parts = base::SplitStringPiece(
+  std::vector<base::StringPiece> parts = base::SplitStringPiece(
       cidr_literal, "/", base::TRIM_WHITESPACE, base::SPLIT_WANT_ALL);
   if (parts.size() != 2)
     return false;
@@ -494,12 +496,13 @@ bool ParseCIDRBlock(std::string_view cidr_literal,
   return true;
 }
 
-bool ParseURLHostnameToAddress(std::string_view hostname,
+bool ParseURLHostnameToAddress(base::StringPiece hostname,
                                IPAddress* ip_address) {
   if (hostname.size() >= 2 && hostname.front() == '[' &&
       hostname.back() == ']') {
     // Strip the square brackets that surround IPv6 literals.
-    auto ip_literal = std::string_view(hostname).substr(1, hostname.size() - 2);
+    auto ip_literal =
+        base::StringPiece(hostname).substr(1, hostname.size() - 2);
     return ip_address->AssignFromIPLiteral(ip_literal) && ip_address->IsIPv6();
   }
 

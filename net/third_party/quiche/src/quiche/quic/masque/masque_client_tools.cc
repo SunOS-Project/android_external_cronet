@@ -4,8 +4,7 @@
 
 #include "quiche/quic/masque/masque_client_tools.h"
 
-#include <optional>
-
+#include "absl/types/optional.h"
 #include "quiche/quic/masque/masque_encapsulated_client.h"
 #include "quiche/quic/masque/masque_utils.h"
 #include "quiche/quic/platform/api/quic_default_proof_providers.h"
@@ -38,7 +37,7 @@ class FakeAddressRemover {
   }
 
  private:
-  std::optional<quiche::QuicheIpAddress> fake_address_;
+  absl::optional<quiche::QuicheIpAddress> fake_address_;
   MasqueClientSession* masque_client_session_ = nullptr;
 };
 

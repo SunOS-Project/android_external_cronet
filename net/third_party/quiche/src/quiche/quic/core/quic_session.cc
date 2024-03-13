@@ -187,7 +187,7 @@ PendingStream* QuicSession::PendingStreamOnStreamFrame(
 void QuicSession::MaybeProcessPendingStream(PendingStream* pending) {
   QUICHE_DCHECK(pending != nullptr);
   QuicStreamId stream_id = pending->id();
-  std::optional<QuicResetStreamError> stop_sending_error_code =
+  absl::optional<QuicResetStreamError> stop_sending_error_code =
       pending->GetStopSendingErrorCode();
   QuicStream* stream = ProcessPendingStream(pending);
   if (stream != nullptr) {
@@ -1349,12 +1349,12 @@ void QuicSession::OnConfigNegotiated() {
               .Normalized()
               .host()
               .address_family();
-      std::optional<QuicSocketAddress> preferred_address =
+      absl::optional<QuicSocketAddress> preferred_address =
           config_.GetPreferredAddressToSend(address_family);
       if (preferred_address.has_value()) {
         // Set connection ID and token if SPAD has received and a preferred
         // address of the same address family is configured.
-        std::optional<QuicNewConnectionIdFrame> frame =
+        absl::optional<QuicNewConnectionIdFrame> frame =
             connection_->MaybeIssueNewConnectionIdForPreferredAddress();
         if (frame.has_value()) {
           config_.SetPreferredAddressConnectionIdAndTokenToSend(
@@ -1391,9 +1391,9 @@ void QuicSession::OnConfigNegotiated() {
   }
 }
 
-std::optional<std::string> QuicSession::OnAlpsData(const uint8_t* /*alps_data*/,
-                                                   size_t /*alps_length*/) {
-  return std::nullopt;
+absl::optional<std::string> QuicSession::OnAlpsData(
+    const uint8_t* /*alps_data*/, size_t /*alps_length*/) {
+  return absl::nullopt;
 }
 
 void QuicSession::AdjustInitialFlowControlWindows(size_t stream_window) {
@@ -1731,7 +1731,7 @@ void QuicSession::OnTlsHandshakeComplete() {
 bool QuicSession::MaybeSendAddressToken() {
   QUICHE_DCHECK(perspective_ == Perspective::IS_SERVER &&
                 connection()->version().HasIetfQuicFrames());
-  std::optional<CachedNetworkParameters> cached_network_params =
+  absl::optional<CachedNetworkParameters> cached_network_params =
       GenerateCachedNetworkParameters();
 
   std::string address_token = GetCryptoStream()->GetAddressToken(
@@ -2426,16 +2426,6 @@ bool QuicSession::HasUnackedStreamData() const {
 
 HandshakeState QuicSession::GetHandshakeState() const {
   return GetCryptoStream()->GetHandshakeState();
-}
-
-QuicByteCount QuicSession::GetFlowControlSendWindowSize(QuicStreamId id) {
-  QuicStream* stream = GetActiveStream(id);
-  if (stream == nullptr) {
-    // No flow control for invalid or inactive stream ids. Returning uint64max
-    // allows QuicPacketCreator to write as much data as possible.
-    return std::numeric_limits<QuicByteCount>::max();
-  }
-  return stream->CalculateSendWindowSize();
 }
 
 WriteStreamDataResult QuicSession::WriteStreamData(QuicStreamId id,

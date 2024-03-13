@@ -77,11 +77,10 @@ class ReportingServiceTest : public ::testing::TestWithParam<bool>,
 
   // Initializes, or re-initializes, |service_| and its dependencies.
   void Init() {
-    if (GetParam()) {
+    if (GetParam())
       store_ = std::make_unique<MockPersistentReportingStore>();
-    } else {
+    else
       store_ = nullptr;
-    }
 
     auto test_context = std::make_unique<TestReportingContext>(
         &clock_, &tick_clock_, ReportingPolicy(), store_.get());
@@ -93,9 +92,8 @@ class ReportingServiceTest : public ::testing::TestWithParam<bool>,
   // If the store exists, simulate finishing loading the store, which should
   // make the rest of the test run synchronously.
   void FinishLoading(bool load_success) {
-    if (store_) {
+    if (store_)
       store_->FinishLoading(load_success);
-    }
   }
 
   MockPersistentReportingStore* store() { return store_.get(); }
@@ -109,8 +107,8 @@ class ReportingServiceTest : public ::testing::TestWithParam<bool>,
   base::SimpleTestTickClock tick_clock_;
 
   std::unique_ptr<MockPersistentReportingStore> store_;
+  raw_ptr<TestReportingContext, DanglingUntriaged> context_;
   std::unique_ptr<ReportingService> service_;
-  raw_ptr<TestReportingContext> context_ = nullptr;
 };
 
 TEST_P(ReportingServiceTest, QueueReport) {
@@ -427,9 +425,8 @@ TEST_P(ReportingServiceTest, ProcessReportToHeaderNetworkIsolationKeyDisabled) {
 }
 
 TEST_P(ReportingServiceTest, WriteToStore) {
-  if (!store()) {
+  if (!store())
     return;
-  }
 
   MockPersistentReportingStore::CommandList expected_commands;
 
@@ -503,9 +500,8 @@ TEST_P(ReportingServiceTest, WriteToStore) {
 }
 
 TEST_P(ReportingServiceTest, WaitUntilLoadFinishesBeforeWritingToStore) {
-  if (!store()) {
+  if (!store())
     return;
-  }
 
   MockPersistentReportingStore::CommandList expected_commands;
 

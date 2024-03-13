@@ -2,19 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "partition_alloc/shim/malloc_zone_functions_apple.h"
+#include "base/allocator/partition_allocator/src/partition_alloc/shim/malloc_zone_functions_apple.h"
 
 #include <atomic>
 #include <type_traits>
 
-#include "partition_alloc/partition_alloc_base/check.h"
-#include "partition_alloc/partition_lock.h"
+#include "base/allocator/partition_allocator/src/partition_alloc/partition_alloc_base/check.h"
+#include "base/allocator/partition_allocator/src/partition_alloc/partition_lock.h"
 
 namespace allocator_shim {
 
 MallocZoneFunctions g_malloc_zones[kMaxZoneCount];
-static_assert(std::is_trivial_v<MallocZoneFunctions> &&
-                  std::is_standard_layout_v<MallocZoneFunctions>,
+static_assert(std::is_pod_v<MallocZoneFunctions>,
               "MallocZoneFunctions must be POD");
 
 void StoreZoneFunctions(const ChromeMallocZone* zone,
@@ -26,10 +25,8 @@ void StoreZoneFunctions(const ChromeMallocZone* zone,
   functions->free = zone->free;
   functions->realloc = zone->realloc;
   functions->size = zone->size;
-  functions->good_size = zone->introspect->good_size;
   PA_BASE_CHECK(functions->malloc && functions->calloc && functions->valloc &&
-                functions->free && functions->realloc && functions->size &&
-                functions->good_size);
+                functions->free && functions->realloc && functions->size);
 
   // These functions might be nullptr.
   functions->batch_malloc = zone->batch_malloc;

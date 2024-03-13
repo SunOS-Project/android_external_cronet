@@ -10,10 +10,10 @@ namespace quiche {
 
 // Chrome converts broken out UTC times for certificates to unix times using
 // the BoringSSL routines.
-std::optional<int64_t> QuicheUtcDateTimeToUnixSecondsImpl(int year, int month,
-                                                          int day, int hour,
-                                                          int minute,
-                                                          int second) {
+absl::optional<int64_t> QuicheUtcDateTimeToUnixSecondsImpl(int year, int month,
+                                                           int day, int hour,
+                                                           int minute,
+                                                           int second) {
   struct tm tmp_tm;
   tmp_tm.tm_year = year - 1900;
   tmp_tm.tm_mon = month - 1;
@@ -29,13 +29,13 @@ std::optional<int64_t> QuicheUtcDateTimeToUnixSecondsImpl(int year, int month,
   }
   int64_t result;
   if (!OPENSSL_tm_to_posix(&tmp_tm, &result)) {
-    return std::nullopt;
+    return absl::nullopt;
   }
   // Our desired behaviour is to return the following second for a leap second
   // assuming it is a valid time.
   if (leap_second) {
     if (!OPENSSL_posix_to_tm(result + 1, &tmp_tm)) {
-      return std::nullopt;
+      return absl::nullopt;
     }
     result++;
   }

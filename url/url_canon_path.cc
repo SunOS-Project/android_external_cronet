@@ -4,9 +4,9 @@
 
 #include <limits.h>
 
-#include <optional>
 #include "base/check.h"
 #include "base/check_op.h"
+#include "third_party/abseil-cpp/absl/types/optional.h"
 #include "url/url_canon.h"
 #include "url/url_canon_internal.h"
 #include "url/url_features.h"
@@ -109,7 +109,7 @@ DotDisposition ClassifyAfterDot(const CHAR* spec,
     *consumed_len = 0;
     return DIRECTORY_CUR;
   }
-  if (IsSlashOrBackslash(spec[after_dot])) {
+  if (IsURLSlash(spec[after_dot])) {
     // Single dot followed by a slash.
     *consumed_len = 1;  // Consume the slash
     return DIRECTORY_CUR;
@@ -123,7 +123,7 @@ DotDisposition ClassifyAfterDot(const CHAR* spec,
       *consumed_len = second_dot_len;
       return DIRECTORY_UP;
     }
-    if (IsSlashOrBackslash(spec[after_second_dot])) {
+    if (IsURLSlash(spec[after_second_dot])) {
       // Double dot followed by a slash.
       *consumed_len = second_dot_len + 1;
       return DIRECTORY_UP;
@@ -297,9 +297,8 @@ bool DoPath(const CHAR* spec,
     // and then canonicalize it, it will of course have a slash already. This
     // check is for the replacement and relative URL resolving cases of file
     // URLs.
-    if (!IsSlashOrBackslash(spec[path.begin])) {
+    if (!IsURLSlash(spec[path.begin]))
       output->push_back('/');
-    }
 
     success =
         DoPartialPathInternal<CHAR, UCHAR>(spec, path, out_path->begin, output);

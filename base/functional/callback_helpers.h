@@ -44,15 +44,27 @@ struct IsOnceCallbackImpl<OnceCallback<R(Args...)>> : std::true_type {};
 
 }  // namespace internal
 
-// IsBaseCallback<T> is satisfied if and only if T is an instantiation of
-// base::OnceCallback<Signature> or base::RepeatingCallback<Signature>.
+// IsBaseCallback<T>::value is true when T is any of the Closure or Callback
+// family of types.
 template <typename T>
-concept IsBaseCallback = internal::IsBaseCallbackImpl<std::decay_t<T>>::value;
+using IsBaseCallback = internal::IsBaseCallbackImpl<std::decay_t<T>>;
 
-// IsOnceCallback<T> is satisfied if and only if T is an instantiation of
-// base::OnceCallback<Signature>.
+// IsOnceCallback<T>::value is true when T is a OnceClosure or OnceCallback
+// type.
 template <typename T>
-concept IsOnceCallback = internal::IsOnceCallbackImpl<std::decay_t<T>>::value;
+using IsOnceCallback = internal::IsOnceCallbackImpl<std::decay_t<T>>;
+
+// SFINAE friendly enabler allowing to overload methods for both Repeating and
+// OnceCallbacks.
+//
+// Usage:
+// template <template <typename> class CallbackType,
+//           ... other template args ...,
+//           typename = EnableIfIsBaseCallback<CallbackType>>
+// void DoStuff(CallbackType<...> cb, ...);
+template <template <typename> class CallbackType>
+using EnableIfIsBaseCallback =
+    std::enable_if_t<IsBaseCallback<CallbackType<void()>>::value>;
 
 namespace internal {
 

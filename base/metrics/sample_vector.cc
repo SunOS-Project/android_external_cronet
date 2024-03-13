@@ -10,7 +10,6 @@
 #include "base/debug/crash_logging.h"
 #include "base/lazy_instance.h"
 #include "base/memory/ptr_util.h"
-#include "base/memory/raw_span.h"
 #include "base/metrics/persistent_memory_allocator.h"
 #include "base/notreached.h"
 #include "base/numerics/safe_conversions.h"
@@ -35,16 +34,20 @@ namespace {
 template <typename T>
 class IteratorTemplate : public SampleCountIterator {
  public:
-  IteratorTemplate(base::span<T> counts, const BucketRanges* bucket_ranges)
-      : counts_(counts), bucket_ranges_(bucket_ranges) {
-    DCHECK_GE(bucket_ranges_->bucket_count(), counts_.size());
+  IteratorTemplate(T* counts,
+                   size_t counts_size,
+                   const BucketRanges* bucket_ranges)
+      : counts_(counts),
+        counts_size_(counts_size),
+        bucket_ranges_(bucket_ranges) {
+    DCHECK_GE(bucket_ranges_->bucket_count(), counts_size_);
     SkipEmptyBuckets();
   }
 
   ~IteratorTemplate() override;
 
   // SampleCountIterator:
-  bool Done() const override { return index_ >= counts_.size(); }
+  bool Done() const override { return index_ >= counts_size_; }
   void Next() override {
     DCHECK(!Done());
     index_++;
@@ -69,7 +72,7 @@ class IteratorTemplate : public SampleCountIterator {
       return;
     }
 
-    while (index_ < counts_.size()) {
+    while (index_ < counts_size_) {
       if (subtle::NoBarrier_Load(&counts_[index_]) != 0) {
         return;
       }
@@ -77,12 +80,14 @@ class IteratorTemplate : public SampleCountIterator {
     }
   }
 
-  raw_span<T> counts_;
+  raw_ptr<T, AllowPtrArithmetic> counts_;
+  size_t counts_size_;
   raw_ptr<const BucketRanges> bucket_ranges_;
+
   size_t index_ = 0;
 };
 
-using SampleVectorIterator = IteratorTemplate<const HistogramBase::AtomicCount>;
+typedef IteratorTemplate<const HistogramBase::AtomicCount> SampleVectorIterator;
 
 template <>
 SampleVectorIterator::~IteratorTemplate() = default;
@@ -98,8 +103,8 @@ void SampleVectorIterator::Get(HistogramBase::Sample* min,
   *count = subtle::NoBarrier_Load(&counts_[index_]);
 }
 
-using ExtractingSampleVectorIterator =
-    IteratorTemplate<HistogramBase::AtomicCount>;
+typedef IteratorTemplate<HistogramBase::AtomicCount>
+    ExtractingSampleVectorIterator;
 
 template <>
 ExtractingSampleVectorIterator::~IteratorTemplate() {
@@ -223,13 +228,12 @@ std::unique_ptr<SampleCountIterator> SampleVectorBase::Iterator() const {
 
   // Handle the multi-sample case.
   if (counts() || MountExistingCountsStorage()) {
-    return std::make_unique<SampleVectorIterator>(
-        base::make_span(counts(), counts_size()), bucket_ranges_);
+    return std::make_unique<SampleVectorIterator>(counts(), counts_size(),
+                                                  bucket_ranges_);
   }
 
   // And the no-value case.
-  return std::make_unique<SampleVectorIterator>(
-      base::span<const HistogramBase::AtomicCount>(), bucket_ranges_);
+  return std::make_unique<SampleVectorIterator>(nullptr, 0, bucket_ranges_);
 }
 
 std::unique_ptr<SampleCountIterator> SampleVectorBase::ExtractingIterator() {
@@ -254,12 +258,12 @@ std::unique_ptr<SampleCountIterator> SampleVectorBase::ExtractingIterator() {
   // Handle the multi-sample case.
   if (counts() || MountExistingCountsStorage()) {
     return std::make_unique<ExtractingSampleVectorIterator>(
-        base::make_span(counts(), counts_size()), bucket_ranges_);
+        counts(), counts_size(), bucket_ranges_);
   }
 
   // And the no-value case.
-  return std::make_unique<ExtractingSampleVectorIterator>(
-      base::span<HistogramBase::AtomicCount>(), bucket_ranges_);
+  return std::make_unique<ExtractingSampleVectorIterator>(nullptr, 0,
+                                                          bucket_ranges_);
 }
 
 bool SampleVectorBase::AddSubtractImpl(SampleCountIterator* iter,

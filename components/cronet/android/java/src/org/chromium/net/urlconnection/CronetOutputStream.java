@@ -38,7 +38,9 @@ public abstract class CronetOutputStream extends OutputStream {
      */
     abstract void checkReceivedEnoughContent() throws IOException;
 
-    /** Returns {@link UploadDataProvider} implementation. */
+    /**
+     * Returns {@link UploadDataProvider} implementation.
+     */
     abstract UploadDataProvider getUploadDataProvider();
 
     /**
@@ -50,7 +52,9 @@ public abstract class CronetOutputStream extends OutputStream {
         mRequestCompleted = true;
     }
 
-    /** Throws an IOException if the stream is closed or the request is done. */
+    /**
+     * Throws an IOException if the stream is closed or the request is done.
+     */
     protected void checkNotClosed() throws IOException {
         if (mRequestCompleted) {
             checkNoException();

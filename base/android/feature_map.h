@@ -8,7 +8,7 @@
 #include "base/base_export.h"
 #include "base/containers/flat_map.h"
 #include "base/feature_list.h"
-#include "base/strings/string_piece.h"
+#include "base/strings/string_piece_forward.h"
 
 namespace base::android {
 

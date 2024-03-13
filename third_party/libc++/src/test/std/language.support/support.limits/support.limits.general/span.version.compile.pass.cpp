@@ -15,9 +15,8 @@
 
 // Test the feature test macros defined by <span>
 
-/*  Constant                           Value
-    __cpp_lib_span                     202002L [C++20]
-    __cpp_lib_span_initializer_list    202311L [C++26]
+/*  Constant          Value
+    __cpp_lib_span    202002L [C++20]
 */
 
 #include <span>
@@ -29,28 +28,16 @@
 #   error "__cpp_lib_span should not be defined before c++20"
 # endif
 
-# ifdef __cpp_lib_span_initializer_list
-#   error "__cpp_lib_span_initializer_list should not be defined before c++26"
-# endif
-
 #elif TEST_STD_VER == 14
 
 # ifdef __cpp_lib_span
 #   error "__cpp_lib_span should not be defined before c++20"
 # endif
 
-# ifdef __cpp_lib_span_initializer_list
-#   error "__cpp_lib_span_initializer_list should not be defined before c++26"
-# endif
-
 #elif TEST_STD_VER == 17
 
 # ifdef __cpp_lib_span
 #   error "__cpp_lib_span should not be defined before c++20"
-# endif
-
-# ifdef __cpp_lib_span_initializer_list
-#   error "__cpp_lib_span_initializer_list should not be defined before c++26"
 # endif
 
 #elif TEST_STD_VER == 20
@@ -62,10 +49,6 @@
 #   error "__cpp_lib_span should have the value 202002L in c++20"
 # endif
 
-# ifdef __cpp_lib_span_initializer_list
-#   error "__cpp_lib_span_initializer_list should not be defined before c++26"
-# endif
-
 #elif TEST_STD_VER == 23
 
 # ifndef __cpp_lib_span
@@ -75,10 +58,6 @@
 #   error "__cpp_lib_span should have the value 202002L in c++23"
 # endif
 
-# ifdef __cpp_lib_span_initializer_list
-#   error "__cpp_lib_span_initializer_list should not be defined before c++26"
-# endif
-
 #elif TEST_STD_VER > 23
 
 # ifndef __cpp_lib_span
@@ -86,19 +65,6 @@
 # endif
 # if __cpp_lib_span != 202002L
 #   error "__cpp_lib_span should have the value 202002L in c++26"
-# endif
-
-# if !defined(_LIBCPP_VERSION)
-#   ifndef __cpp_lib_span_initializer_list
-#     error "__cpp_lib_span_initializer_list should be defined in c++26"
-#   endif
-#   if __cpp_lib_span_initializer_list != 202311L
-#     error "__cpp_lib_span_initializer_list should have the value 202311L in c++26"
-#   endif
-# else // _LIBCPP_VERSION
-#   ifdef __cpp_lib_span_initializer_list
-#     error "__cpp_lib_span_initializer_list should not be defined because it is unimplemented in libc++!"
-#   endif
 # endif
 
 #endif // TEST_STD_VER > 23

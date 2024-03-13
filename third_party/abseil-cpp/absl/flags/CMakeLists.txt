@@ -169,7 +169,6 @@ absl_cc_library(
     absl::strings
     absl::synchronization
     absl::flat_hash_map
-    absl::no_destructor
 )
 
 # Internal-only target, do not depend on directly.

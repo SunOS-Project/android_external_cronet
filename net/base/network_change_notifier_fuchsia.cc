@@ -8,7 +8,6 @@
 #include <lib/sys/cpp/component_context.h>
 
 #include <algorithm>
-#include <optional>
 #include <utility>
 #include <vector>
 
@@ -19,6 +18,7 @@
 #include "base/threading/thread_checker.h"
 #include "base/types/expected.h"
 #include "net/base/fuchsia/network_interface_cache.h"
+#include "third_party/abseil-cpp/absl/types/optional.h"
 
 namespace net {
 
@@ -98,7 +98,7 @@ void NetworkChangeNotifierFuchsia::OnInterfacesEvent(
 }
 
 void NetworkChangeNotifierFuchsia::HandleCacheStatus(
-    std::optional<internal::NetworkInterfaceCache::ChangeBits> change_bits) {
+    absl::optional<internal::NetworkInterfaceCache::ChangeBits> change_bits) {
   if (!change_bits.has_value()) {
     watcher_.Unbind();
     return;

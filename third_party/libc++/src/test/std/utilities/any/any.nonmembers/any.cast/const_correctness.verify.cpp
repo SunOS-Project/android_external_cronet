@@ -8,6 +8,8 @@
 
 // UNSUPPORTED: c++03, c++11, c++14
 
+// UNSUPPORTED: availability-bad_any_cast-missing
+
 // <any>
 
 // template <class ValueType>

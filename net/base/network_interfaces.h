@@ -9,13 +9,14 @@
 
 #include <array>
 #include <memory>
-#include <optional>
 #include <string>
 #include <vector>
 
 #include "net/base/ip_address.h"
 #include "net/base/net_export.h"
 #include "net/base/network_change_notifier.h"
+
+#include "third_party/abseil-cpp/absl/types/optional.h"
 
 namespace net {
 
@@ -62,7 +63,7 @@ struct NET_EXPORT NetworkInterface {
                    const IPAddress& address,
                    uint32_t prefix_length,
                    int ip_address_attributes,
-                   std::optional<Eui48MacAddress> mac_address = std::nullopt);
+                   absl::optional<Eui48MacAddress> mac_address = absl::nullopt);
   NetworkInterface(const NetworkInterface& other);
   ~NetworkInterface();
 
@@ -73,7 +74,7 @@ struct NET_EXPORT NetworkInterface {
   IPAddress address;
   uint32_t prefix_length;
   int ip_address_attributes;  // Combination of |IPAddressAttributes|.
-  std::optional<Eui48MacAddress> mac_address;
+  absl::optional<Eui48MacAddress> mac_address;
 };
 
 typedef std::vector<NetworkInterface> NetworkInterfaceList;

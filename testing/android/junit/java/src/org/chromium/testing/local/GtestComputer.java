@@ -14,7 +14,9 @@ import org.junit.runner.notification.RunNotifier;
 import org.junit.runners.model.InitializationError;
 import org.junit.runners.model.RunnerBuilder;
 
-/** A Computer that logs the start and end of test cases googletest-style. */
+/**
+ *  A Computer that logs the start and end of test cases googletest-style.
+ */
 public class GtestComputer extends Computer {
 
     private final GtestLogger mLogger;
@@ -23,7 +25,9 @@ public class GtestComputer extends Computer {
         mLogger = logger;
     }
 
-    /** A wrapping Runner that logs the start and end of each test case. */
+    /**
+     *  A wrapping Runner that logs the start and end of each test case.
+     */
     private class GtestSuiteRunner extends Runner implements Filterable {
         private final Runner mRunner;
 
@@ -69,7 +73,8 @@ public class GtestComputer extends Computer {
                     public Runner runnerForClass(Class<?> testClass) throws Throwable {
                         return new GtestSuiteRunner(builder.runnerForClass(testClass));
                     }
-                },
-                classes);
+                }, classes);
     }
+
 }
+

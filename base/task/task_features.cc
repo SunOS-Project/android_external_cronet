@@ -31,6 +31,15 @@ BASE_FEATURE(kNoWorkerThreadReclaim,
              "NoWorkerThreadReclaim",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
+// static
+BASE_FEATURE(kNoWakeUpsForCanceledTasks,
+             "NoWakeUpsForCanceledTasks",
+             FEATURE_ENABLED_BY_DEFAULT);
+
+BASE_FEATURE(kRemoveCanceledTasksInTaskQueue,
+             "RemoveCanceledTasksInTaskQueue2",
+             base::FEATURE_ENABLED_BY_DEFAULT);
+
 BASE_FEATURE(kDelayFirstWorkerWake,
              "DelayFirstWorkerWake",
              base::FEATURE_DISABLED_BY_DEFAULT);
@@ -96,9 +105,5 @@ BASE_FEATURE(kMaxDelayedStarvationTasks,
 
 const base::FeatureParam<int> kMaxDelayedStarvationTasksParam{
     &kMaxDelayedStarvationTasks, "count", 3};
-
-BASE_FEATURE(kUseNewJobImplementation,
-             "UseNewJobImplementation",
-             base::FEATURE_DISABLED_BY_DEFAULT);
 
 }  // namespace base

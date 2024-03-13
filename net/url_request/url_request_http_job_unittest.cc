@@ -263,8 +263,7 @@ TEST_F(URLRequestHttpJobWithProxyTest, TestSuccessfulWithOneProxy) {
 
   std::unique_ptr<ProxyResolutionService> proxy_resolution_service =
       ConfiguredProxyResolutionService::CreateFixedFromPacResultForTest(
-          ProxyServerToPacResultElement(
-              proxy_chain.GetProxyServer(/*chain_index=*/0)),
+          ProxyChainToPacResultElement(proxy_chain),
           TRAFFIC_ANNOTATION_FOR_TESTS);
 
   MockWrite writes[] = {MockWrite(kSimpleProxyGetMockWrite)};
@@ -307,9 +306,7 @@ TEST_F(URLRequestHttpJobWithProxyTest,
   // DIRECT.
   std::unique_ptr<ProxyResolutionService> proxy_resolution_service =
       ConfiguredProxyResolutionService::CreateFixedFromPacResultForTest(
-          ProxyServerToPacResultElement(
-              proxy_chain.GetProxyServer(/*chain_index=*/0)) +
-              "; DIRECT",
+          ProxyChainToPacResultElement(proxy_chain) + "; DIRECT",
           TRAFFIC_ANNOTATION_FOR_TESTS);
 
   MockWrite writes[] = {MockWrite(kSimpleGetMockWrite)};
@@ -2112,8 +2109,6 @@ TEST_F(URLRequestHttpJobTest, PartitionedCookiePrivacyMode) {
   {  // Get cookies with privacy mode enabled and partitioned state allowed.
     network_delegate.set_force_privacy_mode(true);
     network_delegate.set_partitioned_state_allowed(true);
-    network_delegate.SetCookieFilter("unpartitioned");
-    network_delegate.set_block_get_cookies_by_name(true);
     TestDelegate delegate;
     std::unique_ptr<URLRequest> req(context->CreateRequest(
         https_test.GetURL("/echoheader?Cookie"), DEFAULT_PRIORITY, &delegate,

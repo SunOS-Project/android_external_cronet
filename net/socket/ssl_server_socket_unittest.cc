@@ -293,6 +293,8 @@ class FakeSocket : public StreamSocket {
 
   bool WasEverUsed() const override { return true; }
 
+  bool WasAlpnNegotiated() const override { return false; }
+
   NextProto GetNegotiatedProtocol() const override { return kProtoUnknown; }
 
   bool GetSSLInfo(SSLInfo* ssl_info) override { return false; }
@@ -325,8 +327,10 @@ TEST(FakeSocketTest, DataTransfer) {
   const char kTestData[] = "testing123";
   const int kTestDataSize = strlen(kTestData);
   const int kReadBufSize = 1024;
-  auto write_buf = base::MakeRefCounted<StringIOBuffer>(kTestData);
-  auto read_buf = base::MakeRefCounted<IOBufferWithSize>(kReadBufSize);
+  scoped_refptr<IOBuffer> write_buf =
+      base::MakeRefCounted<StringIOBuffer>(kTestData);
+  scoped_refptr<IOBuffer> read_buf =
+      base::MakeRefCounted<IOBuffer>(kReadBufSize);
 
   // Write then read.
   int written =
@@ -497,7 +501,7 @@ class SSLServerSocketTest : public PlatformTest, public WithTaskEnvironment {
         base::MakeRefCounted<StringIOBuffer>("testing123");
     scoped_refptr<DrainableIOBuffer> read_buf =
         base::MakeRefCounted<DrainableIOBuffer>(
-            base::MakeRefCounted<IOBufferWithSize>(kReadBufSize), kReadBufSize);
+            base::MakeRefCounted<IOBuffer>(kReadBufSize), kReadBufSize);
     TestCompletionCallback write_callback;
     TestCompletionCallback read_callback;
     int server_ret = server_socket_->Write(write_buf.get(), write_buf->size(),
@@ -920,7 +924,7 @@ TEST_F(SSLServerSocketTest, HandshakeWithWrongClientCertSupplied) {
   const int kReadBufSize = 1024;
   scoped_refptr<DrainableIOBuffer> read_buf =
       base::MakeRefCounted<DrainableIOBuffer>(
-          base::MakeRefCounted<IOBufferWithSize>(kReadBufSize), kReadBufSize);
+          base::MakeRefCounted<IOBuffer>(kReadBufSize), kReadBufSize);
   TestCompletionCallback read_callback;
   client_ret = client_socket_->Read(read_buf.get(), read_buf->BytesRemaining(),
                                     read_callback.callback());
@@ -978,7 +982,7 @@ TEST_F(SSLServerSocketTest, HandshakeWithWrongClientCertSuppliedCached) {
   const int kReadBufSize = 1024;
   scoped_refptr<DrainableIOBuffer> read_buf =
       base::MakeRefCounted<DrainableIOBuffer>(
-          base::MakeRefCounted<IOBufferWithSize>(kReadBufSize), kReadBufSize);
+          base::MakeRefCounted<IOBuffer>(kReadBufSize), kReadBufSize);
   TestCompletionCallback read_callback;
   client_ret = client_socket_->Read(read_buf.get(), read_buf->BytesRemaining(),
                                     read_callback.callback());
@@ -1032,7 +1036,7 @@ TEST_P(SSLServerSocketReadTest, DataTransfer) {
       base::MakeRefCounted<StringIOBuffer>("testing123");
   scoped_refptr<DrainableIOBuffer> read_buf =
       base::MakeRefCounted<DrainableIOBuffer>(
-          base::MakeRefCounted<IOBufferWithSize>(kReadBufSize), kReadBufSize);
+          base::MakeRefCounted<IOBuffer>(kReadBufSize), kReadBufSize);
 
   // Write then read.
   TestCompletionCallback write_callback;
@@ -1434,7 +1438,7 @@ TEST_F(SSLServerSocketTest, CancelReadIfReady) {
   // Attempt to read from the server socket. There will not be anything to read.
   // Cancel the read immediately afterwards.
   TestCompletionCallback read_callback;
-  auto read_buf = base::MakeRefCounted<IOBufferWithSize>(1);
+  auto read_buf = base::MakeRefCounted<IOBuffer>(1);
   int read_ret =
       server_socket_->ReadIfReady(read_buf.get(), 1, read_callback.callback());
   ASSERT_THAT(read_ret, IsError(ERR_IO_PENDING));

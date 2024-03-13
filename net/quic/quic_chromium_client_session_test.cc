@@ -175,8 +175,7 @@ class QuicChromiumClientSessionTest
         quic::QuicTime::Delta::FromMilliseconds(
             kDefaultRetransmittableOnWireTimeout.InMilliseconds()),
         /*migrate_idle_session=*/false, allow_port_migration_,
-        kDefaultIdleSessionMigrationPeriod, /*multi_port_probing_interval=*/0,
-        kMaxTimeOnNonDefaultNetwork,
+        kDefaultIdleSessionMigrationPeriod, kMaxTimeOnNonDefaultNetwork,
         kMaxMigrationsToNonDefaultNetworkOnWriteError,
         kMaxMigrationsToNonDefaultNetworkOnPathDegrading,
         kQuicYieldAfterPacketsRead,

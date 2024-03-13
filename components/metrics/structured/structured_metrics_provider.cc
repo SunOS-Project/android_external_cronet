@@ -74,7 +74,7 @@ bool StructuredMetricsProvider::HasIndependentMetrics() {
     return false;
   }
 
-  if (!recorder().CanProvideMetrics()) {
+  if (!recorder().can_provide_metrics()) {
     return false;
   }
 
@@ -83,7 +83,7 @@ bool StructuredMetricsProvider::HasIndependentMetrics() {
     return false;
   }
 
-  return recorder().event_storage()->HasEvents();
+  return recorder().events()->non_uma_events_size() != 0;
 }
 
 void StructuredMetricsProvider::ProvideIndependentMetrics(

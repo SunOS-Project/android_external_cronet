@@ -6,6 +6,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include <__config>
+
+#ifndef _LIBCPP_HAS_NO_THREADS
+
 #include <barrier>
 #include <thread>
 
@@ -89,3 +93,5 @@ void __destroy_barrier_algorithm_base(__barrier_algorithm_base* __barrier)
 #endif // !defined(_LIBCPP_HAS_NO_TREE_BARRIER)
 
 _LIBCPP_END_NAMESPACE_STD
+
+#endif //_LIBCPP_HAS_NO_THREADS

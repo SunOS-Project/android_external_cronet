@@ -15,11 +15,11 @@ namespace net {
 namespace {
 
 void ExpectProxyServerEquals(const char* expectation,
-                             const ProxyList& proxy_list) {
+                             const ProxyList& proxy_servers) {
   if (expectation == nullptr) {
-    EXPECT_TRUE(proxy_list.IsEmpty());
+    EXPECT_TRUE(proxy_servers.IsEmpty());
   } else {
-    EXPECT_EQ(expectation, proxy_list.ToDebugString());
+    EXPECT_EQ(expectation, proxy_servers.ToPacString());
   }
 }
 
@@ -157,7 +157,7 @@ ProxyConfigToValueTestCase GetTestCaseSingleProxy() {
   ProxyConfig config;
   config.proxy_rules().ParseFromString("https://proxy1:8080");
 
-  return {std::move(config), "{\"single_proxy\":[\"[https://proxy1:8080]\"]}"};
+  return {std::move(config), "{\"single_proxy\":[\"https://proxy1:8080\"]}"};
 }
 
 ProxyConfigToValueTestCase GetTestCaseSingleProxyWithBypass() {
@@ -168,7 +168,7 @@ ProxyConfigToValueTestCase GetTestCaseSingleProxyWithBypass() {
 
   return {std::move(config),
           "{\"bypass_list\":[\"*.google.com\",\"192.168.0.1/"
-          "16\"],\"single_proxy\":[\"[https://proxy1:8080]\"]}"};
+          "16\"],\"single_proxy\":[\"https://proxy1:8080\"]}"};
 }
 
 ProxyConfigToValueTestCase GetTestCaseSingleProxyWithReversedBypass() {
@@ -179,7 +179,7 @@ ProxyConfigToValueTestCase GetTestCaseSingleProxyWithReversedBypass() {
 
   return {std::move(config),
           "{\"bypass_list\":[\"*.google.com\"],\"reverse_bypass\":true,"
-          "\"single_proxy\":[\"[https://proxy1:8080]\"]}"};
+          "\"single_proxy\":[\"https://proxy1:8080\"]}"};
 }
 
 ProxyConfigToValueTestCase GetTestCaseProxyPerScheme() {
@@ -193,8 +193,8 @@ ProxyConfigToValueTestCase GetTestCaseProxyPerScheme() {
   return {
       std::move(config),
       "{\"auto_detect\":true,\"bypass_list\":[\"*.google.com\"],\"pac_url\":"
-      "\"http://wpad/wpad.dat\",\"proxy_per_scheme\":{\"http\":[\"[https://"
-      "proxy1:8080]\"],\"https\":[\"[socks5://proxy2:1080]\"]}}"};
+      "\"http://wpad/wpad.dat\",\"proxy_per_scheme\":{\"http\":[\"https://"
+      "proxy1:8080\"],\"https\":[\"socks5://proxy2:1080\"]}}"};
 }
 
 ProxyConfigToValueTestCase GetTestCaseSingleProxyList() {
@@ -202,10 +202,9 @@ ProxyConfigToValueTestCase GetTestCaseSingleProxyList() {
   config.proxy_rules().ParseFromString(
       "https://proxy1:8080,http://proxy2,direct://");
 
-  return {
-      std::move(config),
-      "{\"single_proxy\":[\"[https://proxy1:8080]\",\"[proxy2:80]\",\"direct://"
-      "\"]}"};
+  return {std::move(config),
+          "{\"single_proxy\":[\"https://proxy1:8080\",\"proxy2:80\",\"direct://"
+          "\"]}"};
 }
 
 INSTANTIATE_TEST_SUITE_P(
@@ -491,7 +490,7 @@ class ProxyConfigWebSocketTest : public ::testing::Test {
     rules_.ParseFromString(rules);
   }
   void Apply(const GURL& gurl) { rules_.Apply(gurl, &info_); }
-  std::string ToDebugString() const { return info_.ToDebugString(); }
+  std::string ToPacString() const { return info_.ToPacString(); }
 
   static GURL WsUrl() { return GURL(kWsUrl); }
   static GURL WssUrl() { return GURL(kWssUrl); }
@@ -504,7 +503,7 @@ class ProxyConfigWebSocketTest : public ::testing::Test {
 TEST_F(ProxyConfigWebSocketTest, UsesProxy) {
   ParseFromString("proxy:3128");
   Apply(WsUrl());
-  EXPECT_EQ("PROXY proxy:3128", ToDebugString());
+  EXPECT_EQ("PROXY proxy:3128", ToPacString());
 }
 
 // See RFC6455 Section 4.1. item 3, "_Proxy Usage_". Note that this favors a
@@ -513,7 +512,7 @@ TEST_F(ProxyConfigWebSocketTest, PrefersSocksV4) {
   ParseFromString(
       "http=proxy:3128 ; https=sslproxy:3128 ; socks=socksproxy:1080");
   Apply(WsUrl());
-  EXPECT_EQ("SOCKS socksproxy:1080", ToDebugString());
+  EXPECT_EQ("SOCKS socksproxy:1080", ToPacString());
 }
 
 // See RFC6455 Section 4.1. item 3, "_Proxy Usage_".
@@ -521,13 +520,13 @@ TEST_F(ProxyConfigWebSocketTest, PrefersSocksV5) {
   ParseFromString(
       "http=proxy:3128 ; https=sslproxy:3128 ; socks=socks5://socksproxy:1080");
   Apply(WsUrl());
-  EXPECT_EQ("SOCKS5 socksproxy:1080", ToDebugString());
+  EXPECT_EQ("SOCKS5 socksproxy:1080", ToPacString());
 }
 
 TEST_F(ProxyConfigWebSocketTest, PrefersHttpsToHttp) {
   ParseFromString("http=proxy:3128 ; https=sslproxy:3128");
   Apply(WssUrl());
-  EXPECT_EQ("PROXY sslproxy:3128", ToDebugString());
+  EXPECT_EQ("PROXY sslproxy:3128", ToPacString());
 }
 
 // Tests when a proxy-per-url-scheme configuration was used, and proxies are
@@ -538,9 +537,9 @@ TEST_F(ProxyConfigWebSocketTest, PrefersNonSocksFallbackOverHttps) {
   // The notation for "socks=" is abused to set the "fallback proxy".
   ParseFromString(
       "http=proxy:3128 ; https=sslproxy:3128; socks=https://httpsproxy");
-  EXPECT_EQ("HTTPS httpsproxy:443", rules_.fallback_proxies.ToDebugString());
+  EXPECT_EQ("HTTPS httpsproxy:443", rules_.fallback_proxies.ToPacString());
   Apply(WssUrl());
-  EXPECT_EQ("HTTPS httpsproxy:443", ToDebugString());
+  EXPECT_EQ("HTTPS httpsproxy:443", ToPacString());
 }
 
 // Tests when a proxy-per-url-scheme configuration was used, and the fallback
@@ -549,41 +548,41 @@ TEST_F(ProxyConfigWebSocketTest, PrefersNonSocksFallbackOverHttps) {
 TEST_F(ProxyConfigWebSocketTest, UsesNonSocksFallbackProxy) {
   // The notation for "socks=" is abused to set the "fallback proxy".
   ParseFromString("ftp=ftpproxy:3128; socks=https://httpsproxy");
-  EXPECT_EQ("HTTPS httpsproxy:443", rules_.fallback_proxies.ToDebugString());
+  EXPECT_EQ("HTTPS httpsproxy:443", rules_.fallback_proxies.ToPacString());
   Apply(WssUrl());
-  EXPECT_EQ("HTTPS httpsproxy:443", ToDebugString());
+  EXPECT_EQ("HTTPS httpsproxy:443", ToPacString());
 }
 
 TEST_F(ProxyConfigWebSocketTest, PrefersHttpsEvenForWs) {
   ParseFromString("http=proxy:3128 ; https=sslproxy:3128");
   Apply(WsUrl());
-  EXPECT_EQ("PROXY sslproxy:3128", ToDebugString());
+  EXPECT_EQ("PROXY sslproxy:3128", ToPacString());
 }
 
 TEST_F(ProxyConfigWebSocketTest, PrefersHttpToDirect) {
   ParseFromString("http=proxy:3128");
   Apply(WssUrl());
-  EXPECT_EQ("PROXY proxy:3128", ToDebugString());
+  EXPECT_EQ("PROXY proxy:3128", ToPacString());
 }
 
 TEST_F(ProxyConfigWebSocketTest, IgnoresFtpProxy) {
   ParseFromString("ftp=ftpproxy:3128");
   Apply(WssUrl());
-  EXPECT_EQ("DIRECT", ToDebugString());
+  EXPECT_EQ("DIRECT", ToPacString());
 }
 
 TEST_F(ProxyConfigWebSocketTest, ObeysBypassRules) {
   ParseFromString("http=proxy:3128 ; https=sslproxy:3128");
   rules_.bypass_rules.AddRuleFromString(".chromium.org");
   Apply(GURL("wss://codereview.chromium.org/feed"));
-  EXPECT_EQ("DIRECT", ToDebugString());
+  EXPECT_EQ("DIRECT", ToPacString());
 }
 
 TEST_F(ProxyConfigWebSocketTest, ObeysLocalBypass) {
   ParseFromString("http=proxy:3128 ; https=sslproxy:3128");
   rules_.bypass_rules.AddRuleFromString("<local>");
   Apply(GURL("ws://localhost/feed"));
-  EXPECT_EQ("DIRECT", ToDebugString());
+  EXPECT_EQ("DIRECT", ToPacString());
 }
 
 }  // namespace

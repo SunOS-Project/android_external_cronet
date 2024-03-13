@@ -351,8 +351,7 @@ const base::Value* PrefService::GetUserPrefValue(
     return nullptr;
 
   if (value->type() != pref->GetType()) {
-    DUMP_WILL_BE_NOTREACHED_NORETURN()
-        << "Pref value type doesn't match registered type.";
+    NOTREACHED() << "Pref value type doesn't match registered type.";
     return nullptr;
   }
 

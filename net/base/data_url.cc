@@ -6,14 +6,13 @@
 
 #include "net/base/data_url.h"
 
-#include <string>
-#include <string_view>
-
 #include "base/base64.h"
+#include "base/containers/cxx20_erase.h"
 #include "base/feature_list.h"
 #include "base/features.h"
 #include "base/ranges/algorithm.h"
 #include "base/strings/escape.h"
+#include "base/strings/string_piece.h"
 #include "base/strings/string_split.h"
 #include "base/strings/string_util.h"
 #include "net/base/mime_util.h"
@@ -35,7 +34,7 @@ bool IsBase64Whitespace(char c) {
 //   - Doesn't need any extra padding.
 //   - Does not have any escaped characters.
 //   - Does not have any whitespace.
-bool IsDataURLReadyForDecode(std::string_view body) {
+bool IsDataURLReadyForDecode(base::StringPiece body) {
   return (body.length() % 4) == 0 && base::ranges::none_of(body, [](char c) {
            return c == '%' || IsBase64Whitespace(c);
          });
@@ -54,7 +53,7 @@ bool DataURL::Parse(const GURL& url,
   DCHECK(charset->empty());
   DCHECK(!data || data->empty());
 
-  std::string_view content;
+  base::StringPiece content;
   std::string content_string;
   if (base::FeatureList::IsEnabled(base::features::kOptimizeDataUrls)) {
     // Avoid copying the URL content which can be expensive for large URLs.
@@ -64,11 +63,11 @@ bool DataURL::Parse(const GURL& url,
     content = content_string;
   }
 
-  std::string_view::const_iterator comma = base::ranges::find(content, ',');
+  base::StringPiece::const_iterator comma = base::ranges::find(content, ',');
   if (comma == content.end())
     return false;
 
-  std::vector<std::string_view> meta_data =
+  std::vector<base::StringPiece> meta_data =
       base::SplitStringPiece(base::MakeStringPiece(content.begin(), comma), ";",
                              base::TRIM_WHITESPACE, base::SPLIT_WANT_ALL);
 
@@ -81,8 +80,8 @@ bool DataURL::Parse(const GURL& url,
     ++iter;
   }
 
-  static constexpr std::string_view kBase64Tag("base64");
-  static constexpr std::string_view kCharsetTag("charset=");
+  static constexpr base::StringPiece kBase64Tag("base64");
+  static constexpr base::StringPiece kCharsetTag("charset=");
 
   bool base64_encoded = false;
   for (; iter != meta_data.cend(); ++iter) {
@@ -153,7 +152,7 @@ bool DataURL::Parse(const GURL& url,
       if (!(mime_type_value.compare(0, 5, "text/") == 0 ||
             mime_type_value.find("xml") != std::string::npos)) {
         temp = std::string(raw_body);
-        std::erase_if(temp, base::IsAsciiWhitespace<char>);
+        base::EraseIf(temp, base::IsAsciiWhitespace<char>);
         raw_body = temp;
       }
 
@@ -167,7 +166,7 @@ bool DataURL::Parse(const GURL& url,
 }
 
 Error DataURL::BuildResponse(const GURL& url,
-                             std::string_view method,
+                             base::StringPiece method,
                              std::string* mime_type,
                              std::string* charset,
                              std::string* data,

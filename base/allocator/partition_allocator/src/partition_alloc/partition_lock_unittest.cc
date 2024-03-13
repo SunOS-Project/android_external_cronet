@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "partition_alloc/partition_lock.h"
+#include "base/allocator/partition_allocator/src/partition_alloc/partition_lock.h"
 
+#include "base/allocator/partition_allocator/src/partition_alloc/partition_alloc_base/debug/debugging_buildflags.h"
+#include "base/allocator/partition_allocator/src/partition_alloc/partition_alloc_base/thread_annotations.h"
+#include "base/allocator/partition_allocator/src/partition_alloc/partition_alloc_base/threading/platform_thread_for_testing.h"
+#include "base/allocator/partition_allocator/src/partition_alloc/partition_alloc_base/time/time.h"
 #include "build/build_config.h"
-#include "partition_alloc/partition_alloc_base/debug/debugging_buildflags.h"
-#include "partition_alloc/partition_alloc_base/thread_annotations.h"
-#include "partition_alloc/partition_alloc_base/threading/platform_thread_for_testing.h"
-#include "partition_alloc/partition_alloc_base/time/time.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
 namespace partition_alloc::internal {
@@ -164,9 +164,7 @@ TEST(PartitionAllocLockTest, AssertAcquired) {
 }
 
 // AssertAcquired() is only enforced with DCHECK()s.
-// DCHECKs don't work with EXPECT_DEATH on official builds.
-#if defined(GTEST_HAS_DEATH_TEST) && BUILDFLAG(PA_DCHECK_IS_ON) && \
-    (!defined(OFFICIAL_BUILD) || !defined(NDEBUG))
+#if defined(GTEST_HAS_DEATH_TEST) && BUILDFLAG(PA_DCHECK_IS_ON)
 
 TEST(PartitionAllocLockTest, AssertAcquiredDeathTest) {
   Lock lock;
@@ -200,10 +198,7 @@ TEST(PartitionAllocLockTest, AssertAcquiredAnotherThreadHoldsTheLock) {
   // EXPECT_DEATH() and multiple live threads.
   base::PlatformThreadForTesting::Join(handle);
 
-  // DCHECKs don't work with EXPECT_DEATH on official builds.
-#if BUILDFLAG(PA_DCHECK_IS_ON) && (!defined(OFFICIAL_BUILD) || !defined(NDEBUG))
   EXPECT_DEATH(lock.AssertAcquired(), "");
-#endif
 }
 
 #if BUILDFLAG(IS_APPLE)

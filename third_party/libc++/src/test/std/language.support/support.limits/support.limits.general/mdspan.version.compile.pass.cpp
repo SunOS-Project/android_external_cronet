@@ -15,20 +15,15 @@
 
 // Test the feature test macros defined by <mdspan>
 
-/*  Constant                         Value
-    __cpp_lib_freestanding_mdspan    202311L [C++26]
-    __cpp_lib_mdspan                 202207L [C++23]
-    __cpp_lib_submdspan              202306L [C++26]
+/*  Constant               Value
+    __cpp_lib_mdspan       202207L [C++23]
+    __cpp_lib_submdspan    202306L [C++26]
 */
 
 #include <mdspan>
 #include "test_macros.h"
 
 #if TEST_STD_VER < 14
-
-# ifdef __cpp_lib_freestanding_mdspan
-#   error "__cpp_lib_freestanding_mdspan should not be defined before c++26"
-# endif
 
 # ifdef __cpp_lib_mdspan
 #   error "__cpp_lib_mdspan should not be defined before c++23"
@@ -40,10 +35,6 @@
 
 #elif TEST_STD_VER == 14
 
-# ifdef __cpp_lib_freestanding_mdspan
-#   error "__cpp_lib_freestanding_mdspan should not be defined before c++26"
-# endif
-
 # ifdef __cpp_lib_mdspan
 #   error "__cpp_lib_mdspan should not be defined before c++23"
 # endif
@@ -53,10 +44,6 @@
 # endif
 
 #elif TEST_STD_VER == 17
-
-# ifdef __cpp_lib_freestanding_mdspan
-#   error "__cpp_lib_freestanding_mdspan should not be defined before c++26"
-# endif
 
 # ifdef __cpp_lib_mdspan
 #   error "__cpp_lib_mdspan should not be defined before c++23"
@@ -68,10 +55,6 @@
 
 #elif TEST_STD_VER == 20
 
-# ifdef __cpp_lib_freestanding_mdspan
-#   error "__cpp_lib_freestanding_mdspan should not be defined before c++26"
-# endif
-
 # ifdef __cpp_lib_mdspan
 #   error "__cpp_lib_mdspan should not be defined before c++23"
 # endif
@@ -81,10 +64,6 @@
 # endif
 
 #elif TEST_STD_VER == 23
-
-# ifdef __cpp_lib_freestanding_mdspan
-#   error "__cpp_lib_freestanding_mdspan should not be defined before c++26"
-# endif
 
 # ifndef __cpp_lib_mdspan
 #   error "__cpp_lib_mdspan should be defined in c++23"
@@ -98,19 +77,6 @@
 # endif
 
 #elif TEST_STD_VER > 23
-
-# if !defined(_LIBCPP_VERSION)
-#   ifndef __cpp_lib_freestanding_mdspan
-#     error "__cpp_lib_freestanding_mdspan should be defined in c++26"
-#   endif
-#   if __cpp_lib_freestanding_mdspan != 202311L
-#     error "__cpp_lib_freestanding_mdspan should have the value 202311L in c++26"
-#   endif
-# else // _LIBCPP_VERSION
-#   ifdef __cpp_lib_freestanding_mdspan
-#     error "__cpp_lib_freestanding_mdspan should not be defined because it is unimplemented in libc++!"
-#   endif
-# endif
 
 # ifndef __cpp_lib_mdspan
 #   error "__cpp_lib_mdspan should be defined in c++26"

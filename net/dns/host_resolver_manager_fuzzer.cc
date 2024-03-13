@@ -214,8 +214,7 @@ class DnsRequest {
     if (parameters.source == net::HostResolverSource::MULTICAST_DNS &&
         (parameters.include_canonical_name || parameters.loopback_only ||
          parameters.cache_usage !=
-             net::HostResolver::ResolveHostParameters::CacheUsage::ALLOWED ||
-         parameters.dns_query_type == net::DnsQueryType::HTTPS)) {
+             net::HostResolver::ResolveHostParameters::CacheUsage::ALLOWED)) {
       return false;
     }
 

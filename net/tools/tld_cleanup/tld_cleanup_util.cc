@@ -74,18 +74,16 @@ NormalizeResult NormalizeRule(std::string& domain, Rule& rule) {
   NormalizeResult result = NormalizeResult::kSuccess;
 
   // Strip single leading and trailing dots.
-  if (domain.starts_with(".")) {
+  if (base::StartsWith(domain, "."))
     domain.erase(0, 1);
-  }
-  if (domain.ends_with(".")) {
+  if (base::EndsWith(domain, "."))
     domain.pop_back();
-  }
 
   // Allow single leading '*.' or '!', saved here so it's not canonicalized.
-  if (domain.starts_with("!")) {
+  if (base::StartsWith(domain, "!")) {
     domain.erase(0, 1);
     rule.exception = true;
-  } else if (domain.starts_with("*.")) {
+  } else if (base::StartsWith(domain, "*.")) {
     domain.erase(0, 2);
     rule.wildcard = true;
   }
@@ -128,15 +126,15 @@ NormalizeResult NormalizeDataToRuleMap(const std::string& data,
   RuleMap extra_rules;
 
   for (std::string line; std::getline(data_stream, line, '\n');) {
-    if (line.starts_with(kBeginPrivateDomainsComment)) {
+    if (base::StartsWith(line, kBeginPrivateDomainsComment)) {
       in_private_section = true;
       continue;
     }
-    if (line.starts_with(kEndPrivateDomainsComment)) {
+    if (base::StartsWith(line, kEndPrivateDomainsComment)) {
       in_private_section = false;
       continue;
     }
-    if (line.starts_with("//")) {
+    if (base::StartsWith(line, "//")) {
       // Skip comments.
       continue;
     }

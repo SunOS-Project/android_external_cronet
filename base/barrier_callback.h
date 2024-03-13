@@ -5,7 +5,6 @@
 #ifndef BASE_BARRIER_CALLBACK_H_
 #define BASE_BARRIER_CALLBACK_H_
 
-#include <concepts>
 #include <memory>
 #include <type_traits>
 #include <utility>
@@ -93,13 +92,15 @@ void ShouldNeverRun(T t) {
 //
 // See also
 // https://chromium.googlesource.com/chromium/src/+/HEAD/docs/callback.md
-template <typename T,
-          typename RawArg = base::remove_cvref_t<T>,
-          typename DoneArg = std::vector<RawArg>,
-          template <typename>
-          class CallbackType>
-  requires(std::same_as<std::vector<RawArg>, std::remove_cvref_t<DoneArg>> &&
-           IsBaseCallback<CallbackType<void()>>)
+template <
+    typename T,
+    typename RawArg = base::remove_cvref_t<T>,
+    typename DoneArg = std::vector<RawArg>,
+    template <typename>
+    class CallbackType,
+    std::enable_if_t<std::is_same_v<std::vector<RawArg>,
+                                    base::remove_cvref_t<DoneArg>>>* = nullptr,
+    typename = base::EnableIfIsBaseCallback<CallbackType>>
 RepeatingCallback<void(T)> BarrierCallback(
     size_t num_callbacks,
     CallbackType<void(DoneArg)> done_callback) {

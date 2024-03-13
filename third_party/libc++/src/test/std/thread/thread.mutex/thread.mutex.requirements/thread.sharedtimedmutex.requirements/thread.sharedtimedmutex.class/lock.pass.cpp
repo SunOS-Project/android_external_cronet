@@ -9,6 +9,8 @@
 // UNSUPPORTED: no-threads
 // UNSUPPORTED: c++03, c++11
 
+// UNSUPPORTED: availability-shared_mutex-missing
+
 // ALLOW_RETRIES: 3
 
 // <shared_mutex>
