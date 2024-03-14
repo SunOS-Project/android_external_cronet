@@ -227,6 +227,7 @@ java_library {
         ":statslog-cronet-java-gen",
     ],
     libs: [
+        "androidx.annotation_annotation",
         "framework-statsd",
     ],
     sdk_version: "module_current",
