@@ -1474,6 +1474,8 @@ def get_cmd_condition(arch):
     return "( $$CC_ARCH == 'arm' && $$CC_OS == 'android' )"
   elif arch == "android_arm64":
     return "( $$CC_ARCH == 'arm64' && $$CC_OS == 'android' )"
+  elif arch == "android_riscv64":
+    return "( $$CC_ARCH == 'riscv64' && $$CC_OS == 'android' )"
   elif arch == "host":
     return "$$CC_OS != 'android'"
   else:
