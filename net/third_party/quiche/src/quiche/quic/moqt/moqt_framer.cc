@@ -6,9 +6,9 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 #include "quiche/quic/core/quic_data_writer.h"
 #include "quiche/quic/core/quic_time.h"
 #include "quiche/quic/core/quic_types.h"
@@ -37,7 +37,7 @@ inline size_t NeededVarIntLen(const MoqtSubscribeLocationMode value) {
 inline size_t ParameterLen(const uint64_t type, const uint64_t value_len) {
   return NeededVarIntLen(type) + NeededVarIntLen(value_len) + value_len;
 }
-inline size_t LocationLength(const absl::optional<MoqtSubscribeLocation> loc) {
+inline size_t LocationLength(const std::optional<MoqtSubscribeLocation> loc) {
   if (!loc.has_value()) {
     return NeededVarIntLen(MoqtSubscribeLocationMode::kNone);
   }
@@ -79,7 +79,7 @@ inline bool WriteStringParameter(quic::QuicDataWriter& writer, uint64_t type,
 }
 
 inline bool WriteLocation(quic::QuicDataWriter& writer,
-                          absl::optional<MoqtSubscribeLocation> loc) {
+                          std::optional<MoqtSubscribeLocation> loc) {
   if (!loc.has_value()) {
     return writer.WriteVarInt62(
         static_cast<uint64_t>(MoqtSubscribeLocationMode::kNone));
@@ -187,6 +187,7 @@ quiche::QuicheBuffer MoqtFramer::SerializeClientSetup(
                          static_cast<uint64_t>(MoqtSetupParameter::kPath),
                          message.path.value());
   }
+  QUICHE_DCHECK(writer.remaining() == 0);
   return buffer;
 }
 
@@ -198,8 +199,7 @@ quiche::QuicheBuffer MoqtFramer::SerializeServerSetup(
   if (message.role.has_value()) {
     num_params++;
     buffer_size +=
-        ParameterLen(static_cast<uint64_t>(MoqtSetupParameter::kRole),
-                     static_cast<uint64_t>(message.role.value()));
+        ParameterLen(static_cast<uint64_t>(MoqtSetupParameter::kRole), 1);
   }
   buffer_size += NeededVarIntLen(num_params);
   quiche::QuicheBuffer buffer(allocator_, buffer_size);
@@ -212,6 +212,7 @@ quiche::QuicheBuffer MoqtFramer::SerializeServerSetup(
                          static_cast<uint64_t>(MoqtSetupParameter::kRole),
                          static_cast<uint64_t>(message.role.value()));
   }
+  QUICHE_DCHECK(writer.remaining() == 0);
   return buffer;
 }
 
@@ -227,7 +228,8 @@ quiche::QuicheBuffer MoqtFramer::SerializeSubscribeRequest(
     return quiche::QuicheBuffer();
   }
   size_t buffer_size = NeededVarIntLen(MoqtMessageType::kSubscribeRequest) +
-                       LengthPrefixedStringLength(message.full_track_name) +
+                       LengthPrefixedStringLength(message.track_namespace) +
+                       LengthPrefixedStringLength(message.track_name) +
                        LocationLength(message.start_group) +
                        LocationLength(message.start_object) +
                        LocationLength(message.end_group) +
@@ -244,7 +246,8 @@ quiche::QuicheBuffer MoqtFramer::SerializeSubscribeRequest(
   quic::QuicDataWriter writer(buffer.size(), buffer.data());
   writer.WriteVarInt62(
       static_cast<uint64_t>(MoqtMessageType::kSubscribeRequest));
-  writer.WriteStringPieceVarInt62(message.full_track_name);
+  writer.WriteStringPieceVarInt62(message.track_namespace);
+  writer.WriteStringPieceVarInt62(message.track_name);
   WriteLocation(writer, message.start_group);
   WriteLocation(writer, message.start_object);
   WriteLocation(writer, message.end_group);
@@ -256,6 +259,7 @@ quiche::QuicheBuffer MoqtFramer::SerializeSubscribeRequest(
         static_cast<uint64_t>(MoqtTrackRequestParameter::kAuthorizationInfo),
         message.authorization_info.value());
   }
+  QUICHE_DCHECK(writer.remaining() == 0);
   return buffer;
 }
 
@@ -274,6 +278,7 @@ quiche::QuicheBuffer MoqtFramer::SerializeSubscribeOk(
   writer.WriteStringPieceVarInt62(message.track_name);
   writer.WriteVarInt62(message.track_id);
   writer.WriteVarInt62(message.expires.ToMilliseconds());
+  QUICHE_DCHECK(writer.remaining() == 0);
   return buffer;
 }
 
@@ -292,6 +297,7 @@ quiche::QuicheBuffer MoqtFramer::SerializeSubscribeError(
   writer.WriteStringPieceVarInt62(message.track_name);
   writer.WriteVarInt62(message.error_code);
   writer.WriteStringPieceVarInt62(message.reason_phrase);
+  QUICHE_DCHECK(writer.remaining() == 0);
   return buffer;
 }
 
@@ -306,6 +312,7 @@ quiche::QuicheBuffer MoqtFramer::SerializeUnsubscribe(
   writer.WriteVarInt62(static_cast<uint64_t>(MoqtMessageType::kUnsubscribe));
   writer.WriteStringPieceVarInt62(message.track_namespace);
   writer.WriteStringPieceVarInt62(message.track_name);
+  QUICHE_DCHECK(writer.remaining() == 0);
   return buffer;
 }
 
@@ -324,6 +331,7 @@ quiche::QuicheBuffer MoqtFramer::SerializeSubscribeFin(
   writer.WriteStringPieceVarInt62(message.track_name);
   writer.WriteVarInt62(message.final_group);
   writer.WriteVarInt62(message.final_object);
+  QUICHE_DCHECK(writer.remaining() == 0);
   return buffer;
 }
 
@@ -346,6 +354,7 @@ quiche::QuicheBuffer MoqtFramer::SerializeSubscribeRst(
   writer.WriteStringPieceVarInt62(message.reason_phrase);
   writer.WriteVarInt62(message.final_group);
   writer.WriteVarInt62(message.final_object);
+  QUICHE_DCHECK(writer.remaining() == 0);
   return buffer;
 }
 
@@ -373,6 +382,7 @@ quiche::QuicheBuffer MoqtFramer::SerializeAnnounce(
         static_cast<uint64_t>(MoqtTrackRequestParameter::kAuthorizationInfo),
         message.authorization_info.value());
   }
+  QUICHE_DCHECK(writer.remaining() == 0);
   return buffer;
 }
 
@@ -385,6 +395,7 @@ quiche::QuicheBuffer MoqtFramer::SerializeAnnounceOk(
   quic::QuicDataWriter writer(buffer.size(), buffer.data());
   writer.WriteVarInt62(static_cast<uint64_t>(MoqtMessageType::kAnnounceOk));
   writer.WriteStringPieceVarInt62(message.track_namespace);
+  QUICHE_DCHECK(writer.remaining() == 0);
   return buffer;
 }
 
@@ -401,6 +412,7 @@ quiche::QuicheBuffer MoqtFramer::SerializeAnnounceError(
   writer.WriteStringPieceVarInt62(message.track_namespace);
   writer.WriteVarInt62(message.error_code);
   writer.WriteStringPieceVarInt62(message.reason_phrase);
+  QUICHE_DCHECK(writer.remaining() == 0);
   return buffer;
 }
 
@@ -413,6 +425,7 @@ quiche::QuicheBuffer MoqtFramer::SerializeUnannounce(
   quic::QuicDataWriter writer(buffer.size(), buffer.data());
   writer.WriteVarInt62(static_cast<uint64_t>(MoqtMessageType::kUnannounce));
   writer.WriteStringPieceVarInt62(message.track_namespace);
+  QUICHE_DCHECK(writer.remaining() == 0);
   return buffer;
 }
 
@@ -424,6 +437,7 @@ quiche::QuicheBuffer MoqtFramer::SerializeGoAway(const MoqtGoAway& message) {
   quic::QuicDataWriter writer(buffer.size(), buffer.data());
   writer.WriteVarInt62(static_cast<uint64_t>(MoqtMessageType::kGoAway));
   writer.WriteStringPieceVarInt62(message.new_session_uri);
+  QUICHE_DCHECK(writer.remaining() == 0);
   return buffer;
 }
 

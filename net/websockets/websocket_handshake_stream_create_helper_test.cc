@@ -146,7 +146,10 @@ class MockClientSocketHandleFactory {
             /*network_quality_estimator=*/nullptr,
             /*net_log=*/nullptr,
             /*websocket_endpoint_lock_manager=*/nullptr,
-            /*http_server_properties=*/nullptr),
+            /*http_server_properties=*/nullptr,
+            /*alpn_protos=*/nullptr,
+            /*application_settings=*/nullptr,
+            /*ignore_certificate_errors=*/nullptr),
         pool_(1, 1, &common_connect_job_params_) {}
 
   MockClientSocketHandleFactory(const MockClientSocketHandleFactory&) = delete;
@@ -487,7 +490,8 @@ class WebSocketHandshakeStreamCreateHelperTest
             quic::QuicTime::Delta::FromMilliseconds(
                 kDefaultRetransmittableOnWireTimeout.InMilliseconds()),
             /*migrate_idle_session=*/true, /*allow_port_migration=*/false,
-            kDefaultIdleSessionMigrationPeriod, kMaxTimeOnNonDefaultNetwork,
+            kDefaultIdleSessionMigrationPeriod,
+            /*multi_port_probing_interval=*/0, kMaxTimeOnNonDefaultNetwork,
             kMaxMigrationsToNonDefaultNetworkOnWriteError,
             kMaxMigrationsToNonDefaultNetworkOnPathDegrading,
             kQuicYieldAfterPacketsRead,
@@ -495,8 +499,7 @@ class WebSocketHandshakeStreamCreateHelperTest
                 kQuicYieldAfterDurationMilliseconds),
             /*cert_verify_flags=*/0, quic::test::DefaultQuicConfig(),
             std::make_unique<TestQuicCryptoClientConfigHandle>(&crypto_config),
-            dns_start, dns_end,
-            base::DefaultTickClock::GetInstance(),
+            dns_start, dns_end, base::DefaultTickClock::GetInstance(),
             base::SingleThreadTaskRunner::GetCurrentDefault().get(),
             /*socket_performance_watcher=*/nullptr,
             HostResolverEndpointResult(), NetLog::Get());

@@ -921,7 +921,7 @@ class EndToEndTest : public QuicTestWithParam<TestParams> {
   // Default is true.
   bool connect_to_server_on_initialize_;
   QuicSocketAddress server_address_;
-  absl::optional<QuicSocketAddress> server_listening_address_;
+  std::optional<QuicSocketAddress> server_listening_address_;
   std::string server_hostname_;
   QuicTestBackend memory_cache_backend_;
   std::unique_ptr<ServerThread> server_thread_;
@@ -2845,7 +2845,7 @@ TEST_P(EndToEndTest, StreamCancelErrorTest) {
       client_connection->GetStats().packets_sent;
 
   if (version_.UsesHttp3()) {
-    if (GetQuicRestartFlag(quic_opport_bundle_qpack_decoder_data)) {
+    if (GetQuicRestartFlag(quic_opport_bundle_qpack_decoder_data2)) {
       // QPACK decoder instructions and RESET_STREAM and STOP_SENDING frames are
       // sent in a single packet.
       EXPECT_EQ(packets_sent_before + 1, packets_sent_now);
@@ -3028,7 +3028,7 @@ TEST_P(EndToEndTest,
     return;
   }
   override_client_connection_id_length_ = kQuicDefaultConnectionIdLength;
-  SetQuicRestartFlag(quic_opport_bundle_qpack_decoder_data, false);
+  SetQuicRestartFlag(quic_opport_bundle_qpack_decoder_data2, false);
   ASSERT_TRUE(Initialize());
   SendSynchronousFooRequestAndCheckResponse();
 
@@ -4172,7 +4172,7 @@ class DowngradePacketWriter : public PacketDroppingTestWriter {
     QuicVersionLabel version_label;
     ParsedQuicVersion parsed_version = ParsedQuicVersion::Unsupported();
     QuicConnectionId destination_connection_id, source_connection_id;
-    absl::optional<absl::string_view> retry_token;
+    std::optional<absl::string_view> retry_token;
     std::string detailed_error;
     if (QuicFramer::ParsePublicHeaderDispatcher(
             QuicEncryptedPacket(buffer, buf_len),
