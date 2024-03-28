@@ -700,8 +700,9 @@ class QuicConnectionTest : public QuicTestWithParam<TestParams> {
     EXPECT_CALL(visitor_, OnCongestionWindowChange(_)).Times(AnyNumber());
     EXPECT_CALL(visitor_, OnPacketReceived(_, _, _)).Times(AnyNumber());
     EXPECT_CALL(visitor_, OnSuccessfulVersionNegotiation(_)).Times(AnyNumber());
-    if (GetQuicRestartFlag(quic_opport_bundle_qpack_decoder_data)) {
+    if (GetQuicRestartFlag(quic_opport_bundle_qpack_decoder_data2)) {
       EXPECT_CALL(visitor_, MaybeBundleOpportunistically()).Times(AnyNumber());
+      EXPECT_CALL(visitor_, GetFlowControlSendWindowSize(_)).Times(AnyNumber());
     }
     EXPECT_CALL(visitor_, OnOneRttPacketAcknowledged())
         .Times(testing::AtMost(1));
@@ -17126,7 +17127,7 @@ TEST_P(QuicConnectionTest, DetectMigrationToPreferredAddress) {
               GenerateNextConnectionId(connection_id_))
       .WillOnce(Return(server_issued_cid_for_preferred_address));
   EXPECT_CALL(visitor_, MaybeReserveConnectionId(_)).WillOnce(Return(true));
-  absl::optional<QuicNewConnectionIdFrame> frame =
+  std::optional<QuicNewConnectionIdFrame> frame =
       connection_.MaybeIssueNewConnectionIdForPreferredAddress();
   ASSERT_TRUE(frame.has_value());
 
@@ -17179,7 +17180,7 @@ TEST_P(QuicConnectionTest,
               GenerateNextConnectionId(connection_id_))
       .WillOnce(Return(server_issued_cid_for_preferred_address));
   EXPECT_CALL(visitor_, MaybeReserveConnectionId(_)).WillOnce(Return(true));
-  absl::optional<QuicNewConnectionIdFrame> frame =
+  std::optional<QuicNewConnectionIdFrame> frame =
       connection_.MaybeIssueNewConnectionIdForPreferredAddress();
   ASSERT_TRUE(frame.has_value());
 
