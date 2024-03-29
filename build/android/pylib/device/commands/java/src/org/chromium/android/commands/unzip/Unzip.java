@@ -18,7 +18,9 @@ import java.io.PrintStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
-/** Minimal implementation of the command-line unzip utility for Android. */
+/**
+ *  Minimal implementation of the command-line unzip utility for Android.
+ */
 public class Unzip {
 
     private static final String TAG = "Unzip";
@@ -92,3 +94,4 @@ public class Unzip {
         unzip(args);
     }
 }
+

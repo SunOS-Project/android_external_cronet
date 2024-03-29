@@ -4,19 +4,28 @@
 
 PRESUBMIT_VERSION = '2.0.0'
 
-def CheckStdlib(input_api, output_api):
+def CheckSqlModules(input_api, output_api):
   stdlib_dir = input_api.PresubmitLocalPath()
   chromium_src_dir = input_api.os_path.abspath(
     input_api.os_path.join(stdlib_dir, '..', '..'))
+  perfetto_src_dir = input_api.os_path.join(
+    chromium_src_dir, 'third_party', 'perfetto')
   tool = input_api.os_path.join(
     chromium_src_dir,
-    'tools', 'tracing', 'check_stdlib.py')
-  cmd = [ input_api.python3_executable, tool ]
+    'third_party', 'perfetto', 'tools', 'check_sql_modules.py')
+  cmd = [
+    input_api.python3_executable,
+    tool,
+    '--stdlib-sources',
+    input_api.os_path.join(
+    perfetto_src_dir,
+    '..', '..', 'base', 'tracing', 'stdlib', 'chrome')
+    ]
   test_cmd = input_api.Command(
-    name='check_stdlib',
+    name='check_sql_modules',
     cmd=cmd,
     kwargs={},
-    message=output_api.PresubmitError)
+    message=output_api.PresubmitNotifyResult)
   return input_api.RunTests([test_cmd])
 
 _STDLIB_PATHS = (

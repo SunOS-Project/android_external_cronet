@@ -21,9 +21,7 @@ public final class ParameterizedRunnerDelegateCommon {
     private final ParameterSet mClassParameterSet;
     private final List<FrameworkMethod> mParameterizedFrameworkMethodList;
 
-    public ParameterizedRunnerDelegateCommon(
-            TestClass testClass,
-            ParameterSet classParameterSet,
+    public ParameterizedRunnerDelegateCommon(TestClass testClass, ParameterSet classParameterSet,
             List<FrameworkMethod> parameterizedFrameworkMethods) {
         mTestClass = testClass;
         mClassParameterSet = classParameterSet;
@@ -56,9 +54,8 @@ public final class ParameterizedRunnerDelegateCommon {
             if (mClassParameterSet == null) {
                 return mTestClass.getOnlyConstructor().newInstance();
             }
-            return mTestClass
-                    .getOnlyConstructor()
-                    .newInstance(mClassParameterSet.getValues().toArray());
+            return mTestClass.getOnlyConstructor().newInstance(
+                    mClassParameterSet.getValues().toArray());
         } catch (InstantiationException e) {
             throwInstantiationException(e);
         } catch (IllegalAccessException e) {

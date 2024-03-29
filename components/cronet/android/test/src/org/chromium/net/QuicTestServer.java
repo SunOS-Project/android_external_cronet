@@ -12,7 +12,9 @@ import org.jni_zero.NativeMethods;
 import org.chromium.base.ContextUtils;
 import org.chromium.base.test.util.UrlUtils;
 
-/** Wrapper class to start a Quic test server. */
+/**
+ * Wrapper class to start a Quic test server.
+ */
 @JNINamespace("cronet")
 public final class QuicTestServer {
     private static final String TAG = QuicTestServer.class.getSimpleName();
@@ -31,14 +33,14 @@ public final class QuicTestServer {
             throw new IllegalStateException("Quic server is already running");
         }
         TestFilesInstaller.installIfNeeded(context);
-        QuicTestServerJni.get()
-                .startQuicTestServer(
-                        TestFilesInstaller.getInstalledPath(context),
-                        UrlUtils.getIsolatedTestRoot());
+        QuicTestServerJni.get().startQuicTestServer(
+                TestFilesInstaller.getInstalledPath(context), UrlUtils.getIsolatedTestRoot());
         sServerRunning = true;
     }
 
-    /** Shuts down the server. No-op if the server is already shut down. */
+    /**
+     * Shuts down the server. No-op if the server is already shut down.
+     */
     public static void shutdownQuicTestServer() {
         if (!sServerRunning) {
             return;
@@ -90,7 +92,6 @@ public final class QuicTestServer {
          * behavior if not compiled in debug mode.
          */
         void shutdownQuicTestServer();
-
         int getServerPort();
 
         /*

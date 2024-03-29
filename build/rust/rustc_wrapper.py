@@ -7,7 +7,6 @@
 import argparse
 import pathlib
 import subprocess
-import shlex
 import os
 import sys
 import re
@@ -142,7 +141,6 @@ def main():
   parser.add_argument('--depfile', required=True, type=pathlib.Path)
   parser.add_argument('--rsp', type=pathlib.Path, required=True)
   parser.add_argument('--target-windows', action='store_true')
-  parser.add_argument('-v', action='store_true')
   parser.add_argument('args', metavar='ARG', nargs='+')
 
   args = parser.parse_args()
@@ -193,13 +191,9 @@ def main():
     fixed_env_vars.append(k)
 
   try:
-    if args.v:
-      print(' '.join(f'{k}={shlex.quote(v)}' for k, v in env.items()),
-            args.rustc, shlex.join(rustc_args))
     r = subprocess.run([args.rustc, *rustc_args], env=env, check=False)
   finally:
-    if not args.v:
-      os.remove(out_rsp)
+    os.remove(out_rsp)
   if r.returncode != 0:
     sys.exit(r.returncode)
 

@@ -27,7 +27,8 @@ public abstract class Flag {
 
     protected Flag(String featureName) {
         assert !sFlagsCreated.containsKey(featureName)
-                : "Duplicate flag creation for feature: " + featureName;
+            : "Duplicate flag creation for feature: "
+                + featureName;
         mFeatureName = featureName;
         sFlagsCreated.put(mFeatureName, this);
     }

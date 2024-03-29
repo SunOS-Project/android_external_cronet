@@ -18,7 +18,9 @@ import org.jni_zero.NativeMethods;
 
 import org.chromium.base.compat.ApiHelperForQ;
 
-/** Integrates native PowerMonitor with the java side. */
+/**
+ * Integrates native PowerMonitor with the java side.
+ */
 @JNINamespace("base::android")
 public class PowerMonitor {
     private static PowerMonitor sInstance;
@@ -32,7 +34,9 @@ public class PowerMonitor {
         sInstance = new PowerMonitor();
     }
 
-    /** Create a PowerMonitor instance if none exists. */
+    /**
+     * Create a PowerMonitor instance if none exists.
+     */
     public static void create() {
         ThreadUtils.assertOnUiThread();
 
@@ -54,16 +58,13 @@ public class PowerMonitor {
         IntentFilter powerConnectedFilter = new IntentFilter();
         powerConnectedFilter.addAction(Intent.ACTION_POWER_CONNECTED);
         powerConnectedFilter.addAction(Intent.ACTION_POWER_DISCONNECTED);
-        ContextUtils.registerProtectedBroadcastReceiver(
-                context,
-                new BroadcastReceiver() {
-                    @Override
-                    public void onReceive(Context context, Intent intent) {
-                        PowerMonitor.onBatteryChargingChanged(
-                                intent.getAction().equals(Intent.ACTION_POWER_DISCONNECTED));
-                    }
-                },
-                powerConnectedFilter);
+        ContextUtils.registerProtectedBroadcastReceiver(context, new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                PowerMonitor.onBatteryChargingChanged(
+                        intent.getAction().equals(Intent.ACTION_POWER_DISCONNECTED));
+            }
+        }, powerConnectedFilter);
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             PowerManager powerManager =
@@ -74,7 +75,8 @@ public class PowerMonitor {
         }
     }
 
-    private PowerMonitor() {}
+    private PowerMonitor() {
+    }
 
     private static void onBatteryChargingChanged(boolean isBatteryPower) {
         assert sInstance != null;
@@ -103,9 +105,8 @@ public class PowerMonitor {
     }
 
     private static int getRemainingBatteryCapacityImpl() {
-        return ((BatteryManager)
-                        ContextUtils.getApplicationContext()
-                                .getSystemService(Context.BATTERY_SERVICE))
+        return ((BatteryManager) ContextUtils.getApplicationContext().getSystemService(
+                        Context.BATTERY_SERVICE))
                 .getIntProperty(BatteryManager.BATTERY_PROPERTY_CHARGE_COUNTER);
     }
 
@@ -120,9 +121,8 @@ public class PowerMonitor {
         if (sInstance == null) create();
 
         PowerManager powerManager =
-                (PowerManager)
-                        ContextUtils.getApplicationContext()
-                                .getSystemService(Context.POWER_SERVICE);
+                (PowerManager) ContextUtils.getApplicationContext().getSystemService(
+                        Context.POWER_SERVICE);
         if (powerManager == null) return -1;
         return ApiHelperForQ.getCurrentThermalStatus(powerManager);
     }
@@ -130,7 +130,6 @@ public class PowerMonitor {
     @NativeMethods
     interface Natives {
         void onBatteryChargingChanged();
-
         void onThermalStatusChanged(int thermalStatus);
     }
 }

@@ -4,9 +4,7 @@
 
 #include "net/http/http_auth_cache.h"
 
-#include <list>
-#include <map>
-
+#include "base/containers/cxx20_erase.h"
 #include "base/logging.h"
 #include "base/memory/raw_ptr_exclusion.h"
 #include "base/metrics/histogram_macros.h"
@@ -38,7 +36,8 @@ std::string GetParentDirectory(const std::string& path) {
 bool IsEnclosingPath(const std::string& container, const std::string& path) {
   DCHECK(container.empty() || *(container.end() - 1) == '/');
   return ((container.empty() && path.empty()) ||
-          (!container.empty() && path.starts_with(container)));
+          (!container.empty() &&
+           base::StartsWith(path, container, base::CompareCase::SENSITIVE)));
 }
 
 #if DCHECK_IS_ON()
@@ -58,7 +57,7 @@ void CheckPathIsValid(const std::string& path) {
 }
 #endif
 
-// Functor used by std::erase_if.
+// Functor used by EraseIf.
 struct IsEnclosedBy {
   explicit IsEnclosedBy(const std::string& path) : path(path) { }
   bool operator() (const std::string& x) const {
@@ -89,7 +88,7 @@ void HttpAuthCache::SetKeyServerEntriesByNetworkAnonymizationKey(
 
   key_server_entries_by_network_anonymization_key_ =
       key_server_entries_by_network_anonymization_key;
-  std::erase_if(entries_, [](EntryMap::value_type& entry_map_pair) {
+  base::EraseIf(entries_, [](EntryMap::value_type& entry_map_pair) {
     return entry_map_pair.first.target == HttpAuth::AUTH_SERVER;
   });
 }
@@ -248,7 +247,7 @@ void HttpAuthCache::Entry::AddPath(const std::string& path) {
   std::string parent_dir = GetParentDirectory(path);
   if (!HasEnclosingPath(parent_dir, nullptr)) {
     // Remove any entries that have been subsumed by the new entry.
-    std::erase_if(paths_, IsEnclosedBy(parent_dir));
+    base::EraseIf(paths_, IsEnclosedBy(parent_dir));
 
     // Failsafe to prevent unbounded memory growth of the cache.
     //
@@ -313,7 +312,7 @@ void HttpAuthCache::ClearEntriesAddedBetween(
     ClearAllEntries();
     return;
   }
-  std::erase_if(entries_, [begin_time, end_time,
+  base::EraseIf(entries_, [begin_time, end_time,
                            url_matcher](EntryMap::value_type& entry_map_pair) {
     Entry& entry = entry_map_pair.second;
     return entry.creation_time_ >= begin_time &&

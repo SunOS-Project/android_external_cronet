@@ -17,6 +17,16 @@ namespace base {
 
 const MemoryMappedFile::Region MemoryMappedFile::Region::kWholeFile = {0, 0};
 
+bool MemoryMappedFile::Region::operator==(
+    const MemoryMappedFile::Region& other) const {
+  return other.offset == offset && other.size == size;
+}
+
+bool MemoryMappedFile::Region::operator!=(
+    const MemoryMappedFile::Region& other) const {
+  return other.offset != offset || other.size != size;
+}
+
 MemoryMappedFile::~MemoryMappedFile() {
   CloseHandles();
 }

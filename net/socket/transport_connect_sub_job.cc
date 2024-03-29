@@ -93,6 +93,9 @@ class WebSocketStreamSocket final : public StreamSocket {
     return wrapped_socket_->NetLog();
   }
   bool WasEverUsed() const override { return wrapped_socket_->WasEverUsed(); }
+  bool WasAlpnNegotiated() const override {
+    return wrapped_socket_->WasAlpnNegotiated();
+  }
   NextProto GetNegotiatedProtocol() const override {
     return wrapped_socket_->GetNegotiatedProtocol();
   }

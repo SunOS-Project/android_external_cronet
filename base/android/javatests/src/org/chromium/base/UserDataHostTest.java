@@ -12,7 +12,9 @@ import org.junit.runner.RunWith;
 
 import org.chromium.base.test.BaseJUnit4ClassRunner;
 
-/** Test class for {@link UserDataHost}. */
+/**
+ * Test class for {@link UserDataHost}.
+ */
 @RunWith(BaseJUnit4ClassRunner.class)
 public class UserDataHostTest {
     private final UserDataHost mHost = new UserDataHost();
@@ -70,7 +72,9 @@ public class UserDataHostTest {
         }
     }
 
-    /** Verifies basic operations. */
+    /**
+     * Verifies basic operations.
+     */
     @Test
     @SmallTest
     public void testBasicOperations() {
@@ -82,7 +86,9 @@ public class UserDataHostTest {
         removeUserDataException(TestObjectA.class, IllegalStateException.class);
     }
 
-    /** Verifies nulled key or data are not allowed. */
+    /**
+     * Verifies nulled key or data are not allowed.
+     */
     @Test
     @SmallTest
     public void testNullKeyOrDataAreDisallowed() {
@@ -94,7 +100,9 @@ public class UserDataHostTest {
         removeUserDataException(null, IllegalArgumentException.class);
     }
 
-    /** Verifies {@link #setUserData()} overwrites current data. */
+    /**
+     * Verifies {@link #setUserData()} overwrites current data.
+     */
     @Test
     @SmallTest
     public void testSetUserDataOverwrites() {
@@ -107,7 +115,9 @@ public class UserDataHostTest {
         Assert.assertEquals(obj2, mHost.getUserData(TestObjectA.class));
     }
 
-    /** Verifies operation on a different thread is not allowed. */
+    /**
+     * Verifies operation on a different thread is not allowed.
+     */
     @Test
     @SmallTest
     public void testSingleThreadPolicy() {
@@ -117,7 +127,9 @@ public class UserDataHostTest {
                 () -> getUserDataException(TestObjectA.class, IllegalStateException.class));
     }
 
-    /** Verifies {@link UserHostData#destroy()} detroyes each {@link UserData} object. */
+    /**
+     * Verifies {@link UserHostData#destroy()} detroyes each {@link UserData} object.
+     */
     @Test
     @SmallTest
     public void testDestroy() {
@@ -133,7 +145,9 @@ public class UserDataHostTest {
         Assert.assertTrue(objB.isDestroyed());
     }
 
-    /** Verifies that no operation is allowed after {@link #destroy()} is called. */
+    /**
+     * Verifies that no operation is allowed after {@link #destroy()} is called.
+     */
     @Test
     @SmallTest
     public void testOperationsDisallowedAfterDestroy() {

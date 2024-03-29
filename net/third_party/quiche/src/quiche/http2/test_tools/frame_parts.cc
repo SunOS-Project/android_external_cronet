@@ -4,7 +4,6 @@
 
 #include "quiche/http2/test_tools/frame_parts.h"
 
-#include <optional>
 #include <type_traits>
 
 #include "absl/strings/escaping.h"
@@ -535,7 +534,7 @@ AssertionResult FrameParts::InPaddedFrame() {
 
 AssertionResult FrameParts::AppendString(absl::string_view source,
                                          std::string* target,
-                                         std::optional<size_t>* opt_length) {
+                                         absl::optional<size_t>* opt_length) {
   target->append(source.data(), source.size());
   if (opt_length != nullptr) {
     HTTP2_VERIFY_TRUE(*opt_length) << "Length is not set yet\n" << *this;

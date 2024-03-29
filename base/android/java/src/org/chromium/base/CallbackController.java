@@ -9,7 +9,8 @@ import androidx.annotation.Nullable;
 
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
-import java.util.Objects;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 import javax.annotation.concurrent.GuardedBy;
 
@@ -18,13 +19,9 @@ import javax.annotation.concurrent.GuardedBy;
  * version of the same, and cancel them in bulk when {@link #destroy()} is called. Use an instance
  * of this class to wrap lambdas passed to other objects, and later use {@link #destroy()} to
  * prevent future invocations of these lambdas.
- *
- * <p>Besides helping with lifecycle management, this also prevents holding onto object references
- * after callbacks have been canceled.
- *
- * <p>Example usage:
- *
- * <pre>{@code
+ * <p>
+ * Example usage:
+ * {@code
  * public class Foo {
  *    private CallbackController mCallbackController = new CallbackController();
  *    private SomeDestructibleClass mDestructible = new SomeDestructibleClass();
@@ -64,22 +61,20 @@ import javax.annotation.concurrent.GuardedBy;
  *        mDestructible.setBaz(baz);
  *    }
  * }
- * }</pre>
- *
- * <p>It does not matter if the lambda is intended to be invoked once or more times, as it is only
+ * }
+ * <p>
+ * It does not matter if the lambda is intended to be invoked once or more times, as it is only
  * weakly referred from this class. When the lambda is no longer needed, it can be safely garbage
  * collected. All invocations after {@link #destroy()} will be ignored.
- *
- * <p>Each instance of this class in only meant for a single {@link #destroy()} call. After it is
- * destroyed, the owning class should create a new instance instead:
- *
- * <pre>{@code
- * // Somewhere inside Foo.
- * mCallbackController.destroy();  // Invalidates all current callbacks.
- * mCallbackController = new CallbackController();  // Allows to start handing out new callbacks.
- * }</pre>
+ * <p>
+ * Each instance of this class in only meant for a single {@link
+ * #destroy()} call. After it is destroyed, the owning class should create a new instance instead:
+ * {@code
+ *    // Somewhere inside Foo.
+ *    mCallbackController.destroy();  // Invalidates all current callbacks.
+ *    mCallbackController = new CallbackController();  // Allows to start handing out new callbacks.
+ * }
  */
-@SuppressWarnings({"NoSynchronizedThisCheck", "NoSynchronizedMethodCheck"})
 public final class CallbackController {
     /** Interface for cancelable objects tracked by this class. */
     private interface Cancelable {
@@ -89,7 +84,7 @@ public final class CallbackController {
 
     /** Class wrapping a {@link Callback} interface with a {@link Cancelable} interface. */
     private class CancelableCallback<T> implements Cancelable, Callback<T> {
-        @GuardedBy("CallbackController.this")
+        @GuardedBy("mReentrantLock")
         private Callback<T> mCallback;
 
         private CancelableCallback(@NonNull Callback<T> callback) {
@@ -106,7 +101,7 @@ public final class CallbackController {
         public void onResult(T result) {
             // Guarantees the cancelation is not going to happen, while callback is executed by
             // another thread.
-            synchronized (CallbackController.this) {
+            try (AutoCloseableLock acl = AutoCloseableLock.lock(mReentrantLock)) {
                 if (mCallback != null) mCallback.onResult(result);
             }
         }
@@ -114,7 +109,7 @@ public final class CallbackController {
 
     /** Class wrapping {@link Runnable} interface with a {@link Cancelable} interface. */
     private class CancelableRunnable implements Cancelable, Runnable {
-        @GuardedBy("CallbackController.this")
+        @GuardedBy("mReentrantLock")
         private Runnable mRunnable;
 
         private CancelableRunnable(@NonNull Runnable runnable) {
@@ -131,79 +126,108 @@ public final class CallbackController {
         public void run() {
             // Guarantees the cancelation is not going to happen, while runnable is executed by
             // another thread.
-            synchronized (CallbackController.this) {
+            try (AutoCloseableLock acl = AutoCloseableLock.lock(mReentrantLock)) {
                 if (mRunnable != null) mRunnable.run();
             }
         }
     }
 
+    /** Class wrapping the locking logic to reduce repetitive code. */
+    private static class AutoCloseableLock implements AutoCloseable {
+        private final Lock mLock;
+        private boolean mIsLocked;
+
+        private AutoCloseableLock(Lock lock, boolean isLocked) {
+            mLock = lock;
+            mIsLocked = isLocked;
+        }
+
+        static AutoCloseableLock lock(Lock l) {
+            l.lock();
+            return new AutoCloseableLock(l, true);
+        }
+
+        @Override
+        public void close() {
+            if (!mIsLocked) throw new IllegalStateException("mLock isn't locked.");
+            mIsLocked = false;
+            mLock.unlock();
+        }
+    }
+
     /** A list of cancelables created and cancelable by this object. */
     @Nullable
-    @GuardedBy("this")
+    @GuardedBy("mReentrantLock")
     private ArrayList<WeakReference<Cancelable>> mCancelables = new ArrayList<>();
 
+    /** Ensures thread safety of creating cancelables and canceling them. */
+    private final ReentrantLock mReentrantLock = new ReentrantLock(/*fair=*/true);
+
     /**
-     * Wraps a provided {@link Callback} with a cancelable object that is tracked by this {@link
-     * CallbackController}. To cancel a resulting wrapped instance destroy the host.
-     *
-     * <p>This method must not be called after {@link #destroy()}.
+     * Wraps a provided {@link Callback} with a cancelable object that is tracked by this
+     * {@link CallbackController}. To cancel a resulting wrapped instance destroy the host.
+     * <p>
+     * This method must not be called after {@link #destroy()}.
      *
      * @param <T> The type of the callback result.
      * @param callback A callback that will be made cancelable.
      * @return A cancelable instance of the callback.
      */
-    public synchronized <T> Callback<T> makeCancelable(@NonNull Callback<T> callback) {
-        checkNotCanceled();
-        CancelableCallback<T> cancelable = new CancelableCallback<>(callback);
-        addInternal(cancelable);
-        return cancelable;
+    public <T> Callback<T> makeCancelable(@NonNull Callback<T> callback) {
+        try (AutoCloseableLock acl = AutoCloseableLock.lock(mReentrantLock)) {
+            checkNotCanceled();
+            CancelableCallback<T> cancelable = new CancelableCallback<>(callback);
+            mCancelables.add(new WeakReference<>(cancelable));
+            return cancelable;
+        }
     }
 
     /**
-     * Wraps a provided {@link Runnable} with a cancelable object that is tracked by this {@link
-     * CallbackController}. To cancel a resulting wrapped instance destroy the host.
-     *
-     * <p>This method must not be called after {@link #destroy()}.
+     * Wraps a provided {@link Runnable} with a cancelable object that is tracked by this
+     * {@link CallbackController}. To cancel a resulting wrapped instance destroy the host.
+     * <p>
+     * This method must not be called after {@link #destroy()}.
      *
      * @param runnable A runnable that will be made cancelable.
      * @return A cancelable instance of the runnable.
      */
-    public synchronized Runnable makeCancelable(@NonNull Runnable runnable) {
-        checkNotCanceled();
-        CancelableRunnable cancelable = new CancelableRunnable(runnable);
-        addInternal(cancelable);
-        return cancelable;
-    }
-
-    @GuardedBy("this")
-    private void addInternal(Cancelable cancelable) {
-        var cancelables = mCancelables;
-        cancelables.add(new WeakReference<>(cancelable));
-        // Flush null entries.
-        if ((cancelables.size() % 1024) == 0) {
-            // This removes null entries as a side-effect.
-            // Cloning the list is inefficient, but this should rarely be hit.
-            CollectionUtil.strengthen(cancelables);
+    public Runnable makeCancelable(@NonNull Runnable runnable) {
+        try (AutoCloseableLock acl = AutoCloseableLock.lock(mReentrantLock)) {
+            checkNotCanceled();
+            CancelableRunnable cancelable = new CancelableRunnable(runnable);
+            mCancelables.add(new WeakReference<>(cancelable));
+            return cancelable;
         }
     }
 
     /**
      * Cancels all of the cancelables that have not been garbage collected yet.
-     *
-     * <p>This method must only be called once and makes the instance unusable afterwards.
+     * <p>
+     * This method must only be called once and makes the instance unusable afterwards.
      */
-    public synchronized void destroy() {
-        checkNotCanceled();
-        for (Cancelable cancelable : CollectionUtil.strengthen(mCancelables)) {
-            cancelable.cancel();
+    public void destroy() {
+        // This is likely an invalid state. A callback is currently being run, which means the
+        // owning class using this controller is likely in the middle of a method call. But if
+        // destroy is called on the controller, it is also likely being called on the owning class.
+        // After destroy completes, the owning class will be in invalid state to be used, and the
+        // rest of the method call will be operating with the owning class in an invalid state. If
+        // something has a valid use case for this, remove this assert.
+        assert !mReentrantLock.isHeldByCurrentThread();
+
+        try (AutoCloseableLock acl = AutoCloseableLock.lock(mReentrantLock)) {
+            checkNotCanceled();
+            for (Cancelable cancelable : CollectionUtil.strengthen(mCancelables)) {
+                cancelable.cancel();
+            }
+            mCancelables = null;
         }
-        mCancelables = null;
     }
 
     /** If the cancelation already happened, throws an {@link IllegalStateException}. */
-    @GuardedBy("this")
+    @GuardedBy("mReentrantLock")
     private void checkNotCanceled() {
-        // Use NullPointerException because it optimizes well.
-        Objects.requireNonNull(mCancelables);
+        if (mCancelables == null) {
+            throw new IllegalStateException("This CallbackController has already been destroyed.");
+        }
     }
 }

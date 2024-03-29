@@ -24,7 +24,6 @@ check_PROGRAMS = \
 	testchar \
 	testdict \
 	testlimits \
-	testparser \
 	testrecurse
 
 bin_PROGRAMS = xmllint xmlcatalog
@@ -141,10 +140,6 @@ testdict_SOURCES=testdict.c
 testdict_DEPENDENCIES = $(DEPS)
 testdict_LDADD= $(LDADDS)
 
-testparser_SOURCES=testparser.c
-testparser_DEPENDENCIES = $(DEPS)
-testparser_LDADD= $(LDADDS)
-
 runsuite_SOURCES=runsuite.c
 runsuite_DEPENDENCIES = $(DEPS)
 runsuite_LDADD= $(LDADDS)
@@ -198,7 +193,6 @@ check-local:
 	$(CHECKER) ./testapi$(EXEEXT)
 	$(CHECKER) ./testchar$(EXEEXT)
 	$(CHECKER) ./testdict$(EXEEXT)
-	$(CHECKER) ./testparser$(EXEEXT)
 	$(CHECKER) ./testModule$(EXEEXT)
 	$(CHECKER) ./testThreads$(EXEEXT)
 	$(CHECKER) ./runxmlconf$(EXEEXT)

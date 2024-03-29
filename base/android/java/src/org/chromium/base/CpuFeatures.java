@@ -22,7 +22,9 @@ import org.jni_zero.NativeMethods;
 //
 @JNINamespace("base::android")
 public abstract class CpuFeatures {
-    /** Return the number of CPU Cores on the device. */
+    /**
+     * Return the number of CPU Cores on the device.
+     */
     public static int getCount() {
         return CpuFeaturesJni.get().getCoreCount();
     }
@@ -39,7 +41,6 @@ public abstract class CpuFeatures {
     @NativeMethods
     interface Natives {
         int getCoreCount();
-
         long getCpuFeatures();
     }
 }

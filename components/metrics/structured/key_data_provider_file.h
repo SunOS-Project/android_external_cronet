@@ -6,12 +6,12 @@
 #define COMPONENTS_METRICS_STRUCTURED_KEY_DATA_PROVIDER_FILE_H_
 
 #include <memory>
-#include <optional>
 
 #include "base/files/file_path.h"
 #include "base/memory/weak_ptr.h"
 #include "base/time/time.h"
 #include "components/metrics/structured/key_data_provider.h"
+#include "third_party/abseil-cpp/absl/types/optional.h"
 
 namespace metrics::structured {
 
@@ -25,8 +25,8 @@ class KeyDataProviderFile : public KeyDataProvider, KeyDataProvider::Observer {
   // KeyDataProvider:
   bool IsReady() override;
   void OnProfileAdded(const base::FilePath& profile_path) override;
-  std::optional<uint64_t> GetId(const std::string& project_name) override;
-  std::optional<uint64_t> GetSecondaryId(
+  absl::optional<uint64_t> GetId(const std::string& project_name) override;
+  absl::optional<uint64_t> GetSecondaryId(
       const std::string& project_name) override;
   KeyData* GetKeyData(const std::string& project_name) override;
   void Purge() override;
@@ -40,7 +40,6 @@ class KeyDataProviderFile : public KeyDataProvider, KeyDataProvider::Observer {
   bool is_data_loaded_ = false;
 
   std::unique_ptr<KeyData> key_data_;
-  base::OnceClosure on_key_ready_callback_;
 
   base::WeakPtrFactory<KeyDataProviderFile> weak_ptr_factory_{this};
 };

@@ -6,8 +6,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-// XFAIL: LIBCXX-PICOLIBC-FIXME
-
 // <locale>
 
 // template <> class ctype<char>

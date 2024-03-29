@@ -8,7 +8,9 @@ import android.app.Service;
 import android.content.Intent;
 import android.os.IBinder;
 
-/** Authenticator service for testing SPNEGO (Kerberos) support. */
+/**
+ * Authenticator service for testing SPNEGO (Kerberos) support.
+ */
 public class DummySpnegoAuthenticatorService extends Service {
     private static DummySpnegoAuthenticator sAuthenticator;
 

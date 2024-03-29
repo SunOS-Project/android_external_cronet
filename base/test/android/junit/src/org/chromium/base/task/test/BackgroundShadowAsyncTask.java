@@ -32,13 +32,12 @@ public class BackgroundShadowAsyncTask<Result> extends ShadowAsyncTask<Result> {
     public final AsyncTask<Result> executeOnExecutor(Executor e) {
         try {
             return sExecutorService
-                    .submit(
-                            new Callable<AsyncTask<Result>>() {
-                                @Override
-                                public AsyncTask<Result> call() {
-                                    return BackgroundShadowAsyncTask.super.executeInRobolectric();
-                                }
-                            })
+                    .submit(new Callable<AsyncTask<Result>>() {
+                        @Override
+                        public AsyncTask<Result> call() {
+                            return BackgroundShadowAsyncTask.super.executeInRobolectric();
+                        }
+                    })
                     .get();
         } catch (Exception ex) {
             fail(ex.getMessage());
@@ -59,13 +58,12 @@ public class BackgroundShadowAsyncTask<Result> extends ShadowAsyncTask<Result> {
 
     public static void runBackgroundTasks() throws Exception {
         sExecutorService
-                .submit(
-                        new Runnable() {
-                            @Override
-                            public void run() {
-                                ShadowApplication.runBackgroundTasks();
-                            }
-                        })
+                .submit(new Runnable() {
+                    @Override
+                    public void run() {
+                        ShadowApplication.runBackgroundTasks();
+                    }
+                })
                 .get();
     }
 }

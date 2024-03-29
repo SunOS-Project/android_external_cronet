@@ -5,8 +5,7 @@
 #ifndef QUICHE_WEB_TRANSPORT_COMPLETE_BUFFER_VISITOR_H_
 #define QUICHE_WEB_TRANSPORT_COMPLETE_BUFFER_VISITOR_H_
 
-#include <optional>
-
+#include "absl/types/optional.h"
 #include "absl/utility/utility.h"
 #include "quiche/common/quiche_callbacks.h"
 #include "quiche/web_transport/web_transport.h"
@@ -46,8 +45,8 @@ class QUICHE_EXPORT CompleteBufferVisitor : public StreamVisitor {
 
  private:
   webtransport::Stream* stream_;
-  std::optional<std::string> outgoing_data_;
-  std::optional<AllDataReadCallback> incoming_data_callback_;
+  absl::optional<std::string> outgoing_data_;
+  absl::optional<AllDataReadCallback> incoming_data_callback_;
   std::string incoming_data_buffer_;
 };
 

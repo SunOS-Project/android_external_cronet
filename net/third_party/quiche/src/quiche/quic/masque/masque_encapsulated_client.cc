@@ -187,8 +187,8 @@ class MasquePacketWriter : public QuicPacketWriter {
 
   void SetWritable() override {}
 
-  std::optional<int> MessageTooBigErrorCode() const override {
-    return std::nullopt;
+  absl::optional<int> MessageTooBigErrorCode() const override {
+    return absl::nullopt;
   }
 
   QuicByteCount GetMaxPacketSize(

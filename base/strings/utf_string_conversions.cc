@@ -7,9 +7,7 @@
 #include <limits.h>
 #include <stdint.h>
 
-#include <concepts>
 #include <ostream>
-#include <string_view>
 #include <type_traits>
 
 #include "base/strings/string_piece.h"
@@ -44,7 +42,7 @@ struct SizeCoefficient<char16_t, char> {
   static constexpr int value = 3;
 };
 
-#if defined(WCHAR_T_IS_32_BIT)
+#if defined(WCHAR_T_IS_UTF32)
 template <>
 struct SizeCoefficient<wchar_t, char> {
   // UTF-8 uses at most 4 codeunits per character.
@@ -56,7 +54,7 @@ struct SizeCoefficient<wchar_t, char16_t> {
   // UTF-16 uses at most 2 codeunits per character.
   static constexpr int value = 2;
 };
-#endif  // defined(WCHAR_T_IS_32_BIT)
+#endif  // defined(WCHAR_T_IS_UTF32)
 
 template <typename SrcChar, typename DestChar>
 constexpr int size_coefficient_v =
@@ -69,26 +67,25 @@ constexpr int size_coefficient_v =
 // Convenience typedef that checks whether the passed in type is integral (i.e.
 // bool, char, int or their extended versions) and is of the correct size.
 template <typename Char, size_t N>
-concept BitsAre = std::integral<Char> && CHAR_BIT * sizeof(Char) == N;
+using EnableIfBitsAre =
+    std::enable_if_t<std::is_integral_v<Char> && CHAR_BIT * sizeof(Char) == N,
+                     bool>;
 
-template <typename Char>
-  requires(BitsAre<Char, 8>)
+template <typename Char, EnableIfBitsAre<Char, 8> = true>
 void UnicodeAppendUnsafe(Char* out,
                          size_t* size,
                          base_icu::UChar32 code_point) {
   CBU8_APPEND_UNSAFE(reinterpret_cast<uint8_t*>(out), *size, code_point);
 }
 
-template <typename Char>
-  requires(BitsAre<Char, 16>)
+template <typename Char, EnableIfBitsAre<Char, 16> = true>
 void UnicodeAppendUnsafe(Char* out,
                          size_t* size,
                          base_icu::UChar32 code_point) {
   CBU16_APPEND_UNSAFE(out, *size, code_point);
 }
 
-template <typename Char>
-  requires(BitsAre<Char, 32>)
+template <typename Char, EnableIfBitsAre<Char, 32> = true>
 void UnicodeAppendUnsafe(Char* out,
                          size_t* size,
                          base_icu::UChar32 code_point) {
@@ -165,7 +162,7 @@ bool DoUTFConversion(const char16_t* src,
   return success;
 }
 
-#if defined(WCHAR_T_IS_32_BIT)
+#if defined(WCHAR_T_IS_UTF32)
 
 template <typename DestChar>
 bool DoUTFConversion(const wchar_t* src,
@@ -188,7 +185,7 @@ bool DoUTFConversion(const wchar_t* src,
   return success;
 }
 
-#endif  // defined(WCHAR_T_IS_32_BIT)
+#endif  // defined(WCHAR_T_IS_UTF32)
 
 // UTFConversion --------------------------------------------------------------
 // Function template for generating all UTF conversions.
@@ -249,7 +246,7 @@ std::string UTF16ToUTF8(StringPiece16 utf16) {
 
 // UTF-16 <-> Wide -------------------------------------------------------------
 
-#if defined(WCHAR_T_IS_16_BIT)
+#if defined(WCHAR_T_IS_UTF16)
 // When wide == UTF-16 the conversions are a NOP.
 
 bool WideToUTF16(const wchar_t* src, size_t src_len, std::u16string* output) {
@@ -257,7 +254,7 @@ bool WideToUTF16(const wchar_t* src, size_t src_len, std::u16string* output) {
   return true;
 }
 
-std::u16string WideToUTF16(std::wstring_view wide) {
+std::u16string WideToUTF16(WStringPiece wide) {
   return std::u16string(wide.begin(), wide.end());
 }
 
@@ -270,13 +267,13 @@ std::wstring UTF16ToWide(StringPiece16 utf16) {
   return std::wstring(utf16.begin(), utf16.end());
 }
 
-#elif defined(WCHAR_T_IS_32_BIT)
+#elif defined(WCHAR_T_IS_UTF32)
 
 bool WideToUTF16(const wchar_t* src, size_t src_len, std::u16string* output) {
-  return UTFConversion(std::wstring_view(src, src_len), output);
+  return UTFConversion(base::WStringPiece(src, src_len), output);
 }
 
-std::u16string WideToUTF16(std::wstring_view wide) {
+std::u16string WideToUTF16(WStringPiece wide) {
   std::u16string ret;
   // Ignore the success flag of this call, it will do the best it can for
   // invalid input, which is what we want here.
@@ -296,7 +293,7 @@ std::wstring UTF16ToWide(StringPiece16 utf16) {
   return ret;
 }
 
-#endif  // defined(WCHAR_T_IS_32_BIT)
+#endif  // defined(WCHAR_T_IS_UTF32)
 
 // UTF-8 <-> Wide --------------------------------------------------------------
 
@@ -314,24 +311,24 @@ std::wstring UTF8ToWide(StringPiece utf8) {
   return ret;
 }
 
-#if defined(WCHAR_T_IS_16_BIT)
+#if defined(WCHAR_T_IS_UTF16)
 // Easy case since we can use the "utf" versions we already wrote above.
 
 bool WideToUTF8(const wchar_t* src, size_t src_len, std::string* output) {
   return UTF16ToUTF8(as_u16cstr(src), src_len, output);
 }
 
-std::string WideToUTF8(std::wstring_view wide) {
+std::string WideToUTF8(WStringPiece wide) {
   return UTF16ToUTF8(StringPiece16(as_u16cstr(wide), wide.size()));
 }
 
-#elif defined(WCHAR_T_IS_32_BIT)
+#elif defined(WCHAR_T_IS_UTF32)
 
 bool WideToUTF8(const wchar_t* src, size_t src_len, std::string* output) {
-  return UTFConversion(std::wstring_view(src, src_len), output);
+  return UTFConversion(WStringPiece(src, src_len), output);
 }
 
-std::string WideToUTF8(std::wstring_view wide) {
+std::string WideToUTF8(WStringPiece wide) {
   std::string ret;
   // Ignore the success flag of this call, it will do the best it can for
   // invalid input, which is what we want here.
@@ -339,7 +336,7 @@ std::string WideToUTF8(std::wstring_view wide) {
   return ret;
 }
 
-#endif  // defined(WCHAR_T_IS_32_BIT)
+#endif  // defined(WCHAR_T_IS_UTF32)
 
 std::u16string ASCIIToUTF16(StringPiece ascii) {
   DCHECK(IsStringASCII(ascii)) << ascii;
@@ -351,16 +348,16 @@ std::string UTF16ToASCII(StringPiece16 utf16) {
   return std::string(utf16.begin(), utf16.end());
 }
 
-#if defined(WCHAR_T_IS_16_BIT)
+#if defined(WCHAR_T_IS_UTF16)
 std::wstring ASCIIToWide(StringPiece ascii) {
   DCHECK(IsStringASCII(ascii)) << ascii;
   return std::wstring(ascii.begin(), ascii.end());
 }
 
-std::string WideToASCII(std::wstring_view wide) {
+std::string WideToASCII(WStringPiece wide) {
   DCHECK(IsStringASCII(wide)) << wide;
   return std::string(wide.begin(), wide.end());
 }
-#endif  // defined(WCHAR_T_IS_16_BIT)
+#endif  // defined(WCHAR_T_IS_UTF16)
 
 }  // namespace base

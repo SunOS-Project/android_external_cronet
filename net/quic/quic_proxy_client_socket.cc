@@ -131,6 +131,12 @@ bool QuicProxyClientSocket::WasEverUsed() const {
   return session_->WasEverUsed();
 }
 
+bool QuicProxyClientSocket::WasAlpnNegotiated() const {
+  // Do not delegate to `session_`. While `session_` negotiates ALPN with the
+  // proxy, this object represents the tunneled TCP connection to the origin.
+  return false;
+}
+
 NextProto QuicProxyClientSocket::GetNegotiatedProtocol() const {
   // Do not delegate to `session_`. While `session_` negotiates ALPN with the
   // proxy, this object represents the tunneled TCP connection to the origin.

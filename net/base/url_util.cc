@@ -12,18 +12,17 @@
 #include <ws2tcpip.h>
 #endif
 
-#include <optional>
-#include <string_view>
-
 #include "base/check_op.h"
 #include "base/containers/fixed_flat_set.h"
 #include "base/strings/escape.h"
 #include "base/strings/strcat.h"
+#include "base/strings/string_piece.h"
 #include "base/strings/string_util.h"
 #include "base/strings/stringprintf.h"
 #include "base/strings/utf_string_conversions.h"
 #include "net/base/ip_address.h"
 #include "net/base/registry_controlled_domains/registry_controlled_domain.h"
+#include "third_party/abseil-cpp/absl/types/optional.h"
 #include "url/gurl.h"
 #include "url/scheme_host_port.h"
 #include "url/url_canon.h"
@@ -42,7 +41,7 @@ bool IsHostCharAlphanumeric(char c) {
   return ((c >= 'a') && (c <= 'z')) || ((c >= '0') && (c <= '9'));
 }
 
-bool IsNormalizedLocalhostTLD(std::string_view host) {
+bool IsNormalizedLocalhostTLD(base::StringPiece host) {
   return base::EndsWith(host, ".localhost",
                         base::CompareCase::INSENSITIVE_ASCII);
 }
@@ -51,7 +50,7 @@ bool IsNormalizedLocalhostTLD(std::string_view host) {
 // unescaped" to a valid UTF-8 string, return that string, as UTF-16. Otherwise,
 // convert it as-is to UTF-16. "Safely unescaped" is defined as having no
 // escaped character between '0x00' and '0x1F', inclusive.
-std::u16string UnescapeIdentityString(std::string_view escaped_text) {
+std::u16string UnescapeIdentityString(base::StringPiece escaped_text) {
   std::string unescaped_text;
   if (base::UnescapeBinaryURLComponentSafe(
           escaped_text, false /* fail_on_path_separators */, &unescaped_text)) {
@@ -67,8 +66,8 @@ std::u16string UnescapeIdentityString(std::string_view escaped_text) {
 }  // namespace
 
 GURL AppendQueryParameter(const GURL& url,
-                          std::string_view name,
-                          std::string_view value) {
+                          base::StringPiece name,
+                          base::StringPiece value) {
   std::string query(url.query());
 
   if (!query.empty())
@@ -82,8 +81,8 @@ GURL AppendQueryParameter(const GURL& url,
 }
 
 GURL AppendOrReplaceQueryParameter(const GURL& url,
-                                   std::string_view name,
-                                   std::optional<std::string_view> value) {
+                                   base::StringPiece name,
+                                   absl::optional<base::StringPiece> value) {
   bool replaced = false;
   std::string param_name = base::EscapeQueryParamValue(name, true);
   bool should_keep_param = value.has_value();
@@ -92,13 +91,13 @@ GURL AppendOrReplaceQueryParameter(const GURL& url,
   if (should_keep_param)
     param_value = base::EscapeQueryParamValue(value.value(), true);
 
-  const std::string_view input = url.query_piece();
+  const base::StringPiece input = url.query_piece();
   url::Component cursor(0, input.size());
   std::string output;
   url::Component key_range, value_range;
   while (url::ExtractQueryKeyValue(input.data(), &cursor, &key_range,
                                    &value_range)) {
-    const std::string_view key = input.substr(key_range.begin, key_range.len);
+    const base::StringPiece key = input.substr(key_range.begin, key_range.len);
     std::string key_value_pair;
     // Check |replaced| as only the first pair should be replaced.
     if (!replaced && key == param_name) {
@@ -127,7 +126,7 @@ GURL AppendOrReplaceQueryParameter(const GURL& url,
   return url.ReplaceComponents(replacements);
 }
 
-GURL AppendOrReplaceRef(const GURL& url, const std::string_view& ref) {
+GURL AppendOrReplaceRef(const GURL& url, const base::StringPiece& ref) {
   GURL::Replacements replacements;
   replacements.SetRefStr(ref);
   return url.ReplaceComponents(replacements);
@@ -143,18 +142,18 @@ QueryIterator::QueryIterator(const GURL& url)
 
 QueryIterator::~QueryIterator() = default;
 
-std::string_view QueryIterator::GetKey() const {
+base::StringPiece QueryIterator::GetKey() const {
   DCHECK(!at_end_);
   if (key_.is_nonempty())
-    return std::string_view(url_->spec()).substr(key_.begin, key_.len);
-  return std::string_view();
+    return base::StringPiece(url_->spec()).substr(key_.begin, key_.len);
+  return base::StringPiece();
 }
 
-std::string_view QueryIterator::GetValue() const {
+base::StringPiece QueryIterator::GetValue() const {
   DCHECK(!at_end_);
   if (value_.is_nonempty())
-    return std::string_view(url_->spec()).substr(value_.begin, value_.len);
-  return std::string_view();
+    return base::StringPiece(url_->spec()).substr(value_.begin, value_.len);
+  return base::StringPiece();
 }
 
 const std::string& QueryIterator::GetUnescapedValue() {
@@ -183,7 +182,7 @@ void QueryIterator::Advance() {
 }
 
 bool GetValueForKeyInQuery(const GURL& url,
-                           std::string_view search_key,
+                           base::StringPiece search_key,
                            std::string* out_value) {
   for (QueryIterator it(url); !it.IsAtEnd(); it.Advance()) {
     if (it.GetKey() == search_key) {
@@ -194,7 +193,7 @@ bool GetValueForKeyInQuery(const GURL& url,
   return false;
 }
 
-bool ParseHostAndPort(std::string_view input, std::string* host, int* port) {
+bool ParseHostAndPort(base::StringPiece input, std::string* host, int* port) {
   if (input.empty())
     return false;
 
@@ -281,8 +280,8 @@ NET_EXPORT std::string GetHostAndOptionalPort(
   return scheme_host_port.host();
 }
 
-std::string TrimEndingDot(std::string_view host) {
-  std::string_view host_trimmed = host;
+std::string TrimEndingDot(base::StringPiece host) {
+  base::StringPiece host_trimmed = host;
   size_t len = host_trimmed.length();
   if (len > 1 && host_trimmed[len - 1] == '.') {
     host_trimmed.remove_suffix(1);
@@ -294,14 +293,14 @@ std::string GetHostOrSpecFromURL(const GURL& url) {
   return url.has_host() ? TrimEndingDot(url.host_piece()) : url.spec();
 }
 
-std::string GetSuperdomain(std::string_view domain) {
+std::string GetSuperdomain(base::StringPiece domain) {
   size_t dot_pos = domain.find('.');
   if (dot_pos == std::string::npos)
     return "";
   return std::string(domain.substr(dot_pos + 1));
 }
 
-bool IsSubdomainOf(std::string_view subdomain, std::string_view superdomain) {
+bool IsSubdomainOf(base::StringPiece subdomain, base::StringPiece superdomain) {
   // Subdomain must be identical or have strictly more labels than the
   // superdomain.
   if (subdomain.length() <= superdomain.length())
@@ -309,14 +308,13 @@ bool IsSubdomainOf(std::string_view subdomain, std::string_view superdomain) {
 
   // Superdomain must be suffix of subdomain, and the last character not
   // included in the matching substring must be a dot.
-  if (!subdomain.ends_with(superdomain)) {
+  if (!base::EndsWith(subdomain, superdomain))
     return false;
-  }
   subdomain.remove_suffix(superdomain.length());
   return subdomain.back() == '.';
 }
 
-std::string CanonicalizeHost(std::string_view host,
+std::string CanonicalizeHost(base::StringPiece host,
                              url::CanonHostInfo* host_info) {
   // Try to canonicalize the host.
   const url::Component raw_host_component(0, static_cast<int>(host.length()));
@@ -349,7 +347,7 @@ std::string CanonicalizeHost(std::string_view host,
   return canon_host;
 }
 
-bool IsCanonicalizedHostCompliant(std::string_view host) {
+bool IsCanonicalizedHostCompliant(base::StringPiece host) {
   if (host.empty() || host.size() > 254 ||
       (host.back() != '.' && host.size() == 254)) {
     return false;
@@ -389,7 +387,7 @@ bool IsCanonicalizedHostCompliant(std::string_view host) {
   return most_recent_component_started_alphanumeric;
 }
 
-bool IsHostnameNonUnique(std::string_view hostname) {
+bool IsHostnameNonUnique(base::StringPiece hostname) {
   // CanonicalizeHost requires surrounding brackets to parse an IPv6 address.
   const std::string host_or_ip = hostname.find(':') != std::string::npos
                                      ? base::StrCat({"[", hostname, "]"})
@@ -438,7 +436,7 @@ bool IsLocalhost(const GURL& url) {
   return HostStringIsLocalhost(url.HostNoBracketsPiece());
 }
 
-bool HostStringIsLocalhost(std::string_view host) {
+bool HostStringIsLocalhost(base::StringPiece host) {
   IPAddress ip_address;
   if (ip_address.AssignFromIPLiteral(host))
     return ip_address.IsLoopback();
@@ -465,7 +463,7 @@ GURL ChangeWebSocketSchemeToHttpScheme(const GURL& url) {
   return url.ReplaceComponents(replace_scheme);
 }
 
-bool IsStandardSchemeWithNetworkHost(std::string_view scheme) {
+bool IsStandardSchemeWithNetworkHost(base::StringPiece scheme) {
   // file scheme is special. Windows file share origins can have network hosts.
   if (scheme == url::kFileScheme)
     return true;
@@ -490,7 +488,7 @@ bool HasGoogleHost(const GURL& url) {
   return IsGoogleHost(url.host_piece());
 }
 
-bool IsGoogleHost(std::string_view host) {
+bool IsGoogleHost(base::StringPiece host) {
   static const char* kGoogleHostSuffixes[] = {
       ".google.com",
       ".youtube.com",
@@ -509,19 +507,18 @@ bool IsGoogleHost(std::string_view host) {
     // Here it's possible to get away with faster case-sensitive comparisons
     // because the list above is all lowercase, and a GURL's host name will
     // always be canonicalized to lowercase as well.
-    if (host.ends_with(suffix)) {
+    if (base::EndsWith(host, suffix))
       return true;
-    }
   }
   return false;
 }
 
-bool IsGoogleHostWithAlpnH3(std::string_view host) {
+bool IsGoogleHostWithAlpnH3(base::StringPiece host) {
   return base::EqualsCaseInsensitiveASCII(host, "google.com") ||
          base::EqualsCaseInsensitiveASCII(host, "www.google.com");
 }
 
-bool IsLocalHostname(std::string_view host) {
+bool IsLocalHostname(base::StringPiece host) {
   // Remove any trailing '.'.
   if (!host.empty() && *host.rbegin() == '.')
     host.remove_suffix(1);
@@ -530,7 +527,7 @@ bool IsLocalHostname(std::string_view host) {
          IsNormalizedLocalhostTLD(host);
 }
 
-std::string UnescapePercentEncodedUrl(std::string_view input) {
+std::string UnescapePercentEncodedUrl(base::StringPiece input) {
   std::string result(input);
   // Replace any 0x2B (+) with 0x20 (SP).
   for (char& c : result) {

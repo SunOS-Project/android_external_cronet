@@ -232,6 +232,10 @@ bool FuzzedSocket::WasEverUsed() const {
   return total_bytes_written_ != 0 || total_bytes_read_ != 0;
 }
 
+bool FuzzedSocket::WasAlpnNegotiated() const {
+  return false;
+}
+
 NextProto FuzzedSocket::GetNegotiatedProtocol() const {
   return kProtoUnknown;
 }

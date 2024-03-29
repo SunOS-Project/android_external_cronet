@@ -546,10 +546,7 @@ def ReadBuildVars(output_directory):
 
 
 def CreateBuildCommand(output_directory):
-  """Returns [cmd, -C, output_directory].
-
-  Where |cmd| is one of: siso ninja, ninja, or autoninja.
-  """
+  """Returns [cmd, -C, output_directory], where |cmd| is auto{siso,ninja}."""
   suffix = '.bat' if sys.platform.startswith('win32') else ''
   # Prefer the version on PATH, but fallback to known version if PATH doesn't
   # have one (e.g. on bots).
@@ -563,7 +560,7 @@ def CreateBuildCommand(output_directory):
     siso_cmd = [f'{siso_prefix}siso{suffix}', 'ninja']
   else:
     ninja_cmd = [f'autoninja{suffix}']
-    siso_cmd = list(ninja_cmd)
+    siso_cmd = [f'autosiso{suffix}']
 
   if output_directory and os.path.relpath(output_directory) != '.':
     ninja_cmd += ['-C', output_directory]

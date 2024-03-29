@@ -392,9 +392,7 @@ quiche_core_hdrs = [
     "spdy/core/spdy_protocol.h",
     "spdy/core/zero_copy_output_buffer.h",
     "web_transport/complete_buffer_visitor.h",
-    "web_transport/encapsulated/encapsulated_web_transport.h",
     "web_transport/web_transport.h",
-    "web_transport/web_transport_headers.h",
 ]
 quiche_core_srcs = [
     "common/capsule.cc",
@@ -682,8 +680,6 @@ quiche_core_srcs = [
     "spdy/core/spdy_prefixed_buffer_reader.cc",
     "spdy/core/spdy_protocol.cc",
     "web_transport/complete_buffer_visitor.cc",
-    "web_transport/encapsulated/encapsulated_web_transport.cc",
-    "web_transport/web_transport_headers.cc",
 ]
 quiche_tool_support_hdrs = [
     "common/platform/api/quiche_command_line_flags.h",
@@ -714,7 +710,6 @@ quiche_tool_support_hdrs = [
     "quic/tools/quic_tcp_like_trace_converter.h",
     "quic/tools/quic_url.h",
     "quic/tools/simple_ticket_crypter.h",
-    "quic/tools/web_transport_only_backend.h",
     "quic/tools/web_transport_test_visitors.h",
 ]
 quiche_tool_support_srcs = [
@@ -738,14 +733,12 @@ quiche_tool_support_srcs = [
     "quic/tools/quic_tcp_like_trace_converter.cc",
     "quic/tools/quic_url.cc",
     "quic/tools/simple_ticket_crypter.cc",
-    "quic/tools/web_transport_only_backend.cc",
 ]
 quiche_test_support_hdrs = [
     "common/platform/api/quiche_expect_bug.h",
     "common/platform/api/quiche_test.h",
     "common/platform/api/quiche_test_loopback.h",
     "common/platform/api/quiche_test_output.h",
-    "common/test_tools/mock_streams.h",
     "common/test_tools/quiche_test_utils.h",
     "http2/adapter/mock_http2_visitor.h",
     "http2/adapter/recording_http2_visitor.h",
@@ -993,7 +986,6 @@ io_tool_support_hdrs = [
     "quic/tools/quic_client_default_network_helper.h",
     "quic/tools/quic_default_client.h",
     "quic/tools/quic_epoll_client_factory.h",
-    "quic/tools/quic_event_loop_tools.h",
     "quic/tools/quic_server.h",
 ]
 io_tool_support_srcs = [
@@ -1077,7 +1069,6 @@ quiche_tests_srcs = [
     "common/simple_buffer_allocator_test.cc",
     "common/structured_headers_generated_test.cc",
     "common/structured_headers_test.cc",
-    "common/test_tools/mock_streams_test.cc",
     "common/test_tools/quiche_test_utils_test.cc",
     "common/wire_serialization_test.cc",
     "http2/adapter/event_forwarder_test.cc",
@@ -1308,8 +1299,6 @@ quiche_tests_srcs = [
     "spdy/core/spdy_pinnable_buffer_piece_test.cc",
     "spdy/core/spdy_prefixed_buffer_reader_test.cc",
     "spdy/core/spdy_protocol_test.cc",
-    "web_transport/encapsulated/encapsulated_web_transport_test.cc",
-    "web_transport/web_transport_headers_test.cc",
 ]
 io_tests_hdrs = [
 ]
@@ -1481,8 +1470,6 @@ moqt_hdrs = [
     "quic/moqt/moqt_parser.h",
     "quic/moqt/moqt_session.h",
     "quic/moqt/test_tools/moqt_test_message.h",
-    "quic/moqt/tools/moqt_client.h",
-    "quic/moqt/tools/moqt_server.h",
 ]
 moqt_srcs = [
     "quic/moqt/moqt_framer.cc",
@@ -1492,9 +1479,6 @@ moqt_srcs = [
     "quic/moqt/moqt_parser.cc",
     "quic/moqt/moqt_parser_test.cc",
     "quic/moqt/moqt_session.cc",
-    "quic/moqt/tools/moqt_client.cc",
-    "quic/moqt/tools/moqt_end_to_end_test.cc",
-    "quic/moqt/tools/moqt_server.cc",
 ]
 binary_http_hdrs = [
     "binary_http/binary_http_message.h",

@@ -144,9 +144,9 @@ class BASE_EXPORT TaskRunner
             template <typename>
             class TaskCallbackType,
             template <typename>
-            class ReplyCallbackType>
-    requires(IsBaseCallback<TaskCallbackType<void()>> &&
-             IsBaseCallback<ReplyCallbackType<void()>>)
+            class ReplyCallbackType,
+            typename = EnableIfIsBaseCallback<TaskCallbackType>,
+            typename = EnableIfIsBaseCallback<ReplyCallbackType>>
   bool PostTaskAndReplyWithResult(const Location& from_here,
                                   TaskCallbackType<TaskReturnType()> task,
                                   ReplyCallbackType<void(ReplyArgType)> reply) {

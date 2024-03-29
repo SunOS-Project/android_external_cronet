@@ -807,11 +807,6 @@ class NET_EXPORT URLRequest : public base::SupportsUserData {
   }
   bool upgrade_if_insecure() const { return upgrade_if_insecure_; }
 
-  // `ad_tagged` should be set to true if the request is thought to be related
-  // to advertising.
-  void set_ad_tagged(bool ad_tagged) { ad_tagged_ = ad_tagged; }
-  bool ad_tagged() const { return ad_tagged_; }
-
   // By default, client certs will be sent (provided via
   // Delegate::OnCertificateRequested) when cookies are disabled
   // (LOAD_DO_NOT_SEND_COOKIES / LOAD_DO_NOT_SAVE_COOKIES). As described at
@@ -923,7 +918,6 @@ class NET_EXPORT URLRequest : public base::SupportsUserData {
   // been called.
   bool CanSetCookie(const net::CanonicalCookie& cookie,
                     CookieOptions* options,
-                    const net::FirstPartySetMetadata& first_party_set_metadata,
                     CookieInclusionStatus* inclusion_status) const;
 
   // Called just before calling a delegate that may block a request. |type|
@@ -962,12 +956,8 @@ class NET_EXPORT URLRequest : public base::SupportsUserData {
   SiteForCookies site_for_cookies_;
 
   IsolationInfo isolation_info_;
-  // The cookie partition key for the request. Partitioned cookies should be set
-  // using this key and only partitioned cookies with this partition key should
-  // be sent. The cookie partition key is optional(nullopt) if cookie
-  // partitioning is not enabled, or if the NIK has no top-frame site.
-  //
-  // Unpartitioned cookies are unaffected by this field.
+  // TODO(dylancutler): Have URLRequestHttpJob use this partition key instead of
+  // keeping its own copy.
   absl::optional<CookiePartitionKey> cookie_partition_key_ = absl::nullopt;
 
   bool force_ignore_site_for_cookies_ = false;
@@ -1103,8 +1093,6 @@ class NET_EXPORT URLRequest : public base::SupportsUserData {
   base::RepeatingCallback<bool()> is_shared_dictionary_read_allowed_callback_;
 
   bool upgrade_if_insecure_ = false;
-
-  bool ad_tagged_ = false;
 
   bool send_client_certs_ = true;
 

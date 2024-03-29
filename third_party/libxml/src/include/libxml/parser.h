@@ -172,8 +172,6 @@ typedef enum {
 } xmlParserMode;
 
 typedef struct _xmlStartTag xmlStartTag;
-typedef struct _xmlParserNsData xmlParserNsData;
-typedef struct _xmlAttrHashBucket xmlAttrHashBucket;
 
 /**
  * xmlParserCtxt:
@@ -284,7 +282,7 @@ struct _xmlParserCtxt {
     int                nsNr;          /* the number of inherited namespaces */
     int                nsMax;         /* the size of the arrays */
     const xmlChar *   *nsTab;         /* the array of prefix/namespace name */
-    unsigned          *attallocs;     /* which attribute were allocated */
+    int               *attallocs;     /* which attribute were allocated */
     xmlStartTag       *pushTab;       /* array of data for push */
     xmlHashTablePtr    attsDefault;   /* defaulted attributes if any */
     xmlHashTablePtr    attsSpecial;   /* non-CDATA attributes if any */
@@ -321,10 +319,6 @@ struct _xmlParserCtxt {
     unsigned short     nbErrors;    /* number of errors */
     unsigned short   nbWarnings;    /* number of warnings */
     unsigned            maxAmpl;    /* maximum amplification factor */
-
-    xmlParserNsData       *nsdb;    /* namespace database */
-    unsigned        attrHashMax;    /* allocated size */
-    xmlAttrHashBucket *attrHash;    /* atttribute hash table */
 };
 
 /**

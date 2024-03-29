@@ -16,6 +16,8 @@
 #include "base/metrics/sparse_histogram.h"
 #include "base/metrics/statistics_recorder.h"
 #include "base/test/bind.h"
+#include "base/test/scoped_feature_list.h"
+#include "components/metrics/metrics_features.h"
 #include "content/public/test/browser_task_environment.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
@@ -232,10 +234,7 @@ TEST_F(SubprocessMetricsProviderTest, SnapshotMetrics) {
   bar->Add(20);
   DeregisterSubprocessAllocator(123);
   // Do not call MergeHistogramDeltas() here, because the call to
-  // DeregisterSubprocessAllocator() should have already scheduled a task to
-  // merge the histograms.
-  EXPECT_THAT(GetSnapshotHistograms(), IsEmpty());
-  task_environment()->RunUntilIdle();
+  // DeregisterSubprocessAllocator() should have already merged the histograms.
   EXPECT_THAT(GetSnapshotHistograms(),
               UnorderedElementsAre(
                   HistogramData{"_foo", /*total_count=*/1, /*sum=*/10},
@@ -251,6 +250,15 @@ TEST_F(SubprocessMetricsProviderTest, SnapshotMetrics) {
 }
 
 TEST_F(SubprocessMetricsProviderTest, SnapshotMetricsAsync) {
+  base::test::ScopedFeatureList scoped_feature_list_;
+  scoped_feature_list_.InitAndEnableFeatureWithParameters(
+      features::kSubprocessMetricsAsync,
+      {{features::kPeriodicMergeAsync.name, "true"},
+       {features::kDeregisterAsync.name, "true"}});
+  // Force creation of task runner after enabling |kSubprocessMetricsAsync| with
+  // |kDeregisterAsync| set to true.
+  RecreateTaskRunnerForTesting();
+
   base::HistogramBase* foo = base::Histogram::FactoryGet("_foo", 1, 100, 10, 0);
   base::HistogramBase* bar = base::Histogram::FactoryGet("_bar", 1, 100, 10, 0);
   base::HistogramBase* baz = base::Histogram::FactoryGet("_baz", 1, 100, 10, 0);
@@ -325,9 +333,29 @@ TEST_F(SubprocessMetricsProviderTest, SnapshotMetricsAsync) {
   EXPECT_THAT(GetSnapshotHistograms(), IsEmpty());
 }
 
+class SubprocessMetricsProviderWithParamTest
+    : public SubprocessMetricsProviderTest,
+      public testing::WithParamInterface<std::pair<bool, bool>> {};
+
+INSTANTIATE_TEST_SUITE_P(All,
+                         SubprocessMetricsProviderWithParamTest,
+                         testing::Values(std::make_pair(true, false),
+                                         std::make_pair(false, true),
+                                         std::make_pair(true, true)));
+
 // Verifies that it is fine to deregister an allocator even if background tasks
 // that access it are still pending/running.
-TEST_F(SubprocessMetricsProviderTest, AllocatorRefCounted) {
+TEST_P(SubprocessMetricsProviderWithParamTest, AllocatorRefCounted) {
+  base::test::ScopedFeatureList scoped_feature_list_;
+  scoped_feature_list_.InitAndEnableFeatureWithParameters(
+      features::kSubprocessMetricsAsync,
+      {{features::kPeriodicMergeAsync.name,
+        GetParam().first ? "true" : "false"},
+       {features::kDeregisterAsync.name,
+        GetParam().second ? "true" : "false"}});
+  // Force creation of task runner if |kDeregisterAsync| was set to true.
+  RecreateTaskRunnerForTesting();
+
   base::HistogramBase* foo = base::Histogram::FactoryGet("_foo", 1, 100, 10, 0);
   base::HistogramBase* bar = base::Histogram::FactoryGet("_bar", 1, 100, 10, 0);
   base::HistogramBase* baz = base::SparseHistogram::FactoryGet(
@@ -352,17 +380,21 @@ TEST_F(SubprocessMetricsProviderTest, AllocatorRefCounted) {
       [&] { duplicate_allocator_destroyed = true; }));
   RegisterSubprocessAllocator(123, std::move(duplicate_allocator));
 
-  // Merge histogram deltas. This will be done asynchronously.
+  // Merge histogram deltas. Depending on the test's param (GetParam().first),
+  // this may be done asynchronously.
   SubprocessMetricsProvider::MergeHistogramDeltasForTesting(
       /*async=*/true, /*done_callback=*/base::DoNothing());
-  // Deregister the allocator. This will be done asynchronously.
+  // Deregister the allocator. Depending on the test's param
+  // (GetParam().second), the final merge of the histograms may be done
+  // asynchronously.
   DeregisterSubprocessAllocator(123);
 
-  // The call to DeregisterSubprocessAllocator() above will have removed the
-  // allocator from the internal map. However, the allocator should not have
-  // been freed yet as there are still background tasks pending/running
-  // that have a reference to it (i.e., the tasks from MergeHistogramDeltas()
-  // and DeregisterSubprocessAllocator()).
+  // Regardless of the test's params (GetParam()), the call to
+  // DeregisterSubprocessAllocator() above will have removed the allocator from
+  // the internal map. However, the allocator should not have been freed yet as
+  // there are still background tasks pending/running that have a reference to
+  // it (i.e., one possibly posted by MergeHistogramDeltas(), and one possibly
+  // by DeregisterSubprocessAllocator()).
   ASSERT_FALSE(duplicate_allocator_destroyed);
 
   // Run tasks.

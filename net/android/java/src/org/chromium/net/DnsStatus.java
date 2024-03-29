@@ -10,7 +10,9 @@ import org.jni_zero.JNINamespace;
 import java.net.InetAddress;
 import java.util.List;
 
-/** Class to access DNS server configuration. */
+/**
+ * Class to access DNS server configuration.
+ */
 @JNINamespace("net::android")
 public class DnsStatus {
     private final List<InetAddress> mDnsServers;
@@ -21,11 +23,8 @@ public class DnsStatus {
 
     private final String mSearchDomains;
 
-    public DnsStatus(
-            List<InetAddress> dnsServers,
-            boolean privateDnsActive,
-            String privateDnsServerName,
-            String searchDomains) {
+    public DnsStatus(List<InetAddress> dnsServers, boolean privateDnsActive,
+            String privateDnsServerName, String searchDomains) {
         mDnsServers = dnsServers;
         mPrivateDnsActive = privateDnsActive;
         mPrivateDnsServerName = (privateDnsServerName != null) ? privateDnsServerName : "";

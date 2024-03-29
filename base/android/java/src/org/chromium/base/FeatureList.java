@@ -18,28 +18,40 @@ import org.chromium.base.library_loader.LibraryLoader;
 import java.util.HashMap;
 import java.util.Map;
 
-/** Provides shared capabilities for feature flag support. */
+/**
+ * Provides shared capabilities for feature flag support.
+ */
 @JNINamespace("base::android")
 public class FeatureList {
-    /** Test value overrides for tests without native. */
+    /**
+     * Test value overrides for tests without native.
+     */
     public static class TestValues {
         private Map<String, Boolean> mFeatureFlags = new HashMap<>();
         private Map<String, Map<String, String>> mFieldTrialParams = new HashMap<>();
 
-        /** Constructor. */
+        /**
+         * Constructor.
+         */
         public TestValues() {}
 
-        /** Set overrides for feature flags. */
+        /**
+         * Set overrides for feature flags.
+         */
         public void setFeatureFlagsOverride(Map<String, Boolean> featureFlags) {
             mFeatureFlags = featureFlags;
         }
 
-        /** Add an override for a feature flag. */
+        /**
+         * Add an override for a feature flag.
+         */
         public void addFeatureFlagOverride(String featureName, boolean testValue) {
             mFeatureFlags.put(featureName, testValue);
         }
 
-        /** Add an override for a field trial parameter. */
+        /**
+         * Add an override for a field trial parameter.
+         */
         public void addFieldTrialParamOverride(
                 String featureName, String paramName, String testValue) {
             Map<String, String> featureParams = mFieldTrialParams.get(featureName);
@@ -116,7 +128,9 @@ public class FeatureList {
         sTestCanUseDefaults = false;
     }
 
-    /** Sets the feature flags to use in JUnit tests, since native calls are not available there. */
+    /**
+     * Sets the feature flags to use in JUnit tests, since native calls are not available there.
+     */
     @VisibleForTesting
     public static void setTestFeatures(Map<String, Boolean> testFeatures) {
         if (testFeatures == null) {
@@ -193,11 +207,7 @@ public class FeatureList {
      * @return Whether the feature has a test value configured.
      */
     public static boolean hasTestFeature(String featureName) {
-        // TODO(crbug.com/1434471)): Copy into a local reference to avoid race conditions
-        // like crbug.com/1494095 unsetting the test features. Locking down flag state will allow
-        // this mitigation to be removed.
-        TestValues testValues = sTestFeatures;
-        return testValues != null && testValues.mFeatureFlags.containsKey(featureName);
+        return hasTestFeatures() && sTestFeatures.mFeatureFlags.containsKey(featureName);
     }
 
     /**
@@ -208,22 +218,16 @@ public class FeatureList {
      * @throws IllegalArgumentException if no test value was set and default values aren't allowed.
      */
     public static Boolean getTestValueForFeature(String featureName) {
-        // TODO(crbug.com/1434471)): Copy into a local reference to avoid race conditions
-        // like crbug.com/1494095 unsetting the test features. Locking down flag state will allow
-        // this mitigation to be removed.
-        TestValues testValues = sTestFeatures;
-        if (testValues != null) {
-            Boolean override = testValues.getFeatureFlagOverride(featureName);
+        if (hasTestFeatures()) {
+            Boolean override = sTestFeatures.getFeatureFlagOverride(featureName);
             if (override != null) {
                 return override;
             }
             if (!sTestCanUseDefaults) {
-                throw new IllegalArgumentException(
-                        "No test value configured for "
-                                + featureName
-                                + " and native is not available to provide a default value. Use"
-                                + " @EnableFeatures or @DisableFeatures to provide test values for"
-                                + " the flag.");
+                throw new IllegalArgumentException("No test value configured for " + featureName
+                        + " and native is not available to provide a default value. Use"
+                        + " @EnableFeatures or @DisableFeatures to provide test values for the"
+                        + " flag.");
             }
         }
         return null;
@@ -237,12 +241,8 @@ public class FeatureList {
      * @return The test value set for the parameter, or null if no test value has been set.
      */
     public static String getTestValueForFieldTrialParam(String featureName, String paramName) {
-        // TODO(crbug.com/1434471)): Copy into a local reference to avoid race conditions
-        // like crbug.com/1494095 unsetting the test features. Locking down flag state will allow
-        // this mitigation to be removed.
-        TestValues testValues = sTestFeatures;
-        if (testValues != null) {
-            return testValues.getFieldTrialParamOverride(featureName, paramName);
+        if (hasTestFeatures()) {
+            return sTestFeatures.getFieldTrialParamOverride(featureName, paramName);
         }
         return null;
     }
@@ -256,12 +256,8 @@ public class FeatureList {
      */
     public static Map<String, String> getTestValuesForAllFieldTrialParamsForFeature(
             String featureName) {
-        // TODO(crbug.com/1434471)): Copy into a local reference to avoid race conditions
-        // like crbug.com/1494095 unsetting the test features. Locking down flag state will allow
-        // this mitigation to be removed.
-        TestValues testValues = sTestFeatures;
-        if (testValues != null) {
-            return testValues.getAllFieldTrialParamOverridesForFeature(featureName);
+        if (hasTestFeatures()) {
+            return sTestFeatures.getAllFieldTrialParamOverridesForFeature(featureName);
         }
         return null;
     }

@@ -18,7 +18,7 @@ HttpConnection::ReadIOBuffer::ReadIOBuffer()
 }
 
 HttpConnection::ReadIOBuffer::~ReadIOBuffer() {
-  data_ = nullptr;  // Avoid dangling ptr when `base_` is destroyed.
+  data_ = nullptr;  // base_ owns data_.
 }
 
 int HttpConnection::ReadIOBuffer::GetCapacity() const {

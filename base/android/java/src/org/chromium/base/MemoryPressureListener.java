@@ -54,7 +54,9 @@ public class MemoryPressureListener {
 
     private static ObserverList<MemoryPressureCallback> sCallbacks;
 
-    /** Called by the native side to add native callback. */
+    /**
+     * Called by the native side to add native callback.
+     */
     @CalledByNative
     private static void addNativeCallback() {
         ThreadUtils.assertOnUiThread();
@@ -109,8 +111,8 @@ public class MemoryPressureListener {
         } else if (ACTION_TRIM_MEMORY.equals(action)) {
             simulateTrimMemoryPressureSignal(activity, ComponentCallbacks2.TRIM_MEMORY_COMPLETE);
         } else if (ACTION_TRIM_MEMORY_RUNNING_CRITICAL.equals(action)) {
-            simulateTrimMemoryPressureSignal(
-                    activity, ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL);
+            simulateTrimMemoryPressureSignal(activity,
+                    ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL);
         } else if (ACTION_TRIM_MEMORY_MODERATE.equals(action)) {
             simulateTrimMemoryPressureSignal(activity, ComponentCallbacks2.TRIM_MEMORY_MODERATE);
         } else {

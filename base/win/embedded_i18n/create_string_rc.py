@@ -61,7 +61,6 @@ Note: MODE_SPECIFIC_STRINGS cannot be specified if STRING_IDS is not specified.
 from __future__ import print_function
 
 import argparse
-import collections
 import glob
 import io
 import os
@@ -78,8 +77,7 @@ class GrdHandler(sax.handler.ContentHandler):
   """Extracts selected strings from a .grd file.
 
   Attributes:
-    messages: A dict mapping string identifiers to their corresponding messages
-      (key "text") and transconsole ids (key "tc_id").
+    messages: A dict mapping string identifiers to their corresponding messages.
     referenced_xtb_files: A list of all xtb files referenced inside the .grd
       file.
   """
@@ -93,25 +91,18 @@ class GrdHandler(sax.handler.ContentHandler):
       messages are extracted if empty.
     """
     sax.handler.ContentHandler.__init__(self)
-    self.messages = collections.defaultdict(dict)
+    self.messages = {}
     self.referenced_xtb_files = []
     self.__id_set = string_id_set
     self.__message_name = None
     self.__element_stack = []
     self.__text_scraps = []
-
-    # contains the text in the format required by transconsole to generate the
-    # corresponding TC fingerprint.
-    self.__tc_text_scraps = []
-
     self.__characters_callback = None
 
   def startElement(self, name, attrs):
     self.__element_stack.append(name)
     if name == 'message':
       self.__OnOpenMessage(attrs.getValue('name'))
-    elif name == 'ph':
-      self.__OnOpenPlaceholder(attrs.getValue('name'))
     elif name == 'file':
       parent = self.__element_stack[-2]
       if parent == 'translations':
@@ -140,35 +131,18 @@ class GrdHandler(sax.handler.ContentHandler):
     if self.__message_name:
       self.__characters_callback = self.__OnMessageText
 
-  def __OnOpenPlaceholder(self, ph_name):
-    """Invoked at the start of a <ph> with the `name` attribute."""
-    if self.__IsExtractingMessage():
-      # TC uses the `name` attribute as part of the fingerprint
-      # generation.
-      self.__tc_text_scraps.append(ph_name)
-
   def __OnMessageText(self, containing_element, message_text):
     """Invoked to handle a block of text for a message."""
     if message_text and (containing_element == 'message' or
                          containing_element == 'ph'):
       self.__text_scraps.append(message_text)
-      if containing_element == 'message':
-        self.__tc_text_scraps.append(message_text)
 
   def __OnCloseMessage(self):
     """Invoked at the end of a message."""
     if self.__IsExtractingMessage():
-      self.messages[self.__message_name]["text"] = ''.join(
-          self.__text_scraps).strip()
-
-      # Generate the message ID for each source string to correlate it with its
-      # TC translations in the .xtb files.
-      self.messages[self.__message_name]["tc_id"] = tclib.GenerateMessageId(
-          ''.join(self.__tc_text_scraps).strip())
-
+      self.messages[self.__message_name] = ''.join(self.__text_scraps).strip()
       self.__message_name = None
       self.__text_scraps = []
-      self.__tc_text_scraps = []
       self.__characters_callback = None
 
   def __OnAddXtbFile(self, xtb_file_path):
@@ -201,10 +175,6 @@ class XtbHandler(sax.handler.ContentHandler):
     self.__element_stack = []
     self.__string_ids = None
     self.__text_scraps = []
-
-    # The count of the `ph` tags.
-    self.__ph_count = 0
-
     self.__characters_callback = None
 
   def startDocument(self):
@@ -220,8 +190,6 @@ class XtbHandler(sax.handler.ContentHandler):
       self.__OnLanguage(attrs.getValue('lang'))
     if name == 'translation':
       self.__OnOpenTranslation(attrs.getValue('id'))
-    elif name == 'ph':
-      self.__OnOpenPlaceholder()
 
   def endElement(self, name):
     popped = self.__element_stack.pop()
@@ -233,38 +201,26 @@ class XtbHandler(sax.handler.ContentHandler):
     if self.__characters_callback:
       self.__characters_callback(self.__element_stack[-1], content)
 
-  def __IsExtractingTranslation(self):
-    """Returns `True` if a translation is currently being extracted."""
-    return self.__string_ids is not None
-
   def __OnLanguage(self, lang):
     self.lang = lang.replace('-', '_').upper()
 
   def __OnOpenTranslation(self, translation_id):
-    assert not self.__IsExtractingTranslation()
+    assert self.__string_ids is None
     self.__string_ids = self.__translation_ids.get(translation_id)
     if self.__string_ids:
       self.__characters_callback = self.__OnTranslationText
-
-  def __OnOpenPlaceholder(self):
-    if self.__IsExtractingTranslation():
-      # The XTB files contain `ph` tags instead of placeholders, so we add the
-      # placeholders in the format `$1` in place of the `ph` tags here.
-      self.__ph_count += 1
-      self.__text_scraps.append('$' + str(self.__ph_count))
 
   def __OnTranslationText(self, containing_element, message_text):
     if message_text and containing_element == 'translation':
       self.__text_scraps.append(message_text)
 
   def __OnCloseTranslation(self):
-    if self.__IsExtractingTranslation():
+    if self.__string_ids:
       translated_string = ''.join(self.__text_scraps).strip()
       for string_id in self.__string_ids:
         self.translations[string_id] = translated_string
       self.__string_ids = None
       self.__text_scraps = []
-      self.__ph_count = 0
       self.__characters_callback = None
 
 
@@ -402,16 +358,19 @@ Extra input files:
     # Manually put the source strings as en-US in the list of translated
     # strings.
     translated_strings = []
-    for string_id, string_data in source_strings.items():
+    for string_id, message_text in source_strings.items():
       translated_strings.append(self.__TranslationData(string_id,
                                                        'EN_US',
-                                                       string_data["text"]))
+                                                       message_text))
 
-    # Multiple source strings may have the same message text; hence the
-    # message id is mapped to a list of string ids instead of a single value.
+    # Generate the message ID for each source string to correlate it with its
+    # translations in the .xtb files. Multiple source strings may have the same
+    # message text; hence the message id is mapped to a list of string ids
+    # instead of a single value.
     translation_ids = {}
-    for (string_id, string_data) in source_strings.items():
-      translation_ids.setdefault(string_data["tc_id"], []).append(string_id);
+    for (string_id, message_text) in source_strings.items():
+      message_id = tclib.GenerateMessageId(message_text)
+      translation_ids.setdefault(message_id, []).append(string_id);
 
     # Track any xtb files that appear in the xtb folder but are not present in
     # the grd file.
@@ -424,9 +383,9 @@ Extra input files:
       if not xtb_filename in source_xtb_files:
         extra_xtb_files.append(xtb_filename)
       sax_parser.parse(xtb_filename)
-      for string_id, string_data in source_strings.items():
+      for string_id, message_text in source_strings.items():
         translated_string = xtb_handler.translations.get(string_id,
-                                                         string_data["text"])
+                                                         message_text)
         translated_strings.append(self.__TranslationData(string_id,
                                                          xtb_handler.lang,
                                                          translated_string))

@@ -7,7 +7,9 @@ package org.chromium.base.test;
 import org.jni_zero.JNINamespace;
 import org.jni_zero.NativeMethods;
 
-/** Class containing only static methods for querying the status of the reached code profiler. */
+/**
+ * Class containing only static methods for querying the status of the reached code profiler.
+ */
 @JNINamespace("base::android")
 public class ReachedCodeProfiler {
     private ReachedCodeProfiler() {}
@@ -30,7 +32,6 @@ public class ReachedCodeProfiler {
     @NativeMethods
     interface Natives {
         boolean isReachedCodeProfilerEnabled();
-
         boolean isReachedCodeProfilerSupported();
     }
 }

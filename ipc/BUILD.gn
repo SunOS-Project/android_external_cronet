@@ -72,7 +72,6 @@ component("ipc") {
       "message_router.h",
       "trace_ipc_message.cc",
       "trace_ipc_message.h",
-      "urgent_message_observer.h",
     ]
   }
 

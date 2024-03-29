@@ -25,7 +25,9 @@ FirstPartySetsContextConfig FirstPartySetsContextConfig::Clone() const {
 }
 
 bool FirstPartySetsContextConfig::operator==(
-    const FirstPartySetsContextConfig& other) const = default;
+    const FirstPartySetsContextConfig& other) const {
+  return customizations_ == other.customizations_;
+}
 
 absl::optional<FirstPartySetEntryOverride>
 FirstPartySetsContextConfig::FindOverride(const SchemefulSite& site) const {

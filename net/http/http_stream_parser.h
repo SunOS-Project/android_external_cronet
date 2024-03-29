@@ -34,6 +34,7 @@ class HttpRequestHeaders;
 class HttpResponseInfo;
 class IOBuffer;
 class SSLCertRequestInfo;
+class SSLInfo;
 class StreamSocket;
 class UploadDataStream;
 
@@ -108,6 +109,8 @@ class NET_EXPORT_PRIVATE HttpStreamParser {
     return non_informational_response_start_time_;
   }
   base::TimeTicks first_early_hints_time() { return first_early_hints_time_; }
+
+  void GetSSLInfo(SSLInfo* ssl_info);
 
   void GetSSLCertRequestInfo(SSLCertRequestInfo* cert_request_info);
 

@@ -15,9 +15,8 @@
 
 // Test the feature test macros defined by <expected>
 
-/*  Constant                           Value
-    __cpp_lib_expected                 202211L [C++23]
-    __cpp_lib_freestanding_expected    202311L [C++26]
+/*  Constant              Value
+    __cpp_lib_expected    202211L [C++23]
 */
 
 #include <expected>
@@ -29,18 +28,10 @@
 #   error "__cpp_lib_expected should not be defined before c++23"
 # endif
 
-# ifdef __cpp_lib_freestanding_expected
-#   error "__cpp_lib_freestanding_expected should not be defined before c++26"
-# endif
-
 #elif TEST_STD_VER == 14
 
 # ifdef __cpp_lib_expected
 #   error "__cpp_lib_expected should not be defined before c++23"
-# endif
-
-# ifdef __cpp_lib_freestanding_expected
-#   error "__cpp_lib_freestanding_expected should not be defined before c++26"
 # endif
 
 #elif TEST_STD_VER == 17
@@ -49,18 +40,10 @@
 #   error "__cpp_lib_expected should not be defined before c++23"
 # endif
 
-# ifdef __cpp_lib_freestanding_expected
-#   error "__cpp_lib_freestanding_expected should not be defined before c++26"
-# endif
-
 #elif TEST_STD_VER == 20
 
 # ifdef __cpp_lib_expected
 #   error "__cpp_lib_expected should not be defined before c++23"
-# endif
-
-# ifdef __cpp_lib_freestanding_expected
-#   error "__cpp_lib_freestanding_expected should not be defined before c++26"
 # endif
 
 #elif TEST_STD_VER == 23
@@ -72,10 +55,6 @@
 #   error "__cpp_lib_expected should have the value 202211L in c++23"
 # endif
 
-# ifdef __cpp_lib_freestanding_expected
-#   error "__cpp_lib_freestanding_expected should not be defined before c++26"
-# endif
-
 #elif TEST_STD_VER > 23
 
 # ifndef __cpp_lib_expected
@@ -83,19 +62,6 @@
 # endif
 # if __cpp_lib_expected != 202211L
 #   error "__cpp_lib_expected should have the value 202211L in c++26"
-# endif
-
-# if !defined(_LIBCPP_VERSION)
-#   ifndef __cpp_lib_freestanding_expected
-#     error "__cpp_lib_freestanding_expected should be defined in c++26"
-#   endif
-#   if __cpp_lib_freestanding_expected != 202311L
-#     error "__cpp_lib_freestanding_expected should have the value 202311L in c++26"
-#   endif
-# else // _LIBCPP_VERSION
-#   ifdef __cpp_lib_freestanding_expected
-#     error "__cpp_lib_freestanding_expected should not be defined because it is unimplemented in libc++!"
-#   endif
 # endif
 
 #endif // TEST_STD_VER > 23

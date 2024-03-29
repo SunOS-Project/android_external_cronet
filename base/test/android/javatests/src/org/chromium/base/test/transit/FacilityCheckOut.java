@@ -32,8 +32,8 @@ class FacilityCheckOut extends Transition {
     void exitSync() {
         onBeforeTransition();
         triggerTransition();
-        List<ConditionWaiter.ConditionWaitStatus> waitStatuses = createWaitStatuses();
-        waitUntilExit(waitStatuses);
+        List<ConditionWaiter.ConditionWaitStatus> transitionConditions = createConditions();
+        waitUntilExit(transitionConditions);
         onAfterTransition();
         PublicTransitConfig.maybePauseAfterTransition(mFacility);
     }
@@ -49,19 +49,15 @@ class FacilityCheckOut extends Transition {
         Log.i(TAG, "Triggered exit from %s", mFacility);
     }
 
-    private List<ConditionWaiter.ConditionWaitStatus> createWaitStatuses() {
-        ArrayList<ConditionWaiter.ConditionWaitStatus> waitStatuses = new ArrayList<>();
+    private List<ConditionWaiter.ConditionWaitStatus> createConditions() {
+        ArrayList<ConditionWaiter.ConditionWaitStatus> transitionConditions = new ArrayList<>();
         for (Condition condition : mFacility.getExitConditions()) {
-            waitStatuses.add(
+            transitionConditions.add(
                     new ConditionWaiter.ConditionWaitStatus(
                             condition, ConditionWaiter.ConditionOrigin.EXIT));
         }
-        for (Condition condition : getTransitionConditions()) {
-            waitStatuses.add(
-                    new ConditionWaiter.ConditionWaitStatus(
-                            condition, ConditionWaiter.ConditionOrigin.TRANSITION));
-        }
-        return waitStatuses;
+        transitionConditions.addAll(createTransitionConditionStatuses());
+        return transitionConditions;
     }
 
     private void waitUntilExit(List<ConditionWaiter.ConditionWaitStatus> transitionConditions) {

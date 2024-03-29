@@ -298,9 +298,9 @@ QuicSelfIssuedConnectionIdManager::~QuicSelfIssuedConnectionIdManager() {
   retire_connection_id_alarm_->Cancel();
 }
 
-std::optional<QuicNewConnectionIdFrame>
+absl::optional<QuicNewConnectionIdFrame>
 QuicSelfIssuedConnectionIdManager::MaybeIssueNewConnectionId() {
-  std::optional<QuicConnectionId> new_cid =
+  absl::optional<QuicConnectionId> new_cid =
       connection_id_generator_.GenerateNextConnectionId(last_connection_id_);
   if (!new_cid.has_value()) {
     return {};
@@ -320,9 +320,9 @@ QuicSelfIssuedConnectionIdManager::MaybeIssueNewConnectionId() {
   return frame;
 }
 
-std::optional<QuicNewConnectionIdFrame> QuicSelfIssuedConnectionIdManager::
+absl::optional<QuicNewConnectionIdFrame> QuicSelfIssuedConnectionIdManager::
     MaybeIssueNewConnectionIdForPreferredAddress() {
-  std::optional<QuicNewConnectionIdFrame> frame = MaybeIssueNewConnectionId();
+  absl::optional<QuicNewConnectionIdFrame> frame = MaybeIssueNewConnectionId();
   QUICHE_DCHECK(!frame.has_value() || (frame->sequence_number == 1u));
   return frame;
 }
@@ -413,7 +413,8 @@ void QuicSelfIssuedConnectionIdManager::RetireConnectionId() {
 
 void QuicSelfIssuedConnectionIdManager::MaybeSendNewConnectionIds() {
   while (active_connection_ids_.size() < active_connection_id_limit_) {
-    std::optional<QuicNewConnectionIdFrame> frame = MaybeIssueNewConnectionId();
+    absl::optional<QuicNewConnectionIdFrame> frame =
+        MaybeIssueNewConnectionId();
     if (!frame.has_value()) {
       break;
     }
@@ -433,7 +434,7 @@ bool QuicSelfIssuedConnectionIdManager::HasConnectionIdToConsume() const {
   return false;
 }
 
-std::optional<QuicConnectionId>
+absl::optional<QuicConnectionId>
 QuicSelfIssuedConnectionIdManager::ConsumeOneConnectionId() {
   for (const auto& active_cid_data : active_connection_ids_) {
     if (active_cid_data.second >
@@ -446,7 +447,7 @@ QuicSelfIssuedConnectionIdManager::ConsumeOneConnectionId() {
       return active_cid_data.first;
     }
   }
-  return std::nullopt;
+  return absl::nullopt;
 }
 
 bool QuicSelfIssuedConnectionIdManager::IsConnectionIdInUse(

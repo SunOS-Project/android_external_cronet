@@ -4,12 +4,9 @@
 
 package org.chromium.net.impl;
 
-import static org.chromium.net.impl.HttpEngineNativeProvider.EXT_API_LEVEL;
-import static org.chromium.net.impl.HttpEngineNativeProvider.EXT_VERSION;
+import androidx.annotation.RequiresApi;
 
-import androidx.annotation.RequiresExtension;
-
-@RequiresExtension(extension = EXT_API_LEVEL, version = EXT_VERSION)
+@RequiresApi(api = 34)
 class AndroidCallbackExceptionWrapper extends org.chromium.net.CallbackException {
     protected AndroidCallbackExceptionWrapper(android.net.http.CallbackException e) {
         // The CallbackException contract states the cause of the top level exception is the

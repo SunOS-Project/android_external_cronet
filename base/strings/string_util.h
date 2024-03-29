@@ -7,21 +7,20 @@
 #ifndef BASE_STRINGS_STRING_UTIL_H_
 #define BASE_STRINGS_STRING_UTIL_H_
 
-#include <stdarg.h>  // va_list
+#include <stdarg.h>   // va_list
 #include <stddef.h>
 #include <stdint.h>
 
-#include <concepts>
 #include <initializer_list>
-#include <memory>
 #include <string>
-#include <string_view>
+#include <type_traits>
 #include <vector>
 
 #include "base/base_export.h"
 #include "base/check_op.h"
 #include "base/compiler_specific.h"
 #include "base/containers/span.h"
+#include "base/cxx20_to_address.h"
 #include "base/strings/string_piece.h"  // For implicit conversions.
 #include "base/strings/string_util_internal.h"
 #include "build/build_config.h"
@@ -93,11 +92,11 @@ BASE_EXPORT bool IsWprintfFormatPortable(const wchar_t* format);
 template <typename CharT, typename Iter>
 constexpr BasicStringPiece<CharT> MakeBasicStringPiece(Iter begin, Iter end) {
   DCHECK_GE(end - begin, 0);
-  return {std::to_address(begin), static_cast<size_t>(end - begin)};
+  return {base::to_address(begin), static_cast<size_t>(end - begin)};
 }
 
 // Explicit instantiations of MakeBasicStringPiece for the BasicStringPiece
-// aliases defined in base/strings/string_piece.h
+// aliases defined in base/strings/string_piece_forward.h
 template <typename Iter>
 constexpr StringPiece MakeStringPiece(Iter begin, Iter end) {
   return MakeBasicStringPiece<char>(begin, end);
@@ -109,22 +108,22 @@ constexpr StringPiece16 MakeStringPiece16(Iter begin, Iter end) {
 }
 
 template <typename Iter>
-constexpr std::wstring_view MakeWStringView(Iter begin, Iter end) {
+constexpr WStringPiece MakeWStringPiece(Iter begin, Iter end) {
   return MakeBasicStringPiece<wchar_t>(begin, end);
 }
 
 // ASCII-specific tolower.  The standard library's tolower is locale sensitive,
 // so we don't want to use it here.
-template <typename CharT>
-  requires(std::integral<CharT>)
+template <typename CharT,
+          typename = std::enable_if_t<std::is_integral_v<CharT>>>
 constexpr CharT ToLowerASCII(CharT c) {
   return internal::ToLowerASCII(c);
 }
 
 // ASCII-specific toupper.  The standard library's toupper is locale sensitive,
 // so we don't want to use it here.
-template <typename CharT>
-  requires(std::integral<CharT>)
+template <typename CharT,
+          typename = std::enable_if_t<std::is_integral_v<CharT>>>
 CharT ToUpperASCII(CharT c) {
   return (c >= 'a' && c <= 'z') ? static_cast<CharT>(c + 'A' - 'a') : c;
 }
@@ -345,8 +344,8 @@ BASE_EXPORT bool IsStringUTF8AllowingNoncharacters(StringPiece str);
 BASE_EXPORT bool IsStringASCII(StringPiece str);
 BASE_EXPORT bool IsStringASCII(StringPiece16 str);
 
-#if defined(WCHAR_T_IS_32_BIT)
-BASE_EXPORT bool IsStringASCII(std::wstring_view str);
+#if defined(WCHAR_T_IS_UTF32)
+BASE_EXPORT bool IsStringASCII(WStringPiece str);
 #endif
 
 // Performs a case-sensitive string compare of the given 16-bit string against
@@ -465,8 +464,7 @@ inline char HexDigitToInt(char16_t c) {
 // should call IsAsciiWhitespace(), and if they are from a UTF-8 string they may
 // be individual units of a multi-unit code point.  Convert to 16- or 32-bit
 // values known to hold the full code point before calling this.
-template <typename Char>
-  requires(sizeof(Char) > 1)
+template <typename Char, typename = std::enable_if_t<(sizeof(Char) > 1)>>
 inline bool IsUnicodeWhitespace(Char c) {
   // kWhitespaceWide is a null-terminated string.
   for (const auto* cur = kWhitespaceWide; *cur; ++cur) {

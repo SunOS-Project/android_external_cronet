@@ -351,10 +351,6 @@ void HttpNetworkSession::DisableQuic() {
   params_.enable_quic = false;
 }
 
-void HttpNetworkSession::IgnoreCertificateErrorsForTesting() {
-  params_.ignore_certificate_errors = true;
-}
-
 void HttpNetworkSession::ClearSSLSessionCache() {
   ssl_client_session_cache_.Flush();
 }
@@ -372,8 +368,7 @@ CommonConnectJobParams HttpNetworkSession::CreateCommonConnectJobParams(
       context_.socket_performance_watcher_factory,
       context_.network_quality_estimator, context_.net_log,
       for_websockets ? &websocket_endpoint_lock_manager_ : nullptr,
-      context_.http_server_properties, &next_protos_, &application_settings_,
-      &params_.ignore_certificate_errors);
+      context_.http_server_properties);
 }
 
 ClientSocketPoolManager* HttpNetworkSession::GetSocketPoolManager(

@@ -137,7 +137,7 @@ TEST_F(TransportClientSocketTest, Connect) {
 }
 
 TEST_F(TransportClientSocketTest, IsConnected) {
-  auto buf = base::MakeRefCounted<IOBufferWithSize>(4096);
+  scoped_refptr<IOBuffer> buf = base::MakeRefCounted<IOBuffer>(4096);
   TestCompletionCallback callback;
   uint32_t bytes_read;
 
@@ -203,7 +203,7 @@ TEST_F(TransportClientSocketTest, Read) {
 
   SendRequestAndResponse(sock_.get(), connected_sock_.get());
 
-  auto buf = base::MakeRefCounted<IOBufferWithSize>(4096);
+  scoped_refptr<IOBuffer> buf = base::MakeRefCounted<IOBuffer>(4096);
   uint32_t bytes_read = DrainStreamSocket(sock_.get(), buf.get(), 4096,
                                           strlen(kServerReply), &callback);
   ASSERT_EQ(bytes_read, strlen(kServerReply));
@@ -224,7 +224,7 @@ TEST_F(TransportClientSocketTest, Read_SmallChunks) {
 
   SendRequestAndResponse(sock_.get(), connected_sock_.get());
 
-  auto buf = base::MakeRefCounted<IOBufferWithSize>(1);
+  scoped_refptr<IOBuffer> buf = base::MakeRefCounted<IOBuffer>(1);
   uint32_t bytes_read = 0;
   while (bytes_read < strlen(kServerReply)) {
     int rv = sock_->Read(buf.get(), 1, callback.callback());
@@ -252,7 +252,7 @@ TEST_F(TransportClientSocketTest, Read_Interrupted) {
   SendRequestAndResponse(sock_.get(), connected_sock_.get());
 
   // Do a partial read and then exit.  This test should not crash!
-  auto buf = base::MakeRefCounted<IOBufferWithSize>(16);
+  scoped_refptr<IOBuffer> buf = base::MakeRefCounted<IOBuffer>(16);
   int rv = sock_->Read(buf.get(), 16, callback.callback());
   EXPECT_TRUE(rv >= 0 || rv == ERR_IO_PENDING);
 
@@ -267,12 +267,13 @@ TEST_F(TransportClientSocketTest, FullDuplex_ReadFirst) {
 
   // Read first.  There's no data, so it should return ERR_IO_PENDING.
   const int kBufLen = 4096;
-  auto buf = base::MakeRefCounted<IOBufferWithSize>(kBufLen);
+  scoped_refptr<IOBuffer> buf = base::MakeRefCounted<IOBuffer>(kBufLen);
   int rv = sock_->Read(buf.get(), kBufLen, callback.callback());
   EXPECT_THAT(rv, IsError(ERR_IO_PENDING));
 
   const int kWriteBufLen = 64 * 1024;
-  auto request_buffer = base::MakeRefCounted<IOBufferWithSize>(kWriteBufLen);
+  scoped_refptr<IOBuffer> request_buffer =
+      base::MakeRefCounted<IOBuffer>(kWriteBufLen);
   char* request_data = request_buffer->data();
   memset(request_data, 'A', kWriteBufLen);
   TestCompletionCallback write_callback;
@@ -304,7 +305,8 @@ TEST_F(TransportClientSocketTest, FullDuplex_WriteFirst) {
   EstablishConnection(&callback);
 
   const int kWriteBufLen = 64 * 1024;
-  auto request_buffer = base::MakeRefCounted<IOBufferWithSize>(kWriteBufLen);
+  scoped_refptr<IOBuffer> request_buffer =
+      base::MakeRefCounted<IOBuffer>(kWriteBufLen);
   char* request_data = request_buffer->data();
   memset(request_data, 'A', kWriteBufLen);
   TestCompletionCallback write_callback;
@@ -325,7 +327,7 @@ TEST_F(TransportClientSocketTest, FullDuplex_WriteFirst) {
   // Read() to block on ERR_IO_PENDING too.
 
   const int kBufLen = 4096;
-  auto buf = base::MakeRefCounted<IOBufferWithSize>(kBufLen);
+  scoped_refptr<IOBuffer> buf = base::MakeRefCounted<IOBuffer>(kBufLen);
   while (true) {
     int rv = sock_->Read(buf.get(), kBufLen, callback.callback());
     ASSERT_TRUE(rv >= 0 || rv == ERR_IO_PENDING);

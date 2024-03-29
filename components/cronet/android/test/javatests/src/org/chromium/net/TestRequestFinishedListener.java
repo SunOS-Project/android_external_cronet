@@ -12,7 +12,9 @@ import android.os.ConditionVariable;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
-/** RequestFinishedInfo.Listener for testing, which saves the RequestFinishedInfo */
+/**
+ * RequestFinishedInfo.Listener for testing, which saves the RequestFinishedInfo
+ */
 public class TestRequestFinishedListener extends RequestFinishedInfo.Listener {
     private final ConditionVariable mBlock;
     private final ConditionVariable mBlockListener = new ConditionVariable(true);
@@ -42,7 +44,6 @@ public class TestRequestFinishedListener extends RequestFinishedInfo.Listener {
     public void blockListener() {
         mBlockListener.close();
     }
-
     public void unblockListener() {
         mBlockListener.open();
     }

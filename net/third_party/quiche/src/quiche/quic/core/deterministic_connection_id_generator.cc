@@ -20,7 +20,7 @@ DeterministicConnectionIdGenerator::DeterministicConnectionIdGenerator(
   }
 }
 
-std::optional<QuicConnectionId>
+absl::optional<QuicConnectionId>
 DeterministicConnectionIdGenerator::GenerateNextConnectionId(
     const QuicConnectionId& original) {
   if (expected_connection_id_length_ == 0) {
@@ -50,19 +50,19 @@ DeterministicConnectionIdGenerator::GenerateNextConnectionId(
                           expected_connection_id_length_);
 }
 
-std::optional<QuicConnectionId>
+absl::optional<QuicConnectionId>
 DeterministicConnectionIdGenerator::MaybeReplaceConnectionId(
     const QuicConnectionId& original, const ParsedQuicVersion& version) {
   if (original.length() == expected_connection_id_length_) {
-    return std::optional<QuicConnectionId>();
+    return absl::optional<QuicConnectionId>();
   }
   QUICHE_DCHECK(version.AllowsVariableLengthConnectionIds());
-  std::optional<QuicConnectionId> new_connection_id =
+  absl::optional<QuicConnectionId> new_connection_id =
       GenerateNextConnectionId(original);
   // Verify that ReplaceShortServerConnectionId is deterministic.
   if (!new_connection_id.has_value()) {
     QUIC_BUG(unset_next_connection_id);
-    return std::nullopt;
+    return absl::nullopt;
   }
   QUICHE_DCHECK_EQ(
       *new_connection_id,

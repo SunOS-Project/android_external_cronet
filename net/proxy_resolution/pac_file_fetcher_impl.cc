@@ -81,7 +81,7 @@ void ConvertResponseToUTF16(const std::string& charset,
     // Guess the charset by looking at the BOM.
     base::StringPiece bytes_str(bytes);
     for (const auto& bom : kBomMappings) {
-      if (bytes_str.starts_with(bom.prefix)) {
+      if (base::StartsWith(bytes_str, bom.prefix)) {
         return ConvertResponseToUTF16(
             bom.charset,
             // Strip the BOM in the converted response.
@@ -316,7 +316,7 @@ void PacFileFetcherImpl::OnReadCompleted(URLRequest* request, int num_bytes) {
 
 PacFileFetcherImpl::PacFileFetcherImpl(URLRequestContext* url_request_context)
     : url_request_context_(url_request_context),
-      buf_(base::MakeRefCounted<IOBufferWithSize>(kBufSize)),
+      buf_(base::MakeRefCounted<IOBuffer>(kBufSize)),
       max_response_bytes_(kDefaultMaxResponseBytes),
       max_duration_(kDefaultMaxDuration) {
   DCHECK(url_request_context);

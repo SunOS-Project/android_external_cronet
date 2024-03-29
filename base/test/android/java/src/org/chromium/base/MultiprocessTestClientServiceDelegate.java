@@ -23,19 +23,18 @@ public class MultiprocessTestClientServiceDelegate implements ChildProcessServic
 
     private ITestCallback mTestCallback;
 
-    private final ITestController.Stub mTestController =
-            new ITestController.Stub() {
-                @Override
-                public boolean forceStopSynchronous(int exitCode) {
-                    System.exit(exitCode);
-                    return true;
-                }
+    private final ITestController.Stub mTestController = new ITestController.Stub() {
+        @Override
+        public boolean forceStopSynchronous(int exitCode) {
+            System.exit(exitCode);
+            return true;
+        }
 
-                @Override
-                public void forceStop(int exitCode) {
-                    System.exit(exitCode);
-                }
-            };
+        @Override
+        public void forceStop(int exitCode) {
+            System.exit(exitCode);
+        }
+    };
 
     @Override
     public void onServiceCreated() {

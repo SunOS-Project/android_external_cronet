@@ -43,14 +43,14 @@ public class Trip extends Transition {
      * @return the TransitStation entered.
      * @param <T> the type of TransitStation entered.
      */
-    public static <T extends TransitStation> T travelSync(
+    public static <T extends TransitStation> T goSync(
             @Nullable TransitStation origin, T destination, Trigger trigger) {
         Trip trip = new Trip(origin, destination, trigger);
-        trip.travelSyncInternal();
+        trip.travelSync();
         return destination;
     }
 
-    private void travelSyncInternal() {
+    private void travelSync() {
         embark();
         if (mOrigin != null) {
             Log.i(TAG, "Trip %d: Embarked at %s towards %s", mId, mOrigin, mDestination);
@@ -75,37 +75,33 @@ public class Trip extends Transition {
     }
 
     private void waitUntilArrival() {
-        ArrayList<ConditionWaiter.ConditionWaitStatus> waitStatuses = new ArrayList<>();
+        ArrayList<ConditionWaiter.ConditionWaitStatus> transitionConditions = new ArrayList<>();
 
         if (mOrigin != null) {
             for (Condition condition : mOrigin.getExitConditions()) {
-                waitStatuses.add(
+                transitionConditions.add(
                         new ConditionWaiter.ConditionWaitStatus(
                                 condition, ConditionWaiter.ConditionOrigin.EXIT));
             }
             for (Condition condition : mOrigin.getActiveFacilityExitConditions()) {
-                waitStatuses.add(
+                transitionConditions.add(
                         new ConditionWaiter.ConditionWaitStatus(
                                 condition, ConditionWaiter.ConditionOrigin.EXIT));
             }
         }
 
         for (Condition condition : mDestination.getEnterConditions()) {
-            waitStatuses.add(
+            transitionConditions.add(
                     new ConditionWaiter.ConditionWaitStatus(
                             condition, ConditionWaiter.ConditionOrigin.ENTER));
         }
-        for (Condition condition : getTransitionConditions()) {
-            waitStatuses.add(
-                    new ConditionWaiter.ConditionWaitStatus(
-                            condition, ConditionWaiter.ConditionOrigin.TRANSITION));
-        }
+        transitionConditions.addAll(createTransitionConditionStatuses());
 
         // Throws CriteriaNotSatisfiedException if any conditions aren't met within the timeout and
         // prints the state of all conditions. The timeout can be reduced when explicitly looking
         // for flakiness due to tight timeouts.
         try {
-            ConditionWaiter.waitFor(waitStatuses);
+            ConditionWaiter.waitFor(transitionConditions);
         } catch (AssertionError e) {
             throw new TravelException(mOrigin, mDestination, e);
         }
@@ -114,6 +110,5 @@ public class Trip extends Transition {
             mOrigin.setStateFinished();
         }
         mDestination.setStateActive();
-        TrafficControl.notifyActiveStationChanged(mDestination);
     }
 }

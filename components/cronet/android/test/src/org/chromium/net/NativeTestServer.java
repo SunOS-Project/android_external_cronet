@@ -114,23 +114,14 @@ public final class NativeTestServer {
                 boolean useHttps,
                 @ServerCertificate int certificate);
         void shutdownNativeTestServer();
-
         String getEchoBodyURL();
-
         String getEchoHeaderURL(String header);
-
         String getEchoAllHeadersURL();
-
         String getEchoMethodURL();
-
         String getRedirectToEchoBody();
-
         String getFileURL(String filePath);
-
         String getExabyteResponseURL();
-
         String getHostPort();
-
         int getPort();
     }
 }

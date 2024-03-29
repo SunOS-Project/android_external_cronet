@@ -48,8 +48,8 @@ class TracedValue;
 class BASE_EXPORT ProcessMemoryDump {
  public:
   struct BASE_EXPORT MemoryAllocatorDumpEdge {
-    friend bool operator==(const MemoryAllocatorDumpEdge&,
-                           const MemoryAllocatorDumpEdge&) = default;
+    bool operator==(const MemoryAllocatorDumpEdge&) const;
+    bool operator!=(const MemoryAllocatorDumpEdge&) const;
 
     MemoryAllocatorDumpGuid source;
     MemoryAllocatorDumpGuid target;

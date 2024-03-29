@@ -9,6 +9,8 @@
 // UNSUPPORTED: no-threads
 // UNSUPPORTED: c++03, c++11
 
+// XFAIL: availability-shared_mutex-missing
+
 // <shared_mutex>
 
 // template <class Mutex> class shared_lock;

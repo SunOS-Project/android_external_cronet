@@ -27,6 +27,7 @@
 #include <utility>
 
 #include "base/check.h"
+#include "base/functional/identity.h"
 
 namespace base {
 namespace trace_event::internal {
@@ -221,8 +222,7 @@ class LRUCacheBase {
       const LruCacheType&);
 
   ValueList ordering_;
-  // TODO(crbug.com/1472363): Remove annotation once crbug.com/1472363 is fixed.
-  __attribute__((annotate("blink_gc_plugin_ignore"))) KeyIndex index_;
+  KeyIndex index_;
 
   size_type max_size_;
 };
@@ -272,7 +272,7 @@ using HashingLRUCache = internal::LRUCacheBase<
 template <class ValueType, class Compare = std::less<ValueType>>
 using LRUCacheSet =
     internal::LRUCacheBase<ValueType,
-                           std::identity,
+                           identity,
                            internal::LRUCacheKeyIndex<ValueType, Compare>>;
 
 // Implements an LRU cache of `ValueType`, where is value is unique, and may be
@@ -285,7 +285,7 @@ template <class ValueType,
           class Equal = std::equal_to<ValueType>>
 using HashingLRUCacheSet = internal::LRUCacheBase<
     ValueType,
-    std::identity,
+    identity,
     internal::HashingLRUCacheKeyIndex<ValueType, Hash, Equal>>;
 
 }  // namespace base

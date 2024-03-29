@@ -13,34 +13,25 @@ Task::Task(const Location& posted_from,
            OnceClosure task,
            TimeTicks queue_time,
            TimeDelta delay,
-           TimeDelta leeway,
-           int sequence_num)
+           TimeDelta leeway)
     : Task(posted_from,
            std::move(task),
            queue_time,
            delay.is_zero() ? TimeTicks() : queue_time + delay,
-           leeway,
-           subtle::DelayPolicy::kFlexibleNoSooner,
-           sequence_num) {}
+           leeway) {}
 
 Task::Task(const Location& posted_from,
            OnceClosure task,
            TimeTicks queue_time,
            TimeTicks delayed_run_time,
            TimeDelta leeway,
-           subtle::DelayPolicy delay_policy,
-           int sequence_num)
+           subtle::DelayPolicy delay_policy)
     : PendingTask(posted_from,
                   std::move(task),
                   queue_time,
                   delayed_run_time,
                   leeway,
-                  delay_policy) {
-  this->sequence_num = sequence_num;
-}
-
-Task::Task(const TaskMetadata& metadata, OnceClosure task)
-    : PendingTask(metadata, std::move(task)) {}
+                  delay_policy) {}
 
 // This should be "= default but MSVC has trouble with "noexcept = default" in
 // this case.

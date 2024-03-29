@@ -13,7 +13,9 @@ import org.chromium.base.task.TaskRunner;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-/** Collection of helpers for testing the java PostTask. */
+/**
+ * Collection of helpers for testing the java PostTask.
+ */
 public class SchedulerTestHelpers {
     public static void postRecordOrderTask(
             TaskRunner taskQueue, List<Integer> orderList, int order) {
@@ -22,7 +24,12 @@ public class SchedulerTestHelpers {
 
     public static void postRecordOrderDelayedTask(
             TaskRunner taskQueue, List<Integer> orderList, int order, long delay) {
-        taskQueue.postDelayedTask(() -> orderList.add(order), delay);
+        taskQueue.postDelayedTask(new Runnable() {
+            @Override
+            public void run() {
+                orderList.add(order);
+            }
+        }, delay);
     }
 
     public static void postTaskAndBlockUntilRun(TaskRunner taskQueue) {
@@ -32,14 +39,15 @@ public class SchedulerTestHelpers {
     public static void postDelayedTaskAndBlockUntilRun(TaskRunner taskQueue, long delay) {
         final Object lock = new Object();
         final AtomicBoolean taskExecuted = new AtomicBoolean();
-        taskQueue.postDelayedTask(
-                () -> {
-                    synchronized (lock) {
-                        taskExecuted.set(true);
-                        lock.notify();
-                    }
-                },
-                delay);
+        taskQueue.postDelayedTask(new Runnable() {
+            @Override
+            public void run() {
+                synchronized (lock) {
+                    taskExecuted.set(true);
+                    lock.notify();
+                }
+            }
+        }, delay);
         synchronized (lock) {
             try {
                 while (!taskExecuted.get()) {
@@ -75,20 +83,24 @@ public class SchedulerTestHelpers {
             mHandler = handler;
         }
 
-        /** Posts a task that blocks until unblock() is called. */
+        /**
+         * Posts a task that blocks until unblock() is called.
+         */
         public void postBlockingTask() {
-            mHandler.post(
-                    () -> {
-                        synchronized (mLock) {
-                            try {
-                                while (!mTaskExecuted.get()) {
-                                    mLock.wait();
-                                }
-                            } catch (InterruptedException ie) {
-                                ie.printStackTrace();
+            mHandler.post(new Runnable() {
+                @Override
+                public void run() {
+                    synchronized (mLock) {
+                        try {
+                            while (!mTaskExecuted.get()) {
+                                mLock.wait();
                             }
+                        } catch (InterruptedException ie) {
+                            ie.printStackTrace();
                         }
-                    });
+                    }
+                }
+            });
         }
 
         public void unblock() {
@@ -97,27 +109,24 @@ public class SchedulerTestHelpers {
                 mLock.notify();
             }
         }
-    }
-    ;
+    };
 
-    /** Waits until the looper's MessageQueue becomes idle. */
+    /**
+     * Waits until the looper's MessageQueue becomes idle.
+     */
     public static void preNativeRunUntilIdle(HandlerThread handlerThread) {
         final Object lock = new Object();
         final AtomicBoolean taskExecuted = new AtomicBoolean();
 
-        new Handler(handlerThread.getLooper())
-                .post(
-                        () -> {
-                            Looper.myQueue()
-                                    .addIdleHandler(
-                                            () -> {
-                                                synchronized (lock) {
-                                                    taskExecuted.set(true);
-                                                    lock.notify();
-                                                }
-                                                return false;
-                                            });
-                        });
+        new Handler(handlerThread.getLooper()).post(() -> {
+            Looper.myQueue().addIdleHandler(() -> {
+                synchronized (lock) {
+                    taskExecuted.set(true);
+                    lock.notify();
+                }
+                return false;
+            });
+        });
 
         synchronized (lock) {
             try {

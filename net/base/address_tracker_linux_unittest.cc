@@ -741,7 +741,7 @@ enum IPCMessage {
 };
 
 base::File GetSwitchValueFile(const base::CommandLine* command_line,
-                              std::string_view name) {
+                              base::StringPiece name) {
   std::string value = command_line->GetSwitchValueASCII(name);
   int fd;
   CHECK(base::StringToInt(value, &fd));

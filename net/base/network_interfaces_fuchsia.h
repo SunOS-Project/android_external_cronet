@@ -8,10 +8,9 @@
 #include <fuchsia/net/interfaces/cpp/fidl.h>
 #include <stdint.h>
 
-#include <optional>
-
 #include "net/base/network_change_notifier.h"
 #include "net/base/network_interfaces.h"
+#include "third_party/abseil-cpp/absl/types/optional.h"
 
 namespace net::internal {
 
@@ -24,7 +23,7 @@ class InterfaceProperties final {
 
   // Creates an |InterfaceProperties| if |properties| are valid complete
   // properties as reported by |VerifyCompleteInterfaceProperties|.
-  static std::optional<InterfaceProperties> VerifyAndCreate(
+  static absl::optional<InterfaceProperties> VerifyAndCreate(
       fuchsia::net::interfaces::Properties properties);
   InterfaceProperties(InterfaceProperties&& interface);
   InterfaceProperties& operator=(InterfaceProperties&& interface);

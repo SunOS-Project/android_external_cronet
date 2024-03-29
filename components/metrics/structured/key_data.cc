@@ -199,8 +199,7 @@ uint64_t KeyData::HmacMetric(const uint64_t project_name_hash,
 // Misc
 //-----
 
-absl::optional<int> KeyData::LastKeyRotation(
-    const uint64_t project_name_hash) const {
+absl::optional<int> KeyData::LastKeyRotation(const uint64_t project_name_hash) {
   const auto& keys = proto_.get()->get()->keys();
   const auto& it = keys.find(project_name_hash);
   if (it != keys.end()) {
@@ -209,8 +208,7 @@ absl::optional<int> KeyData::LastKeyRotation(
   return absl::nullopt;
 }
 
-absl::optional<int> KeyData::GetKeyAgeInWeeks(
-    uint64_t project_name_hash) const {
+absl::optional<int> KeyData::GetKeyAgeInWeeks(uint64_t project_name_hash) {
   absl::optional<int> last_rotation = LastKeyRotation(project_name_hash);
   if (!last_rotation.has_value()) {
     return absl::nullopt;

@@ -7,7 +7,6 @@
 #include <algorithm>
 #include <cstddef>
 #include <memory>
-#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -15,6 +14,7 @@
 #include "absl/strings/escaping.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 #include "absl/types/span.h"
 #include "quiche/quic/core/crypto/certificate_view.h"
 #include "quiche/quic/core/crypto/crypto_handshake.h"
@@ -937,7 +937,7 @@ class TestProofVerifier : public ProofVerifier {
       const std::string& signature, const ProofVerifyContext* context,
       std::string* error_details, std::unique_ptr<ProofVerifyDetails>* details,
       std::unique_ptr<ProofVerifierCallback> callback) override {
-    std::optional<std::string> payload =
+    absl::optional<std::string> payload =
         CryptoUtils::GenerateProofPayloadToBeSigned(chlo_hash, server_config);
     if (!payload.has_value()) {
       *error_details = "Failed to serialize signed payload";

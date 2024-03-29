@@ -4,11 +4,8 @@
 
 #include "quiche/quic/core/io/quic_default_event_loop.h"
 
-#include <algorithm>
 #include <memory>
-#include <vector>
 
-#include "absl/algorithm/container.h"
 #include "quiche/quic/core/io/quic_poll_event_loop.h"
 #include "quiche/common/platform/api/quiche_event_loop.h"
 
@@ -31,16 +28,12 @@ QuicEventLoopFactory* GetDefaultEventLoop() {
 }
 
 std::vector<QuicEventLoopFactory*> GetAllSupportedEventLoops() {
-  std::vector<QuicEventLoopFactory*> loops = {QuicPollEventLoopFactory::Get()};
+  std::vector<QuicEventLoopFactory*> loops = {
 #ifdef QUICHE_ENABLE_LIBEVENT
-  loops.push_back(QuicLibeventEventLoopFactory::Get());
-  if (QuicLibeventEventLoopFactory::Get()->GetName() !=
-      QuicLibeventEventLoopFactory::GetLevelTriggeredBackendForTests()
-          ->GetName()) {
-    loops.push_back(
-        QuicLibeventEventLoopFactory::GetLevelTriggeredBackendForTests());
-  }
+      QuicLibeventEventLoopFactory::Get(),
+      QuicLibeventEventLoopFactory::GetLevelTriggeredBackendForTests(),
 #endif
+      QuicPollEventLoopFactory::Get()};
   std::vector<QuicEventLoopFactory*> extra =
       quiche::GetExtraEventLoopImplementations();
   loops.insert(loops.end(), extra.begin(), extra.end());

@@ -53,25 +53,23 @@ public class EmbeddedTestServer {
 
     @GuardedBy("mImplMonitor")
     private IEmbeddedTestServerImpl mImpl;
+    private ServiceConnection mConn = new ServiceConnection() {
+        @Override
+        public void onServiceConnected(ComponentName name, IBinder service) {
+            synchronized (mImplMonitor) {
+                mImpl = IEmbeddedTestServerImpl.Stub.asInterface(service);
+                mImplMonitor.notify();
+            }
+        }
 
-    private ServiceConnection mConn =
-            new ServiceConnection() {
-                @Override
-                public void onServiceConnected(ComponentName name, IBinder service) {
-                    synchronized (mImplMonitor) {
-                        mImpl = IEmbeddedTestServerImpl.Stub.asInterface(service);
-                        mImplMonitor.notify();
-                    }
-                }
-
-                @Override
-                public void onServiceDisconnected(ComponentName name) {
-                    synchronized (mImplMonitor) {
-                        mImpl = null;
-                        mImplMonitor.notify();
-                    }
-                }
-            };
+        @Override
+        public void onServiceDisconnected(ComponentName name) {
+            synchronized (mImplMonitor) {
+                mImpl = null;
+                mImplMonitor.notify();
+            }
+        }
+    };
 
     private Context mContext;
     private final Object mImplMonitor = new Object();
@@ -83,7 +81,9 @@ public class EmbeddedTestServer {
         USE_HTTPS,
     }
 
-    /** Exception class raised on failure in the EmbeddedTestServer. */
+    /**
+     * Exception class raised on failure in the EmbeddedTestServer.
+     */
     public static final class EmbeddedTestServerFailure extends Error {
         public EmbeddedTestServerFailure(String errorDesc) {
             super(errorDesc);
@@ -100,24 +100,27 @@ public class EmbeddedTestServer {
      * Notifications are asynchronous and delivered to the UI thread.
      */
     public static class ConnectionListener {
-        private final IConnectionListener mListener =
-                new IConnectionListener.Stub() {
+        private final IConnectionListener mListener = new IConnectionListener.Stub() {
+            @Override
+            public void acceptedSocket(final long socketId) {
+                ThreadUtils.runOnUiThread(new Runnable() {
                     @Override
-                    public void acceptedSocket(final long socketId) {
-                        ThreadUtils.runOnUiThread(
-                                () -> {
-                                    ConnectionListener.this.acceptedSocket(socketId);
-                                });
+                    public void run() {
+                        ConnectionListener.this.acceptedSocket(socketId);
                     }
+                });
+            }
 
+            @Override
+            public void readFromSocket(final long socketId) {
+                ThreadUtils.runOnUiThread(new Runnable() {
                     @Override
-                    public void readFromSocket(final long socketId) {
-                        ThreadUtils.runOnUiThread(
-                                () -> {
-                                    ConnectionListener.this.readFromSocket(socketId);
-                                });
+                    public void run() {
+                        ConnectionListener.this.readFromSocket(socketId);
                     }
-                };
+                });
+            }
+        };
 
         /**
          * A new socket connection has been opened on the server.
@@ -224,10 +227,8 @@ public class EmbeddedTestServer {
             }
         } catch (RemoteException e) {
             throw new EmbeddedTestServerFailure(
-                    "Failed to add default handlers and start serving files from "
-                            + directoryPath
-                            + ": "
-                            + e.toString());
+                    "Failed to add default handlers and start serving files from " + directoryPath
+                    + ": " + e.toString());
         }
     }
 
@@ -348,11 +349,9 @@ public class EmbeddedTestServer {
      *  @return The created server.
      */
     public static EmbeddedTestServer createAndStartServerWithPort(Context context, int port) {
-        Assert.assertNotEquals(
-                "EmbeddedTestServer should not be created on UiThread, the instantiation will hang"
-                    + " forever waiting for tasks to post to UI thread",
-                Looper.getMainLooper(),
-                Looper.myLooper());
+        Assert.assertNotEquals("EmbeddedTestServer should not be created on UiThread, "
+                + "the instantiation will hang forever waiting for tasks to post to UI thread",
+                Looper.getMainLooper(), Looper.myLooper());
         EmbeddedTestServer server = new EmbeddedTestServer();
         return initializeAndStartServer(server, context, port);
     }
@@ -368,7 +367,7 @@ public class EmbeddedTestServer {
      */
     public static EmbeddedTestServer createAndStartHTTPSServer(
             Context context, @ServerCertificate int serverCertificate) {
-        return createAndStartHTTPSServerWithPort(context, serverCertificate, /* port= */ 0);
+        return createAndStartHTTPSServerWithPort(context, serverCertificate, 0 /* port */);
     }
 
     /** Create and initialize an HTTPS server with the default handlers and specified port.
@@ -383,12 +382,10 @@ public class EmbeddedTestServer {
      */
     public static EmbeddedTestServer createAndStartHTTPSServerWithPort(
             Context context, @ServerCertificate int serverCertificate, int port) {
-        Assert.assertNotEquals(
-                "EmbeddedTestServer should not be created on UiThread, "
+        Assert.assertNotEquals("EmbeddedTestServer should not be created on UiThread, "
                         + "the instantiation will hang forever waiting for tasks"
                         + " to post to UI thread",
-                Looper.getMainLooper(),
-                Looper.myLooper());
+                Looper.getMainLooper(), Looper.myLooper());
         EmbeddedTestServer server = new EmbeddedTestServer();
         return initializeAndStartHTTPSServer(server, context, serverCertificate, port);
     }

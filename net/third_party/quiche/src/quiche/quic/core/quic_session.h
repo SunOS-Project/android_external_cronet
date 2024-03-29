@@ -11,12 +11,12 @@
 #include <cstdint>
 #include <map>
 #include <memory>
-#include <optional>
 #include <string>
 #include <vector>
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 #include "absl/types/span.h"
 #include "quiche/quic/core/crypto/tls_connection.h"
 #include "quiche/quic/core/frames/quic_ack_frequency_frame.h"
@@ -189,7 +189,6 @@ class QUICHE_EXPORT QuicSession
   void OnServerPreferredAddressAvailable(
       const QuicSocketAddress& /*server_preferred_address*/) override;
   void MaybeBundleOpportunistically() override {}
-  QuicByteCount GetFlowControlSendWindowSize(QuicStreamId id) override;
 
   // QuicStreamFrameDataProducer
   WriteStreamDataResult WriteStreamData(QuicStreamId id,
@@ -305,8 +304,8 @@ class QUICHE_EXPORT QuicSession
 
   // Called by the TLS handshaker when ALPS data is received.
   // Returns an error message if an error has occurred, or nullopt otherwise.
-  virtual std::optional<std::string> OnAlpsData(const uint8_t* alps_data,
-                                                size_t alps_length);
+  virtual absl::optional<std::string> OnAlpsData(const uint8_t* alps_data,
+                                                 size_t alps_length);
 
   // From HandshakerDelegateInterface
   bool OnNewDecryptionKeyAvailable(EncryptionLevel level,
@@ -317,7 +316,6 @@ class QUICHE_EXPORT QuicSession
       EncryptionLevel level, std::unique_ptr<QuicEncrypter> encrypter) override;
   void SetDefaultEncryptionLevel(EncryptionLevel level) override;
   void OnTlsHandshakeComplete() override;
-  void OnTlsHandshakeConfirmed() override {}
   void DiscardOldDecryptionKey(EncryptionLevel level) override;
   void DiscardOldEncryptionKey(EncryptionLevel level) override;
   void NeuterUnencryptedData() override;
@@ -615,7 +613,7 @@ class QUICHE_EXPORT QuicSession
   // Returns the encryption level to send application data.
   EncryptionLevel GetEncryptionLevelToSendApplicationData() const;
 
-  const std::optional<std::string> user_agent_id() const {
+  const absl::optional<std::string> user_agent_id() const {
     return user_agent_id_;
   }
 
@@ -848,11 +846,11 @@ class QUICHE_EXPORT QuicSession
 
   // Only called at a server session. Generate a CachedNetworkParameters that
   // can be sent to the client as part of the address token, based on the latest
-  // bandwidth/rtt information. If return std::nullopt, address token will not
+  // bandwidth/rtt information. If return absl::nullopt, address token will not
   // contain the CachedNetworkParameters.
-  virtual std::optional<CachedNetworkParameters>
+  virtual absl::optional<CachedNetworkParameters>
   GenerateCachedNetworkParameters() const {
-    return std::nullopt;
+    return absl::nullopt;
   }
 
   // Debug helper for OnCanWrite. Check that after QuicStream::OnCanWrite(),
@@ -996,7 +994,7 @@ class QUICHE_EXPORT QuicSession
 
   // Received information for a connection close.
   QuicConnectionCloseFrame on_closed_frame_;
-  std::optional<ConnectionCloseSource> source_;
+  absl::optional<ConnectionCloseSource> source_;
 
   // Used for connection-level flow control.
   QuicFlowController flow_controller_;
@@ -1044,7 +1042,7 @@ class QUICHE_EXPORT QuicSession
   // negotiation was received.
   ParsedQuicVersionVector client_original_supported_versions_;
 
-  std::optional<std::string> user_agent_id_;
+  absl::optional<std::string> user_agent_id_;
 
   // Initialized to false. Set to true when the session has been properly
   // configured and is ready for general operation.

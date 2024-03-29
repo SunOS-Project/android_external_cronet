@@ -245,8 +245,8 @@ ServiceFormHttpsRecordRdata::ServiceFormHttpsRecordRdata(
       ipv6_hint_(std::move(ipv6_hint)),
       unparsed_params_(std::move(unparsed_params)) {
   DCHECK_NE(priority_, 0);
-  DCHECK(!base::Contains(mandatory_keys_,
-                         dns_protocol::kHttpsServiceParamKeyMandatory));
+  DCHECK(mandatory_keys_.find(dns_protocol::kHttpsServiceParamKeyMandatory) ==
+         mandatory_keys_.end());
 
 #if DCHECK_IS_ON()
   for (const IPAddress& address : ipv4_hint_) {
@@ -431,14 +431,13 @@ bool ServiceFormHttpsRecordRdata::IsCompatible() const {
   for (uint16_t mandatory_key : mandatory_keys_) {
     DCHECK_NE(mandatory_key, dns_protocol::kHttpsServiceParamKeyMandatory);
 
-    if (!base::Contains(supported_keys, mandatory_key)) {
+    if (supported_keys.find(mandatory_key) == supported_keys.end())
       return false;
-    }
   }
 
 #if DCHECK_IS_ON()
   for (const auto& unparsed_param : unparsed_params_) {
-    DCHECK(!base::Contains(mandatory_keys_, unparsed_param.first));
+    DCHECK(mandatory_keys_.find(unparsed_param.first) == mandatory_keys_.end());
   }
 #endif  // DCHECK_IS_ON()
 

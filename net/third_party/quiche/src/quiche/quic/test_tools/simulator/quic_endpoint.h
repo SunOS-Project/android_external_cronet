@@ -112,9 +112,6 @@ class QuicEndpoint : public QuicEndpointBase,
   void OnServerPreferredAddressAvailable(
       const QuicSocketAddress& /*server_preferred_address*/) override {}
   void MaybeBundleOpportunistically() override {}
-  QuicByteCount GetFlowControlSendWindowSize(QuicStreamId /*id*/) override {
-    return std::numeric_limits<QuicByteCount>::max();
-  }
 
   // End QuicConnectionVisitorInterface implementation.
 

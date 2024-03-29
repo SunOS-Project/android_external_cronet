@@ -13,7 +13,9 @@ import java.net.URISyntaxException;
  */
 @Deprecated
 public class URI extends GURL {
-    /** Create a new GURL with a java.net.URI API shim. */
+    /**
+     * Create a new GURL with a java.net.URI API shim.
+     */
     public URI(String uri) throws URISyntaxException {
         super(uri);
         if (!isValid()) {

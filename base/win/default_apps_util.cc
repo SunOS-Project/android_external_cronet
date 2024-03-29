@@ -7,8 +7,6 @@
 #include <shobjidl.h>
 #include <wrl/client.h>
 
-#include <string_view>
-
 #include "base/logging.h"
 #include "base/strings/strcat.h"
 #include "base/strings/string_util.h"
@@ -19,8 +17,8 @@ namespace {
 // Returns the target used as a activate parameter when opening the settings
 // pointing to the page that is the most relevant to a user trying to change the
 // default handler for `protocol`.
-std::wstring GetTargetForDefaultAppsSettings(std::wstring_view protocol) {
-  static constexpr std::wstring_view kSystemSettingsDefaultAppsPrefix(
+std::wstring GetTargetForDefaultAppsSettings(base::WStringPiece protocol) {
+  static constexpr base::WStringPiece kSystemSettingsDefaultAppsPrefix(
       L"SystemSettings_DefaultApps_");
   if (base::EqualsCaseInsensitiveASCII(protocol, L"http"))
     return base::StrCat({kSystemSettingsDefaultAppsPrefix, L"Browser"});
@@ -33,7 +31,7 @@ std::wstring GetTargetForDefaultAppsSettings(std::wstring_view protocol) {
 
 namespace base::win {
 
-bool LaunchDefaultAppsSettingsModernDialog(std::wstring_view protocol) {
+bool LaunchDefaultAppsSettingsModernDialog(base::WStringPiece protocol) {
   // The appModelId looks arbitrary but it is the same in Win8 and Win10. There
   // is no easy way to retrieve the appModelId from the registry.
   static constexpr wchar_t kControlPanelAppModelId[] =

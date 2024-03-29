@@ -4,16 +4,13 @@
 
 package org.chromium.net.impl;
 
-import static org.chromium.net.impl.HttpEngineNativeProvider.EXT_API_LEVEL;
-import static org.chromium.net.impl.HttpEngineNativeProvider.EXT_VERSION;
-
 import android.net.http.HttpException;
 
-import androidx.annotation.RequiresExtension;
+import androidx.annotation.RequiresApi;
 
 import org.chromium.net.CronetException;
 
-@RequiresExtension(extension = EXT_API_LEVEL, version = EXT_VERSION)
+@RequiresApi(api = 34)
 class CronetExceptionTranslationUtils {
     @SuppressWarnings("unchecked")
     public static <T, E extends Exception> T executeTranslatingCronetExceptions(
@@ -28,7 +25,7 @@ class CronetExceptionTranslationUtils {
             } else if (nonCronetException.isInstance(e)) {
                 throw (E) e;
             } else {
-                throw e;
+                throw new AssertionError("Unexpected exception", e);
             }
         }
     }

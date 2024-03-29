@@ -12,7 +12,6 @@
 #include <functional>
 #include <iterator>
 #include <memory>
-#include <optional>
 #include <ostream>
 #include <string>
 #include <utility>
@@ -24,6 +23,7 @@
 #include "absl/strings/ascii.h"
 #include "absl/strings/match.h"
 #include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 #include "quiche/balsa/balsa_enums.h"
 #include "quiche/balsa/header_api.h"
 #include "quiche/balsa/standard_header_map.h"
@@ -1265,7 +1265,8 @@ class QUICHE_EXPORT BalsaHeaders::iterator_base
 
   const BalsaHeaders* headers_;
   HeaderLines::size_type idx_;
-  mutable std::optional<std::pair<absl::string_view, absl::string_view>> value_;
+  mutable absl::optional<std::pair<absl::string_view, absl::string_view>>
+      value_;
 };
 
 // A const iterator for all the header lines.

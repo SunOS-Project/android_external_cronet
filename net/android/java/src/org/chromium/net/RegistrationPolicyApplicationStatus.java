@@ -7,7 +7,9 @@ package org.chromium.net;
 import org.chromium.base.ApplicationState;
 import org.chromium.base.ApplicationStatus;
 
-/** Registration policy which depends on the ApplicationState. */
+/**
+ * Regsitration policy which depends on the ApplicationState.
+ */
 public class RegistrationPolicyApplicationStatus
         extends NetworkChangeNotifierAutoDetect.RegistrationPolicy
         implements ApplicationStatus.ApplicationStateListener {
@@ -17,7 +19,7 @@ public class RegistrationPolicyApplicationStatus
     protected void init(NetworkChangeNotifierAutoDetect notifier) {
         super.init(notifier);
         ApplicationStatus.registerApplicationStateListener(this);
-        onApplicationStateChange(ApplicationState.UNKNOWN);
+        onApplicationStateChange(ApplicationState.UNKNOWN /* unused */);
     }
 
     @Override

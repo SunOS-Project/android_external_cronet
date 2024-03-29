@@ -5,8 +5,6 @@
 #ifndef BASE_TRACE_EVENT_TRACED_VALUE_SUPPORT_H_
 #define BASE_TRACE_EVENT_TRACED_VALUE_SUPPORT_H_
 
-#include <string_view>
-
 #include "base/memory/raw_ptr.h"
 #include "base/memory/raw_ref.h"
 #include "base/memory/scoped_refptr.h"
@@ -202,7 +200,7 @@ struct TraceFormatTraits<wchar_t[N]> {
   static void WriteIntoTrace(perfetto::TracedValue context,
                              const wchar_t value[N]) {
     return std::move(context).WriteString(
-        ::base::WideToUTF8(::std::wstring_view(value)));
+        ::base::WideToUTF8(::base::WStringPiece(value)));
   }
 };
 
@@ -211,7 +209,7 @@ struct TraceFormatTraits<const wchar_t*> {
   static void WriteIntoTrace(perfetto::TracedValue context,
                              const wchar_t* value) {
     return std::move(context).WriteString(
-        ::base::WideToUTF8(::std::wstring_view(value)));
+        ::base::WideToUTF8(::base::WStringPiece(value)));
   }
 };
 
@@ -225,9 +223,9 @@ struct TraceFormatTraits<::base::StringPiece16> {
 };
 
 template <>
-struct TraceFormatTraits<::std::wstring_view> {
+struct TraceFormatTraits<::base::WStringPiece> {
   static void WriteIntoTrace(perfetto::TracedValue context,
-                             ::std::wstring_view value) {
+                             ::base::WStringPiece value) {
     return std::move(context).WriteString(::base::WideToUTF8(value));
   }
 };

@@ -33,16 +33,7 @@ public class JavaExceptionReporter implements Thread.UncaughtExceptionHandler {
     public void uncaughtException(Thread t, Throwable e) {
         if (!mHandlingException) {
             mHandlingException = true;
-            JavaExceptionReporterJni.get()
-                    .reportJavaException(
-                            mCrashAfterReport,
-                            // If we are dealing with a JNI uncaught exception, then `e` is just a
-                            // wrapper around the true exception, annotated with the native stack
-                            // trace. The native stack trace is redundant, since we're going to
-                            // include it separately anyway. Remove it to make the report smaller,
-                            // clearer and to prevent the true Java exception information from being
-                            // truncated away.
-                            e instanceof JniAndroid.UncaughtExceptionException ? e.getCause() : e);
+            JavaExceptionReporterJni.get().reportJavaException(mCrashAfterReport, e);
         }
         if (mParent != null) {
             mParent.uncaughtException(t, e);
@@ -59,8 +50,8 @@ public class JavaExceptionReporter implements Thread.UncaughtExceptionHandler {
     @UiThread
     public static void reportStackTrace(String stackTrace) {
         assert ThreadUtils.runningOnUiThread();
-        JavaExceptionReporterJni.get()
-                .reportJavaStackTrace(PiiElider.sanitizeStacktrace(stackTrace));
+        JavaExceptionReporterJni.get().reportJavaStackTrace(
+                PiiElider.sanitizeStacktrace(stackTrace));
     }
 
     /**
@@ -78,15 +69,13 @@ public class JavaExceptionReporter implements Thread.UncaughtExceptionHandler {
 
     @CalledByNative
     private static void installHandler(boolean crashAfterReport) {
-        Thread.setDefaultUncaughtExceptionHandler(
-                new JavaExceptionReporter(
-                        Thread.getDefaultUncaughtExceptionHandler(), crashAfterReport));
+        Thread.setDefaultUncaughtExceptionHandler(new JavaExceptionReporter(
+                Thread.getDefaultUncaughtExceptionHandler(), crashAfterReport));
     }
 
     @NativeMethods
     interface Natives {
         void reportJavaException(boolean crashAfterReport, Throwable e);
-
         void reportJavaStackTrace(String stackTrace);
     }
 }

@@ -6,6 +6,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include <__config>
+
+#ifndef _LIBCPP_HAS_NO_THREADS
+
 #include <condition_variable>
 #include <thread>
 
@@ -88,3 +92,5 @@ notify_all_at_thread_exit(condition_variable& cond, unique_lock<mutex> lk)
 _LIBCPP_END_NAMESPACE_STD
 
 _LIBCPP_POP_MACROS
+
+#endif // !_LIBCPP_HAS_NO_THREADS

@@ -95,14 +95,20 @@ class VectorBuffer {
 
   // DestructRange ------------------------------------------------------------
 
+  // Trivially destructible objects need not have their destructors called.
+  template <typename T2 = T,
+            std::enable_if_t<std::is_trivially_destructible_v<T2>, int> = 0>
+  void DestructRange(T* begin, T* end) {}
+
+  // Non-trivially destructible objects must have their destructors called
+  // individually.
+  template <typename T2 = T,
+            std::enable_if_t<!std::is_trivially_destructible_v<T2>, int> = 0>
   void DestructRange(T* begin, T* end) {
-    // Trivially destructible objects need not have their destructors called.
-    if constexpr (!std::is_trivially_destructible_v<T>) {
-      CHECK_LE(begin, end);
-      while (begin != end) {
-        begin->~T();
-        begin++;
-      }
+    CHECK_LE(begin, end);
+    while (begin != end) {
+      begin->~T();
+      begin++;
     }
   }
 
@@ -125,24 +131,45 @@ class VectorBuffer {
   static inline constexpr bool is_trivially_copyable_or_relocatable =
       std::is_trivially_copyable_v<T2> || IS_TRIVIALLY_RELOCATABLE(T2);
 
+  template <typename T2 = T,
+            std::enable_if_t<is_trivially_copyable_or_relocatable<T2>, int> = 0>
   static void MoveRange(T* from_begin, T* from_end, T* to) {
     CHECK(!RangesOverlap(from_begin, from_end, to));
 
-    if constexpr (is_trivially_copyable_or_relocatable<T>) {
-      memcpy(to, from_begin,
-             CheckSub(get_uintptr(from_end), get_uintptr(from_begin))
-                 .ValueOrDie());
-    } else {
-      while (from_begin != from_end) {
-        if constexpr (std::move_constructible<T>) {
-          new (to) T(std::move(*from_begin));
-        } else {
-          new (to) T(*from_begin);
-        }
-        from_begin->~T();
-        from_begin++;
-        to++;
-      }
+    memcpy(
+        to, from_begin,
+        CheckSub(get_uintptr(from_end), get_uintptr(from_begin)).ValueOrDie());
+  }
+
+  // Not trivially copyable, but movable: call the move constructor and
+  // destruct the original.
+  template <typename T2 = T,
+            std::enable_if_t<std::is_move_constructible_v<T2> &&
+                                 !is_trivially_copyable_or_relocatable<T2>,
+                             int> = 0>
+  static void MoveRange(T* from_begin, T* from_end, T* to) {
+    CHECK(!RangesOverlap(from_begin, from_end, to));
+    while (from_begin != from_end) {
+      new (to) T(std::move(*from_begin));
+      from_begin->~T();
+      from_begin++;
+      to++;
+    }
+  }
+
+  // Not movable, not trivially copyable: call the copy constructor and
+  // destruct the original.
+  template <typename T2 = T,
+            std::enable_if_t<!std::is_move_constructible_v<T2> &&
+                                 !is_trivially_copyable_or_relocatable<T2>,
+                             int> = 0>
+  static void MoveRange(T* from_begin, T* from_end, T* to) {
+    CHECK(!RangesOverlap(from_begin, from_end, to));
+    while (from_begin != from_end) {
+      new (to) T(*from_begin);
+      from_begin->~T();
+      from_begin++;
+      to++;
     }
   }
 

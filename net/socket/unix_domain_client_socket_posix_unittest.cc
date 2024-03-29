@@ -201,7 +201,8 @@ TEST_F(UnixDomainClientSocketTest, ConnectWithSocketDescriptor) {
 
   // Try to read data.
   const int kReadDataSize = 10;
-  auto read_buffer = base::MakeRefCounted<IOBufferWithSize>(kReadDataSize);
+  scoped_refptr<IOBuffer> read_buffer =
+      base::MakeRefCounted<IOBuffer>(kReadDataSize);
   TestCompletionCallback read_callback;
   EXPECT_EQ(ERR_IO_PENDING,
             rewrapped_socket.Read(
@@ -283,7 +284,8 @@ TEST_F(UnixDomainClientSocketTest, DisconnectFromClient) {
 
   // Try to read data.
   const int kReadDataSize = 10;
-  auto read_buffer = base::MakeRefCounted<IOBufferWithSize>(kReadDataSize);
+  scoped_refptr<IOBuffer> read_buffer =
+      base::MakeRefCounted<IOBuffer>(kReadDataSize);
   TestCompletionCallback read_callback;
   EXPECT_EQ(ERR_IO_PENDING,
             accepted_socket->Read(
@@ -316,7 +318,8 @@ TEST_F(UnixDomainClientSocketTest, DisconnectFromServer) {
 
   // Try to read data.
   const int kReadDataSize = 10;
-  auto read_buffer = base::MakeRefCounted<IOBufferWithSize>(kReadDataSize);
+  scoped_refptr<IOBuffer> read_buffer =
+      base::MakeRefCounted<IOBuffer>(kReadDataSize);
   TestCompletionCallback read_callback;
   EXPECT_EQ(ERR_IO_PENDING,
             client_socket.Read(
@@ -349,7 +352,7 @@ TEST_F(UnixDomainClientSocketTest, ReadAfterWrite) {
 
   // Send data from client to server.
   const int kWriteDataSize = 10;
-  auto write_buffer =
+  scoped_refptr<IOBuffer> write_buffer =
       base::MakeRefCounted<StringIOBuffer>(std::string(kWriteDataSize, 'd'));
   EXPECT_EQ(
       kWriteDataSize,
@@ -357,7 +360,8 @@ TEST_F(UnixDomainClientSocketTest, ReadAfterWrite) {
 
   // The buffer is bigger than write data size.
   const int kReadBufferSize = kWriteDataSize * 2;
-  auto read_buffer = base::MakeRefCounted<IOBufferWithSize>(kReadBufferSize);
+  scoped_refptr<IOBuffer> read_buffer =
+      base::MakeRefCounted<IOBuffer>(kReadBufferSize);
   EXPECT_EQ(kWriteDataSize,
             ReadSynchronously(accepted_socket.get(),
                               read_buffer.get(),
@@ -421,14 +425,15 @@ TEST_F(UnixDomainClientSocketTest, ReadBeforeWrite) {
   const int kReadBufferSize = kWriteDataSize * 2;
   const int kSmallReadBufferSize = kWriteDataSize / 3;
   // Read smaller than write data size first.
-  auto read_buffer = base::MakeRefCounted<IOBufferWithSize>(kReadBufferSize);
+  scoped_refptr<IOBuffer> read_buffer =
+      base::MakeRefCounted<IOBuffer>(kReadBufferSize);
   TestCompletionCallback read_callback;
   EXPECT_EQ(
       ERR_IO_PENDING,
       accepted_socket->Read(
           read_buffer.get(), kSmallReadBufferSize, read_callback.callback()));
 
-  auto write_buffer =
+  scoped_refptr<IOBuffer> write_buffer =
       base::MakeRefCounted<StringIOBuffer>(std::string(kWriteDataSize, 'd'));
   EXPECT_EQ(
       kWriteDataSize,

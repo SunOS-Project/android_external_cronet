@@ -179,8 +179,10 @@ class NET_EXPORT_PRIVATE HttpStreamRequest {
   void SetPriority(RequestPriority priority);
 
   // Marks completion of the request. Must be called before OnStreamReady().
-  void Complete(NextProto negotiated_protocol,
-                AlternateProtocolUsage alternate_protocol_usage);
+  void Complete(bool was_alpn_negotiated,
+                NextProto negotiated_protocol,
+                AlternateProtocolUsage alternate_protocol_usage,
+                bool using_spdy);
 
   // Called by |helper_| to record connection attempts made by the socket
   // layer in an attached Job for this stream request.
@@ -189,12 +191,18 @@ class NET_EXPORT_PRIVATE HttpStreamRequest {
   // Returns the LoadState for the request.
   LoadState GetLoadState() const;
 
+  // Returns true if TLS/ALPN was negotiated for this stream.
+  bool was_alpn_negotiated() const;
+
   // Protocol negotiated with the server.
   NextProto negotiated_protocol() const;
 
   // The reason why Chrome uses a specific transport protocol for HTTP
   // semantics.
   AlternateProtocolUsage alternate_protocol_usage() const;
+
+  // Returns true if this stream is being fetched over SPDY.
+  bool using_spdy() const;
 
   // Returns socket-layer connection attempts made for this stream request.
   const ConnectionAttempts& connection_attempts() const;
@@ -224,12 +232,14 @@ class NET_EXPORT_PRIVATE HttpStreamRequest {
   const NetLogWithSource net_log_;
 
   bool completed_ = false;
+  bool was_alpn_negotiated_ = false;
   // Protocol negotiated with the server.
   NextProto negotiated_protocol_ = kProtoUnknown;
   // The reason why Chrome uses a specific transport protocol for HTTP
   // semantics.
   AlternateProtocolUsage alternate_protocol_usage_ =
       AlternateProtocolUsage::ALTERNATE_PROTOCOL_USAGE_UNSPECIFIED_REASON;
+  bool using_spdy_ = false;
   ConnectionAttempts connection_attempts_;
   const StreamType stream_type_;
 };
