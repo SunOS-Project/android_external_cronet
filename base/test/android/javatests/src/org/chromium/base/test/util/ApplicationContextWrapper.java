@@ -8,7 +8,9 @@ import android.content.ComponentCallbacks;
 import android.content.Context;
 import android.content.ContextWrapper;
 
-/** ContextWrapper that can be used to wrap Application. */
+/**
+ * ContextWrapper that can be used to wrap Application.
+ */
 public class ApplicationContextWrapper extends ContextWrapper {
     public ApplicationContextWrapper(Context base) {
         super(base);

@@ -5,7 +5,6 @@
 #ifndef BASE_THREADING_SEQUENCE_BOUND_H_
 #define BASE_THREADING_SEQUENCE_BOUND_H_
 
-#include <concepts>
 #include <new>
 #include <tuple>
 #include <type_traits>
@@ -220,24 +219,30 @@ class SequenceBound {
   // classes that build the callback chain and post it on destruction. Capturing
   // the return value and passing it elsewhere or triggering lifetime extension
   // (e.g. by binding the return value to a reference) are both unsupported.
-  template <typename R, typename C, typename... Args>
-    requires(std::derived_from<UnwrappedT, C>)
+  template <typename R,
+            typename C,
+            typename... Args,
+            typename = std::enable_if_t<std::is_base_of_v<C, UnwrappedT>>>
   auto AsyncCall(R (C::*method)(Args...),
                  const Location& location = Location::Current()) const {
     return AsyncCallBuilder<R (C::*)(Args...), R, std::tuple<Args...>>(
         this, &location, method);
   }
 
-  template <typename R, typename C, typename... Args>
-    requires(std::derived_from<UnwrappedT, C>)
+  template <typename R,
+            typename C,
+            typename... Args,
+            typename = std::enable_if_t<std::is_base_of_v<C, UnwrappedT>>>
   auto AsyncCall(R (C::*method)(Args...) const,
                  const Location& location = Location::Current()) const {
     return AsyncCallBuilder<R (C::*)(Args...) const, R, std::tuple<Args...>>(
         this, &location, method);
   }
 
-  template <typename R, typename C, typename... Args>
-    requires(std::derived_from<UnwrappedT, C>)
+  template <typename R,
+            typename C,
+            typename... Args,
+            typename = std::enable_if_t<std::is_base_of_v<C, UnwrappedT>>>
   auto AsyncCall(internal::IgnoreResultHelper<R (C::*)(Args...) const> method,
                  const Location& location = Location::Current()) const {
     return AsyncCallBuilder<
@@ -245,8 +250,10 @@ class SequenceBound {
         std::tuple<Args...>>(this, &location, method);
   }
 
-  template <typename R, typename C, typename... Args>
-    requires(std::derived_from<UnwrappedT, C>)
+  template <typename R,
+            typename C,
+            typename... Args,
+            typename = std::enable_if_t<std::is_base_of_v<C, UnwrappedT>>>
   auto AsyncCall(internal::IgnoreResultHelper<R (C::*)(Args...)> method,
                  const Location& location = Location::Current()) const {
     return AsyncCallBuilder<internal::IgnoreResultHelper<R (C::*)(Args...)>,
@@ -349,8 +356,9 @@ class SequenceBound {
   friend class SequenceBound;
 
   template <template <typename> class CallbackType>
-  static constexpr bool IsCrossThreadTask =
-      CrossThreadTraits::template IsCrossThreadTask<CallbackType>;
+  using EnableIfIsCrossThreadTask =
+      typename CrossThreadTraits::template EnableIfIsCrossThreadTask<
+          CallbackType>;
 
   // Support helpers for `AsyncCall()` implementation.
   //
@@ -480,8 +488,9 @@ class SequenceBound {
           << "make sure to invoke Then() or use base::IgnoreResult()";
     }
 
-    template <template <typename> class CallbackType, typename ThenArg>
-      requires(IsCrossThreadTask<CallbackType>)
+    template <template <typename> class CallbackType,
+              typename ThenArg,
+              typename = EnableIfIsCrossThreadTask<CallbackType>>
     void Then(CallbackType<void(ThenArg)> then_callback) && {
       this->sequence_bound_->PostTaskAndThenHelper(
           *this->location_,
@@ -582,8 +591,9 @@ class SequenceBound {
       CHECK(!this->sequence_bound_);
     }
 
-    template <template <typename> class CallbackType, typename ThenArg>
-      requires(IsCrossThreadTask<CallbackType>)
+    template <template <typename> class CallbackType,
+              typename ThenArg,
+              typename = EnableIfIsCrossThreadTask<CallbackType>>
     void Then(CallbackType<void(ThenArg)> then_callback) && {
       this->sequence_bound_->PostTaskAndThenHelper(*this->location_,
                                                    std::move(this->callback_),
@@ -653,8 +663,8 @@ class SequenceBound {
   template <typename ReturnType,
             template <typename>
             class CallbackType,
-            typename ThenArg>
-    requires(IsCrossThreadTask<CallbackType>)
+            typename ThenArg,
+            typename = EnableIfIsCrossThreadTask<CallbackType>>
   void PostTaskAndThenHelper(const Location& location,
                              CrossThreadTask<ReturnType()> callback,
                              CallbackType<void(ThenArg)> then_callback) const {

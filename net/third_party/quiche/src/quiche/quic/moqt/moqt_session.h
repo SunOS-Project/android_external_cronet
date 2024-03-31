@@ -5,11 +5,11 @@
 #ifndef QUICHE_QUIC_MOQT_MOQT_SESSION_H_
 #define QUICHE_QUIC_MOQT_MOQT_SESSION_H_
 
-#include <optional>
 #include <string>
 #include <utility>
 
 #include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 #include "quiche/quic/core/quic_types.h"
 #include "quiche/quic/moqt/moqt_framer.h"
 #include "quiche/quic/moqt/moqt_messages.h"
@@ -24,31 +24,18 @@ namespace moqt {
 using MoqtSessionEstablishedCallback = quiche::SingleUseCallback<void()>;
 using MoqtSessionTerminatedCallback =
     quiche::SingleUseCallback<void(absl::string_view error_message)>;
-using MoqtSessionDeletedCallback = quiche::SingleUseCallback<void()>;
-
-// Callbacks for session-level events.
-struct MoqtSessionCallbacks {
-  MoqtSessionEstablishedCallback session_established_callback = +[] {};
-  MoqtSessionTerminatedCallback session_terminated_callback =
-      +[](absl::string_view) {};
-  MoqtSessionDeletedCallback session_deleted_callback = +[] {};
-};
 
 class QUICHE_EXPORT MoqtSession : public webtransport::SessionVisitor {
  public:
   MoqtSession(webtransport::Session* session, MoqtSessionParameters parameters,
-              MoqtSessionCallbacks callbacks)
+              MoqtSessionEstablishedCallback session_established_callback,
+              MoqtSessionTerminatedCallback session_terminated_callback)
       : session_(session),
         parameters_(parameters),
-        session_established_callback_(
-            std::move(callbacks.session_established_callback)),
-        session_terminated_callback_(
-            std::move(callbacks.session_terminated_callback)),
-        session_deleted_callback_(
-            std::move(callbacks.session_deleted_callback)),
+        session_established_callback_(std::move(session_established_callback)),
+        session_terminated_callback_(std::move(session_terminated_callback)),
         framer_(quiche::SimpleBufferAllocator::Get(),
                 parameters.using_webtrans) {}
-  ~MoqtSession() { std::move(session_deleted_callback_)(); }
 
   // webtransport::SessionVisitor implementation.
   void OnSessionReady() override;
@@ -115,17 +102,16 @@ class QUICHE_EXPORT MoqtSession : public webtransport::SessionVisitor {
     MoqtParser parser_;
     // nullopt means "incoming stream, and we don't know if it's the control
     // stream or a data stream yet".
-    std::optional<bool> is_control_stream_;
+    absl::optional<bool> is_control_stream_;
   };
 
   webtransport::Session* session_;
   MoqtSessionParameters parameters_;
   MoqtSessionEstablishedCallback session_established_callback_;
   MoqtSessionTerminatedCallback session_terminated_callback_;
-  MoqtSessionDeletedCallback session_deleted_callback_;
   MoqtFramer framer_;
 
-  std::optional<webtransport::StreamId> control_stream_;
+  absl::optional<webtransport::StreamId> control_stream_;
   std::string error_;
 };
 

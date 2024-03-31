@@ -352,10 +352,11 @@ bool WebSocketBasicHandshakeStream::GetLoadTimingInfo(
 }
 
 void WebSocketBasicHandshakeStream::GetSSLInfo(SSLInfo* ssl_info) {
-  if (!state_.connection()->socket() ||
-      !state_.connection()->socket()->GetSSLInfo(ssl_info)) {
+  if (!state_.connection()->socket()) {
     ssl_info->Reset();
+    return;
   }
+  parser()->GetSSLInfo(ssl_info);
 }
 
 void WebSocketBasicHandshakeStream::GetSSLCertRequestInfo(

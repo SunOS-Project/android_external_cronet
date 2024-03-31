@@ -5,7 +5,6 @@
 #ifndef BASE_TYPES_TOKEN_TYPE_H_
 #define BASE_TYPES_TOKEN_TYPE_H_
 
-#include <compare>
 #include <type_traits>
 
 #include "base/check.h"
@@ -31,24 +30,13 @@ class TokenType : public StrongAlias<TypeMarker, UnguessableToken> {
     // mistake; do not propagate that mistake here as well.
     CHECK(!token.is_empty());
   }
-
-  // This object allows default assignment operators for compatibility with
-  // STL containers.
   TokenType(const TokenType& token) = default;
   TokenType(TokenType&& token) noexcept = default;
   TokenType& operator=(const TokenType& token) = default;
   TokenType& operator=(TokenType&& token) noexcept = default;
 
-  // StrongAlias doesn't define <=> because not all underlying types will
-  // implement it. TokenType can define it using UnguessableToken's
-  // implementation, though.
-  friend constexpr auto operator<=>(const TokenType& lhs,
-                                    const TokenType& rhs) {
-    return lhs.value() <=> rhs.value();
-  }
-  friend constexpr bool operator==(const TokenType& lhs, const TokenType& rhs) {
-    return lhs.value() == rhs.value();
-  }
+  // This object allows default assignment operators for compatibility with
+  // STL containers.
 
   // Hash functor for use in unordered containers.
   struct Hasher {

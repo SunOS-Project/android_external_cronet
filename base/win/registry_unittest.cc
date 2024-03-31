@@ -11,7 +11,6 @@
 
 #include <cstring>
 #include <iterator>
-#include <string_view>
 #include <utility>
 
 #include "base/compiler_specific.h"
@@ -163,7 +162,7 @@ TEST_F(RegistryTest, TruncatedCharTest) {
   ASSERT_TRUE(iterator.Valid());
   // Avoid having to use EXPECT_STREQ here by leveraging StringPiece's
   // operator== to perform a deep comparison.
-  EXPECT_EQ(std::wstring_view(kName), std::wstring_view(iterator.Name()));
+  EXPECT_EQ(WStringPiece(kName), WStringPiece(iterator.Name()));
   // ValueSize() is in bytes.
   ASSERT_EQ(std::size(kData), iterator.ValueSize());
   // Value() is NUL terminated.
@@ -184,17 +183,17 @@ TEST_F(RegistryTest, ValueIteratorEmptyKey) {
 
 // Tests that the default value is seen by a value iterator.
 TEST_F(RegistryTest, ValueIteratorDefaultValue) {
-  const std::wstring_view kTestString(L"i miss you");
+  const WStringPiece kTestString(L"i miss you");
   ASSERT_EQ(RegKey(HKEY_CURRENT_USER, root_key().c_str(), KEY_SET_VALUE)
                 .WriteValue(nullptr, kTestString.data()),
             ERROR_SUCCESS);
   RegistryValueIterator iterator(HKEY_CURRENT_USER, root_key().c_str());
   EXPECT_EQ(iterator.ValueCount(), 1U);
   ASSERT_TRUE(iterator.Valid());
-  EXPECT_EQ(std::wstring_view(iterator.Name()), std::wstring_view());
+  EXPECT_EQ(WStringPiece(iterator.Name()), WStringPiece());
   EXPECT_EQ(iterator.ValueSize(), (kTestString.size() + 1) * sizeof(wchar_t));
   EXPECT_EQ(iterator.Type(), REG_SZ);
-  EXPECT_EQ(std::wstring_view(iterator.Value()), kTestString);
+  EXPECT_EQ(WStringPiece(iterator.Value()), kTestString);
   ++iterator;
   EXPECT_FALSE(iterator.Valid());
 }

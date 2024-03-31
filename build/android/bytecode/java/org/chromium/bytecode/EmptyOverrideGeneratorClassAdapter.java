@@ -31,12 +31,7 @@ class EmptyOverrideGeneratorClassAdapter extends ClassVisitor {
     }
 
     @Override
-    public void visit(
-            int version,
-            int access,
-            String name,
-            String signature,
-            String superName,
+    public void visit(int version, int access, String name, String signature, String superName,
             String[] interfaces) {
         super.visit(version, access, name, signature, superName, interfaces);
 
@@ -57,9 +52,8 @@ class EmptyOverrideGeneratorClassAdapter extends ClassVisitor {
                 continue;
             }
 
-            MethodVisitor mv =
-                    super.visitMethod(
-                            method.access, method.methodName, method.description, null, null);
+            MethodVisitor mv = super.visitMethod(
+                    method.access, method.methodName, method.description, null, null);
             writeOverrideCode(mv, method.access, method.methodName, method.description);
         }
 

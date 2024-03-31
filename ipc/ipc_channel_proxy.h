@@ -41,7 +41,6 @@ namespace IPC {
 class ChannelFactory;
 class MessageFilter;
 class MessageFilterRouter;
-class UrgentMessageObserver;
 
 //-----------------------------------------------------------------------------
 // IPC::ChannelProxy
@@ -168,10 +167,6 @@ class COMPONENT_EXPORT(IPC) ChannelProxy : public Sender {
   // the IO thread.
   void AddFilter(MessageFilter* filter);
   void RemoveFilter(MessageFilter* filter);
-
-  // Set the `UrgentMessageObserver` for the channel. Must be called on the
-  // proxy thread before initialization.
-  void SetUrgentMessageObserver(UrgentMessageObserver* observer);
 
   using GenericAssociatedInterfaceFactory =
       base::RepeatingCallback<void(mojo::ScopedInterfaceEndpointHandle)>;
@@ -341,7 +336,6 @@ class COMPONENT_EXPORT(IPC) ChannelProxy : public Sender {
     void OnDispatchAssociatedInterfaceRequest(
         const std::string& interface_name,
         mojo::ScopedInterfaceEndpointHandle handle);
-    void SetUrgentMessageObserver(UrgentMessageObserver* observer);
 
     void ClearChannel();
 
@@ -403,7 +397,6 @@ class COMPONENT_EXPORT(IPC) ChannelProxy : public Sender {
     base::Lock pending_io_thread_interfaces_lock_;
     std::vector<std::pair<std::string, GenericAssociatedInterfaceFactory>>
         pending_io_thread_interfaces_;
-    raw_ptr<UrgentMessageObserver> urgent_message_observer_ = nullptr;
   };
 
   Context* context() { return context_.get(); }

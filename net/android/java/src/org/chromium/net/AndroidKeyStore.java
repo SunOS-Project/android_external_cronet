@@ -17,7 +17,9 @@ import java.security.Signature;
 import javax.crypto.Cipher;
 import javax.crypto.NoSuchPaddingException;
 
-/** Specifies all the dependencies from the native OpenSSL engine on an Android KeyStore. */
+/**
+ * Specifies all the dependencies from the native OpenSSL engine on an Android KeyStore.
+ */
 @JNINamespace("net::android")
 public class AndroidKeyStore {
     private static final String TAG = "AndroidKeyStore";
@@ -95,16 +97,10 @@ public class AndroidKeyStore {
             signature.update(message);
             return signature.sign();
         } catch (Exception e) {
-            Log.e(
-                    TAG,
-                    "Exception while signing message with "
-                            + algorithm
-                            + " and "
-                            + privateKey.getAlgorithm()
-                            + " private key ("
-                            + privateKey.getClass().getName()
-                            + "): "
-                            + e);
+            Log.e(TAG,
+                    "Exception while signing message with " + algorithm + " and "
+                            + privateKey.getAlgorithm() + " private key ("
+                            + privateKey.getClass().getName() + "): " + e);
             return null;
         }
     }
@@ -132,16 +128,10 @@ public class AndroidKeyStore {
             cipher.init(Cipher.ENCRYPT_MODE, privateKey);
             return cipher.doFinal(message);
         } catch (Exception e) {
-            Log.e(
-                    TAG,
-                    "Exception while encrypting input with "
-                            + algorithm
-                            + " and "
-                            + privateKey.getAlgorithm()
-                            + " private key ("
-                            + privateKey.getClass().getName()
-                            + "): "
-                            + e);
+            Log.e(TAG,
+                    "Exception while encrypting input with " + algorithm + " and "
+                            + privateKey.getAlgorithm() + " private key ("
+                            + privateKey.getClass().getName() + "): " + e);
             return null;
         }
     }

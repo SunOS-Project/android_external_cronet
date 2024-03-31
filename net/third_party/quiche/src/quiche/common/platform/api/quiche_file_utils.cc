@@ -1,7 +1,5 @@
 #include "quiche/common/platform/api/quiche_file_utils.h"
 
-#include <optional>
-
 #include "quiche_platform_impl/quiche_file_utils_impl.h"
 
 namespace quiche {
@@ -10,7 +8,7 @@ std::string JoinPath(absl::string_view a, absl::string_view b) {
   return JoinPathImpl(a, b);
 }
 
-std::optional<std::string> ReadFileContents(absl::string_view file) {
+absl::optional<std::string> ReadFileContents(absl::string_view file) {
   return ReadFileContentsImpl(file);
 }
 

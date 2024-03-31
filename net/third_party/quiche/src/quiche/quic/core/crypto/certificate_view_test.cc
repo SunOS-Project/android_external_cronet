@@ -157,27 +157,27 @@ TEST(CertificateViewTest, DerTime) {
               Optional(QuicWallTime::FromUNIXSeconds(24)));
   EXPECT_TRUE(ParseDerTime(CBS_ASN1_UTCTIME, "200101000024Z").has_value());
 
-  EXPECT_EQ(ParseDerTime(CBS_ASN1_GENERALIZEDTIME, ""), std::nullopt);
+  EXPECT_EQ(ParseDerTime(CBS_ASN1_GENERALIZEDTIME, ""), absl::nullopt);
   EXPECT_EQ(ParseDerTime(CBS_ASN1_GENERALIZEDTIME, "19700101000024.001Z"),
-            std::nullopt);
+            absl::nullopt);
   EXPECT_EQ(ParseDerTime(CBS_ASN1_GENERALIZEDTIME, "19700101000024Q"),
-            std::nullopt);
+            absl::nullopt);
   EXPECT_EQ(ParseDerTime(CBS_ASN1_GENERALIZEDTIME, "19700101000024-0500"),
-            std::nullopt);
+            absl::nullopt);
   EXPECT_EQ(ParseDerTime(CBS_ASN1_GENERALIZEDTIME, "700101000024ZZ"),
-            std::nullopt);
+            absl::nullopt);
   EXPECT_EQ(ParseDerTime(CBS_ASN1_GENERALIZEDTIME, "19700101000024.00Z"),
-            std::nullopt);
+            absl::nullopt);
   EXPECT_EQ(ParseDerTime(CBS_ASN1_GENERALIZEDTIME, "19700101000024.Z"),
-            std::nullopt);
+            absl::nullopt);
   EXPECT_EQ(ParseDerTime(CBS_ASN1_GENERALIZEDTIME, "197O0101000024Z"),
-            std::nullopt);
+            absl::nullopt);
   EXPECT_EQ(ParseDerTime(CBS_ASN1_GENERALIZEDTIME, "19700101000024.0O1Z"),
-            std::nullopt);
+            absl::nullopt);
   EXPECT_EQ(ParseDerTime(CBS_ASN1_GENERALIZEDTIME, "-9700101000024Z"),
-            std::nullopt);
+            absl::nullopt);
   EXPECT_EQ(ParseDerTime(CBS_ASN1_GENERALIZEDTIME, "1970-101000024Z"),
-            std::nullopt);
+            absl::nullopt);
 
   EXPECT_TRUE(ParseDerTime(CBS_ASN1_UTCTIME, "490101000024Z").has_value());
   // This should parse as 1950, which predates UNIX epoch.
@@ -186,7 +186,7 @@ TEST(CertificateViewTest, DerTime) {
   EXPECT_THAT(ParseDerTime(CBS_ASN1_GENERALIZEDTIME, "19700101230000Z"),
               Optional(QuicWallTime::FromUNIXSeconds(23 * 3600)));
   EXPECT_EQ(ParseDerTime(CBS_ASN1_GENERALIZEDTIME, "19700101240000Z"),
-            std::nullopt);
+            absl::nullopt);
 }
 
 TEST(CertificateViewTest, NameAttribute) {

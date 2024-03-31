@@ -23,7 +23,9 @@ import org.jni_zero.JNINamespace;
 import org.chromium.base.compat.ApiHelperForM;
 import org.chromium.base.compat.ApiHelperForP;
 
-/** Exposes radio related information about the current device. */
+/**
+ * Exposes radio related information about the current device.
+ */
 @JNINamespace("base::android")
 public class RadioUtils {
     // Cached value indicating if app has ACCESS_NETWORK_STATE permission.
@@ -40,8 +42,7 @@ public class RadioUtils {
      */
     @CalledByNative
     private static boolean isSupported() {
-        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.P
-                && haveAccessNetworkState()
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && haveAccessNetworkState()
                 && haveAccessWifiState();
     }
 
@@ -50,12 +51,10 @@ public class RadioUtils {
         // end in the same result so it's not a problem.
         if (sHaveAccessNetworkState == null) {
             sHaveAccessNetworkState =
-                    ApiCompatibilityUtils.checkPermission(
-                                    ContextUtils.getApplicationContext(),
-                                    Manifest.permission.ACCESS_NETWORK_STATE,
-                                    Process.myPid(),
-                                    Process.myUid())
-                            == PackageManager.PERMISSION_GRANTED;
+                    ApiCompatibilityUtils.checkPermission(ContextUtils.getApplicationContext(),
+                            Manifest.permission.ACCESS_NETWORK_STATE, Process.myPid(),
+                            Process.myUid())
+                    == PackageManager.PERMISSION_GRANTED;
         }
         return sHaveAccessNetworkState;
     }
@@ -65,12 +64,9 @@ public class RadioUtils {
         // end in the same result so it's not a problem.
         if (sHaveAccessWifiState == null) {
             sHaveAccessWifiState =
-                    ApiCompatibilityUtils.checkPermission(
-                                    ContextUtils.getApplicationContext(),
-                                    Manifest.permission.ACCESS_WIFI_STATE,
-                                    Process.myPid(),
-                                    Process.myUid())
-                            == PackageManager.PERMISSION_GRANTED;
+                    ApiCompatibilityUtils.checkPermission(ContextUtils.getApplicationContext(),
+                            Manifest.permission.ACCESS_WIFI_STATE, Process.myPid(), Process.myUid())
+                    == PackageManager.PERMISSION_GRANTED;
         }
         return sHaveAccessWifiState;
     }
@@ -81,14 +77,12 @@ public class RadioUtils {
      */
     @CalledByNative
     @RequiresApi(Build.VERSION_CODES.P)
-    @SuppressWarnings("AssertionSideEffect") // isSupported() caches via sHaveAccessNetworkState.
     private static boolean isWifiConnected() {
         assert isSupported();
         try (TraceEvent te = TraceEvent.scoped("RadioUtils::isWifiConnected")) {
             ConnectivityManager connectivityManager =
-                    (ConnectivityManager)
-                            ContextUtils.getApplicationContext()
-                                    .getSystemService(Context.CONNECTIVITY_SERVICE);
+                    (ConnectivityManager) ContextUtils.getApplicationContext().getSystemService(
+                            Context.CONNECTIVITY_SERVICE);
             Network network = ApiHelperForM.getActiveNetwork(connectivityManager);
             if (network == null) {
                 return false;
@@ -108,14 +102,12 @@ public class RadioUtils {
      */
     @CalledByNative
     @RequiresApi(Build.VERSION_CODES.P)
-    @SuppressWarnings("AssertionSideEffect") // isSupported() caches via sHaveAccessNetworkState.
     private static int getCellSignalLevel() {
         assert isSupported();
         try (TraceEvent te = TraceEvent.scoped("RadioUtils::getCellSignalLevel")) {
             TelephonyManager telephonyManager =
-                    (TelephonyManager)
-                            ContextUtils.getApplicationContext()
-                                    .getSystemService(Context.TELEPHONY_SERVICE);
+                    (TelephonyManager) ContextUtils.getApplicationContext().getSystemService(
+                            Context.TELEPHONY_SERVICE);
             int level = -1;
             try {
                 SignalStrength signalStrength = ApiHelperForP.getSignalStrength(telephonyManager);
@@ -136,14 +128,12 @@ public class RadioUtils {
      */
     @CalledByNative
     @RequiresApi(Build.VERSION_CODES.P)
-    @SuppressWarnings("AssertionSideEffect") // isSupported() caches via sHaveAccessNetworkState.
     private static int getCellDataActivity() {
         assert isSupported();
         try (TraceEvent te = TraceEvent.scoped("RadioUtils::getCellDataActivity")) {
             TelephonyManager telephonyManager =
-                    (TelephonyManager)
-                            ContextUtils.getApplicationContext()
-                                    .getSystemService(Context.TELEPHONY_SERVICE);
+                    (TelephonyManager) ContextUtils.getApplicationContext().getSystemService(
+                            Context.TELEPHONY_SERVICE);
             try {
                 return telephonyManager.getDataActivity();
             } catch (java.lang.SecurityException e) {

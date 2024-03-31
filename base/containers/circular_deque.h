@@ -218,13 +218,27 @@ class circular_deque_const_iterator {
     lhs.CheckComparable(rhs);
     return lhs.index_ == rhs.index_;
   }
-  friend std::strong_ordering operator<=>(
-      const circular_deque_const_iterator& lhs,
-      const circular_deque_const_iterator& rhs) {
+  friend bool operator!=(const circular_deque_const_iterator& lhs,
+                         const circular_deque_const_iterator& rhs) {
+    return !(lhs == rhs);
+  }
+  friend bool operator<(const circular_deque_const_iterator& lhs,
+                        const circular_deque_const_iterator& rhs) {
     lhs.CheckComparable(rhs);
-    // The order is based on the position of the element in the circular_dequeue
-    // rather than `index_` at which the element is stored in the ring buffer.
-    return lhs.OffsetFromBegin() <=> rhs.OffsetFromBegin();
+    return lhs.OffsetFromBegin() < rhs.OffsetFromBegin();
+  }
+  friend bool operator<=(const circular_deque_const_iterator& lhs,
+                         const circular_deque_const_iterator& rhs) {
+    return !(lhs > rhs);
+  }
+  friend bool operator>(const circular_deque_const_iterator& lhs,
+                        const circular_deque_const_iterator& rhs) {
+    lhs.CheckComparable(rhs);
+    return lhs.OffsetFromBegin() > rhs.OffsetFromBegin();
+  }
+  friend bool operator>=(const circular_deque_const_iterator& lhs,
+                         const circular_deque_const_iterator& rhs) {
+    return !(lhs < rhs);
   }
 
  protected:

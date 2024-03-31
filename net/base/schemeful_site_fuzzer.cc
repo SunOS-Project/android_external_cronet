@@ -5,14 +5,13 @@
 #include "net/base/schemeful_site.h"
 
 #include <stdlib.h>
-
 #include <iostream>
-#include <optional>
 #include <string>
 
 #include "testing/libfuzzer/proto/lpm_interface.h"
 #include "testing/libfuzzer/proto/url.pb.h"
 #include "testing/libfuzzer/proto/url_proto_converter.h"
+#include "third_party/abseil-cpp/absl/types/optional.h"
 #include "url/gurl.h"
 #include "url/origin.h"
 
@@ -32,7 +31,7 @@ DEFINE_PROTO_FUZZER(const url_proto::Url& url_message) {
 
   net::SchemefulSite site(origin);
 
-  std::optional<net::SchemefulSite> site_with_registrable_domain =
+  absl::optional<net::SchemefulSite> site_with_registrable_domain =
       net::SchemefulSite::CreateIfHasRegisterableDomain(origin);
 
   if (site_with_registrable_domain) {

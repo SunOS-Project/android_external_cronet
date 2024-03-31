@@ -188,8 +188,7 @@ void ReportingService::SendStagedLog() {
         MetricsLogsEventManager::LogEvent::kLogUploading,
         log_store()->staged_log_hash());
   }
-  log_uploader_->UploadLog(log_store()->staged_log(),
-                           log_store()->staged_log_metadata(), hash, signature,
+  log_uploader_->UploadLog(log_store()->staged_log(), hash, signature,
                            reporting_info_);
 }
 

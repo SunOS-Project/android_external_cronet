@@ -7,6 +7,7 @@
 #include <Security/Security.h>
 
 #include "build/build_config.h"
+#include "net/cert/pki/cert_errors.h"
 #include "net/cert/x509_certificate.h"
 #include "net/cert/x509_util.h"
 #include "net/cert/x509_util_apple.h"
@@ -20,19 +21,18 @@ bool TestRootCerts::AddImpl(X509Certificate* certificate) {
     return false;
   }
 
-  if (CFArrayContainsValue(
-          temporary_roots_.get(),
-          CFRangeMake(0, CFArrayGetCount(temporary_roots_.get())),
-          os_cert.get())) {
+  if (CFArrayContainsValue(temporary_roots_,
+                           CFRangeMake(0, CFArrayGetCount(temporary_roots_)),
+                           os_cert.get())) {
     return true;
   }
-  CFArrayAppendValue(temporary_roots_.get(), os_cert.get());
+  CFArrayAppendValue(temporary_roots_, os_cert.get());
 
   return true;
 }
 
 void TestRootCerts::ClearImpl() {
-  CFArrayRemoveAllValues(temporary_roots_.get());
+  CFArrayRemoveAllValues(temporary_roots_);
 }
 
 OSStatus TestRootCerts::FixupSecTrustRef(SecTrustRef trust_ref) const {
@@ -40,8 +40,7 @@ OSStatus TestRootCerts::FixupSecTrustRef(SecTrustRef trust_ref) const {
     return noErr;
   }
 
-  OSStatus status =
-      SecTrustSetAnchorCertificates(trust_ref, temporary_roots_.get());
+  OSStatus status = SecTrustSetAnchorCertificates(trust_ref, temporary_roots_);
   if (status) {
     return status;
   }

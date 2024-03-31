@@ -13,7 +13,9 @@ import org.chromium.base.ContextUtils;
 import org.chromium.base.library_loader.LibraryLoader;
 import org.chromium.base.library_loader.LibraryProcessType;
 
-/** An {@link android.app.Application} for running native browser tests. */
+/**
+ * An {@link android.app.Application} for running native browser tests.
+ */
 public abstract class NativeBrowserTestApplication extends Application {
     @Override
     protected void attachBaseContext(Context base) {
@@ -28,11 +30,9 @@ public abstract class NativeBrowserTestApplication extends Application {
     }
 
     protected void setLibraryProcessType() {
-        LibraryLoader.getInstance()
-                .setLibraryProcessType(
-                        isBrowserProcess()
-                                ? LibraryProcessType.PROCESS_BROWSER
-                                : LibraryProcessType.PROCESS_CHILD);
+        LibraryLoader.getInstance().setLibraryProcessType(isBrowserProcess()
+                        ? LibraryProcessType.PROCESS_BROWSER
+                        : LibraryProcessType.PROCESS_CHILD);
     }
 
     /**

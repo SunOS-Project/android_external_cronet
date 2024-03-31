@@ -190,7 +190,7 @@ void QuicServerSessionBase::OnCongestionWindowChange(QuicTime now) {
       bandwidth_estimate_sent_to_client_ = new_bandwidth_estimate;
     }
   } else {
-    std::optional<CachedNetworkParameters> cached_network_params =
+    absl::optional<CachedNetworkParameters> cached_network_params =
         GenerateCachedNetworkParameters();
 
     if (cached_network_params.has_value()) {
@@ -311,7 +311,7 @@ QuicSSLConfig QuicServerSessionBase::GetSSLConfig() const {
   return ssl_config;
 }
 
-std::optional<CachedNetworkParameters>
+absl::optional<CachedNetworkParameters>
 QuicServerSessionBase::GenerateCachedNetworkParameters() const {
   const QuicSentPacketManager& sent_packet_manager =
       connection()->sent_packet_manager();

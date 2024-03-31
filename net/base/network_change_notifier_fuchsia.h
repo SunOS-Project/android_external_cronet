@@ -7,7 +7,6 @@
 
 #include <fuchsia/net/interfaces/cpp/fidl.h>
 
-#include <optional>
 #include <vector>
 
 #include "base/threading/thread_checker.h"
@@ -15,6 +14,7 @@
 #include "net/base/fuchsia/network_interface_cache.h"
 #include "net/base/net_export.h"
 #include "net/base/network_change_notifier.h"
+#include "third_party/abseil-cpp/absl/types/optional.h"
 
 namespace net {
 
@@ -52,7 +52,7 @@ class NET_EXPORT_PRIVATE NetworkChangeNotifierFuchsia
 
   // Notifies observers of changes. Unbinds `watcher_` if there was an error.
   void HandleCacheStatus(
-      std::optional<internal::NetworkInterfaceCache::ChangeBits> change_bits);
+      absl::optional<internal::NetworkInterfaceCache::ChangeBits> change_bits);
 
   fuchsia::net::interfaces::WatcherPtr watcher_;
 

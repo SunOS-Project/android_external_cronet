@@ -5,11 +5,11 @@
 #include "quiche/quic/core/quic_stream.h"
 
 #include <limits>
-#include <optional>
 #include <string>
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 #include "quiche/quic/core/quic_error_codes.h"
 #include "quiche/quic/core/quic_flow_controller.h"
 #include "quiche/quic/core/quic_session.h"
@@ -298,15 +298,15 @@ QuicStream::QuicStream(PendingStream* pending, QuicSession* session,
 
 namespace {
 
-std::optional<QuicFlowController> FlowController(QuicStreamId id,
-                                                 QuicSession* session,
-                                                 StreamType type) {
+absl::optional<QuicFlowController> FlowController(QuicStreamId id,
+                                                  QuicSession* session,
+                                                  StreamType type) {
   if (type == CRYPTO) {
     // The only QuicStream with a StreamType of CRYPTO is QuicCryptoStream, when
     // it is using crypto frames instead of stream frames. The QuicCryptoStream
     // doesn't have any flow control in that case, so we don't create a
     // QuicFlowController for it.
-    return std::nullopt;
+    return absl::nullopt;
   }
   return QuicFlowController(
       session, id,
@@ -330,7 +330,7 @@ QuicStream::QuicStream(QuicStreamId id, QuicSession* session,
                        QuicStreamSequencer sequencer, bool is_static,
                        StreamType type, uint64_t stream_bytes_read,
                        bool fin_received,
-                       std::optional<QuicFlowController> flow_controller,
+                       absl::optional<QuicFlowController> flow_controller,
                        QuicFlowController* connection_flow_controller)
     : sequencer_(std::move(sequencer)),
       id_(id),
@@ -1211,11 +1211,20 @@ void QuicStream::WriteBufferedData(EncryptionLevel level) {
 
   bool fin = fin_buffered_;
 
-  QUIC_BUG_IF(quic_bug_10586_13, !flow_controller_.has_value())
-      << ENDPOINT << "WriteBufferedData called on stream without flow control";
-
   // How much data flow control permits to be written.
-  QuicByteCount send_window = CalculateSendWindowSize();
+  QuicByteCount send_window;
+  if (flow_controller_.has_value()) {
+    send_window = flow_controller_->SendWindowSize();
+  } else {
+    send_window = std::numeric_limits<QuicByteCount>::max();
+    QUIC_BUG(quic_bug_10586_13)
+        << ENDPOINT
+        << "WriteBufferedData called on stream without flow control";
+  }
+  if (stream_contributes_to_connection_flow_control_) {
+    send_window =
+        std::min(send_window, connection_flow_controller_->SendWindowSize());
+  }
 
   if (send_window == 0 && !fin_with_zero_data) {
     // Quick return if nothing can be sent.
@@ -1405,35 +1414,21 @@ void QuicStream::UpdateReceiveWindowSize(QuicStreamOffset size) {
   flow_controller_->UpdateReceiveWindowSize(size);
 }
 
-std::optional<QuicByteCount> QuicStream::GetSendWindow() const {
+absl::optional<QuicByteCount> QuicStream::GetSendWindow() const {
   return flow_controller_.has_value()
-             ? std::optional<QuicByteCount>(flow_controller_->SendWindowSize())
-             : std::nullopt;
+             ? absl::optional<QuicByteCount>(flow_controller_->SendWindowSize())
+             : absl::nullopt;
 }
 
-std::optional<QuicByteCount> QuicStream::GetReceiveWindow() const {
+absl::optional<QuicByteCount> QuicStream::GetReceiveWindow() const {
   return flow_controller_.has_value()
-             ? std::optional<QuicByteCount>(
+             ? absl::optional<QuicByteCount>(
                    flow_controller_->receive_window_size())
-             : std::nullopt;
+             : absl::nullopt;
 }
 
 void QuicStream::OnStreamCreatedFromPendingStream() {
   sequencer()->SetUnblocked();
-}
-
-QuicByteCount QuicStream::CalculateSendWindowSize() const {
-  QuicByteCount send_window;
-  if (flow_controller_.has_value()) {
-    send_window = flow_controller_->SendWindowSize();
-  } else {
-    send_window = std::numeric_limits<QuicByteCount>::max();
-  }
-  if (stream_contributes_to_connection_flow_control_) {
-    send_window =
-        std::min(send_window, connection_flow_controller_->SendWindowSize());
-  }
-  return send_window;
 }
 
 }  // namespace quic

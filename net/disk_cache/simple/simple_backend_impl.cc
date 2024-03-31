@@ -223,9 +223,7 @@ SimpleBackendImpl::SimpleBackendImpl(
       orig_max_size_(max_bytes),
       entry_operations_mode_(CacheTypeToOperationsMode(cache_type)),
       post_doom_waiting_(
-          base::MakeRefCounted<SimplePostOperationWaiterTable>()),
-      post_open_by_hash_waiting_(
-          base::MakeRefCounted<SimplePostOperationWaiterTable>()),
+          base::MakeRefCounted<SimplePostDoomWaiterTable>(cache_type)),
       net_log_(net_log) {
   // Treat negative passed-in sizes same as SetMaxSize would here and in other
   // backends, as default (if first call).
@@ -292,9 +290,9 @@ int64_t SimpleBackendImpl::MaxFileSize() const {
       kMinFileSizeLimit);
 }
 
-scoped_refptr<SimplePostOperationWaiterTable> SimpleBackendImpl::OnDoomStart(
+scoped_refptr<SimplePostDoomWaiterTable> SimpleBackendImpl::OnDoomStart(
     uint64_t entry_hash) {
-  post_doom_waiting_->OnOperationStart(entry_hash);
+  post_doom_waiting_->OnDoomStart(entry_hash);
   return post_doom_waiting_;
 }
 
@@ -373,13 +371,11 @@ EntryResult SimpleBackendImpl::OpenEntry(const std::string& key,
                                          EntryResultCallback callback) {
   const uint64_t entry_hash = simple_util::GetEntryHashKey(key);
 
-  std::vector<base::OnceClosure>* post_operation = nullptr;
-  PostOperationQueue post_operation_queue = PostOperationQueue::kNone;
+  std::vector<SimplePostDoomWaiter>* post_doom = nullptr;
   scoped_refptr<SimpleEntryImpl> simple_entry = CreateOrFindActiveOrDoomedEntry(
-      entry_hash, key, request_priority, post_operation, post_operation_queue);
+      entry_hash, key, request_priority, &post_doom);
   if (!simple_entry) {
-    if (post_operation_queue == PostOperationQueue::kPostDoom &&
-        post_operation->empty() &&
+    if (post_doom->empty() &&
         entry_operations_mode_ == SimpleEntryImpl::OPTIMISTIC_OPERATIONS) {
       // The entry is doomed, and no other backend operations are queued for the
       // entry, thus the open must fail and it's safe to return synchronously.
@@ -395,9 +391,9 @@ EntryResult SimpleBackendImpl::OpenEntry(const std::string& key,
     base::OnceCallback<EntryResult(EntryResultCallback)> operation =
         base::BindOnce(&SimpleBackendImpl::OpenEntry, base::Unretained(this),
                        key, request_priority);
-    post_operation->emplace_back(
-        base::BindOnce(&RunEntryResultOperationAndCallback, AsWeakPtr(),
-                       std::move(operation), std::move(callback)));
+    post_doom->emplace_back(base::BindOnce(&RunEntryResultOperationAndCallback,
+                                           AsWeakPtr(), std::move(operation),
+                                           std::move(callback)));
     return EntryResult::MakeError(net::ERR_IO_PENDING);
   }
   return simple_entry->OpenEntry(std::move(callback));
@@ -410,26 +406,25 @@ EntryResult SimpleBackendImpl::CreateEntry(
   DCHECK_LT(0u, key.size());
   const uint64_t entry_hash = simple_util::GetEntryHashKey(key);
 
-  std::vector<base::OnceClosure>* post_operation = nullptr;
-  PostOperationQueue post_operation_queue = PostOperationQueue::kNone;
+  std::vector<SimplePostDoomWaiter>* post_doom = nullptr;
   scoped_refptr<SimpleEntryImpl> simple_entry = CreateOrFindActiveOrDoomedEntry(
-      entry_hash, key, request_priority, post_operation, post_operation_queue);
+      entry_hash, key, request_priority, &post_doom);
 
   // If couldn't grab an entry object due to pending doom, see if circumstances
   // are right for an optimistic create.
-  if (!simple_entry && post_operation_queue == PostOperationQueue::kPostDoom) {
+  if (!simple_entry) {
     simple_entry = MaybeOptimisticCreateForPostDoom(
-        entry_hash, key, request_priority, post_operation);
+        entry_hash, key, request_priority, post_doom);
   }
 
-  // If that doesn't work either, retry this once doom / open by hash is done.
+  // If that doesn't work either, retry this once doom is done.
   if (!simple_entry) {
     base::OnceCallback<EntryResult(EntryResultCallback)> operation =
         base::BindOnce(&SimpleBackendImpl::CreateEntry, base::Unretained(this),
                        key, request_priority);
-    post_operation->emplace_back(
-        base::BindOnce(&RunEntryResultOperationAndCallback, AsWeakPtr(),
-                       std::move(operation), std::move(callback)));
+    post_doom->emplace_back(base::BindOnce(&RunEntryResultOperationAndCallback,
+                                           AsWeakPtr(), std::move(operation),
+                                           std::move(callback)));
     return EntryResult::MakeError(net::ERR_IO_PENDING);
   }
 
@@ -443,27 +438,23 @@ EntryResult SimpleBackendImpl::OpenOrCreateEntry(
   DCHECK_LT(0u, key.size());
   const uint64_t entry_hash = simple_util::GetEntryHashKey(key);
 
-  std::vector<base::OnceClosure>* post_operation = nullptr;
-  PostOperationQueue post_operation_queue = PostOperationQueue::kNone;
+  std::vector<SimplePostDoomWaiter>* post_doom = nullptr;
   scoped_refptr<SimpleEntryImpl> simple_entry = CreateOrFindActiveOrDoomedEntry(
-      entry_hash, key, request_priority, post_operation, post_operation_queue);
+      entry_hash, key, request_priority, &post_doom);
 
   // If couldn't grab an entry object due to pending doom, see if circumstances
   // are right for an optimistic create.
   if (!simple_entry) {
-    if (post_operation_queue == PostOperationQueue::kPostDoom) {
-      simple_entry = MaybeOptimisticCreateForPostDoom(
-          entry_hash, key, request_priority, post_operation);
-    }
+    simple_entry = MaybeOptimisticCreateForPostDoom(
+        entry_hash, key, request_priority, post_doom);
     if (simple_entry) {
       return simple_entry->CreateEntry(std::move(callback));
     } else {
-      // If that doesn't work either, retry this once doom / open by hash is
-      // done.
+      // If that doesn't work either, retry this once doom is done.
       base::OnceCallback<EntryResult(EntryResultCallback)> operation =
           base::BindOnce(&SimpleBackendImpl::OpenOrCreateEntry,
                          base::Unretained(this), key, request_priority);
-      post_operation->emplace_back(
+      post_doom->emplace_back(
           base::BindOnce(&RunEntryResultOperationAndCallback, AsWeakPtr(),
                          std::move(operation), std::move(callback)));
       return EntryResult::MakeError(net::ERR_IO_PENDING);
@@ -478,7 +469,7 @@ SimpleBackendImpl::MaybeOptimisticCreateForPostDoom(
     uint64_t entry_hash,
     const std::string& key,
     net::RequestPriority request_priority,
-    std::vector<base::OnceClosure>* post_doom) {
+    std::vector<SimplePostDoomWaiter>* post_doom) {
   scoped_refptr<SimpleEntryImpl> simple_entry;
   // We would like to optimistically have create go ahead, for benefit of
   // HTTP cache use. This can only be sanely done if we are the only op
@@ -508,22 +499,20 @@ net::Error SimpleBackendImpl::DoomEntry(const std::string& key,
                                         CompletionOnceCallback callback) {
   const uint64_t entry_hash = simple_util::GetEntryHashKey(key);
 
-  std::vector<base::OnceClosure>* post_operation = nullptr;
-  PostOperationQueue post_operation_queue = PostOperationQueue::kNone;
-  scoped_refptr<SimpleEntryImpl> simple_entry = CreateOrFindActiveOrDoomedEntry(
-      entry_hash, key, priority, post_operation, post_operation_queue);
+  std::vector<SimplePostDoomWaiter>* post_doom = nullptr;
+  scoped_refptr<SimpleEntryImpl> simple_entry =
+      CreateOrFindActiveOrDoomedEntry(entry_hash, key, priority, &post_doom);
   if (!simple_entry) {
-    // At first glance, it appears exceedingly silly to queue up a doom when we
-    // get here with `post_operation_queue == PostOperationQueue::kPostDoom`,
-    // e.g. a doom already pending; but it's possible that the sequence of
-    // operations is Doom/Create/Doom, in which case the second Doom is not
-    // at all redundant.
+    // At first glance, it appears exceedingly silly to queue up a doom
+    // when we get here because the files corresponding to our key are being
+    // deleted... but it's possible that one of the things in post_doom is a
+    // create for our key, in which case we still have work to do.
     base::OnceCallback<net::Error(CompletionOnceCallback)> operation =
         base::BindOnce(&SimpleBackendImpl::DoomEntry, base::Unretained(this),
                        key, priority);
-    post_operation->emplace_back(
-        base::BindOnce(&RunOperationAndCallback, AsWeakPtr(),
-                       std::move(operation), std::move(callback)));
+    post_doom->emplace_back(base::BindOnce(&RunOperationAndCallback,
+                                           AsWeakPtr(), std::move(operation),
+                                           std::move(callback)));
     return net::ERR_IO_PENDING;
   }
 
@@ -780,18 +769,13 @@ SimpleBackendImpl::CreateOrFindActiveOrDoomedEntry(
     const uint64_t entry_hash,
     const std::string& key,
     net::RequestPriority request_priority,
-    std::vector<base::OnceClosure>*& post_operation,
-    PostOperationQueue& post_operation_queue) {
+    std::vector<SimplePostDoomWaiter>** post_doom) {
   DCHECK_EQ(entry_hash, simple_util::GetEntryHashKey(key));
 
   // If there is a doom pending, we would want to serialize after it.
-  std::vector<base::OnceClosure>* post_doom =
-      post_doom_waiting_->Find(entry_hash);
-  if (post_doom) {
-    post_operation = post_doom;
-    post_operation_queue = PostOperationQueue::kPostDoom;
+  *post_doom = post_doom_waiting_->Find(entry_hash);
+  if (*post_doom)
     return nullptr;
-  }
 
   std::pair<EntryMap::iterator, bool> insert_result =
       active_entries_.insert(EntryMap::value_type(entry_hash, nullptr));
@@ -809,33 +793,21 @@ SimpleBackendImpl::CreateOrFindActiveOrDoomedEntry(
   // update its priority.
   DCHECK(it->second);
   // It's possible, but unlikely, that we have an entry hash collision with a
-  // currently active entry, or we may not know the key of active entry yet,
-  // since it's being opened by hash.
+  // currently active entry.
   if (key != it->second->key()) {
-    DCHECK(!did_insert);
-    if (it->second->key().has_value()) {
-      // Collision case.
-      it->second->Doom();
-      DCHECK_EQ(0U, active_entries_.count(entry_hash));
-      DCHECK(post_doom_waiting_->Has(entry_hash));
-      // Re-run ourselves to handle the now-pending doom.
-      return CreateOrFindActiveOrDoomedEntry(entry_hash, key, request_priority,
-                                             post_operation,
-                                             post_operation_queue);
-    } else {
-      // Open by hash case.
-      post_operation = post_open_by_hash_waiting_->Find(entry_hash);
-      CHECK(post_operation);
-      post_operation_queue = PostOperationQueue::kPostOpenByHash;
-      return nullptr;
-    }
+    it->second->Doom();
+    DCHECK_EQ(0U, active_entries_.count(entry_hash));
+    DCHECK(post_doom_waiting_->Has(entry_hash));
+    // Re-run ourselves to handle the now-pending doom.
+    return CreateOrFindActiveOrDoomedEntry(entry_hash, key, request_priority,
+                                           post_doom);
   }
   return base::WrapRefCounted(it->second);
 }
 
 EntryResult SimpleBackendImpl::OpenEntryFromHash(uint64_t entry_hash,
                                                  EntryResultCallback callback) {
-  std::vector<base::OnceClosure>* post_doom =
+  std::vector<SimplePostDoomWaiter>* post_doom =
       post_doom_waiting_->Find(entry_hash);
   if (post_doom) {
     base::OnceCallback<EntryResult(EntryResultCallback)> operation =
@@ -863,22 +835,14 @@ EntryResult SimpleBackendImpl::OpenEntryFromHash(uint64_t entry_hash,
     it->second = simple_entry.get();
     simple_entry->SetActiveEntryProxy(
         ActiveEntryProxy::Create(entry_hash, this));
-    post_open_by_hash_waiting_->OnOperationStart(entry_hash);
-    callback =
-        base::BindOnce(&SimpleBackendImpl::OnEntryOpenedFromHash, AsWeakPtr(),
-                       entry_hash, simple_entry, std::move(callback));
   }
-
-  // Note: the !did_insert case includes when another OpenEntryFromHash is
-  // pending; we don't care since that one will take care of the queue and we
-  // don't need to check for key collisions.
   return it->second->OpenEntry(std::move(callback));
 }
 
 net::Error SimpleBackendImpl::DoomEntryFromHash(
     uint64_t entry_hash,
     CompletionOnceCallback callback) {
-  std::vector<base::OnceClosure>* post_doom =
+  std::vector<SimplePostDoomWaiter>* post_doom =
       post_doom_waiting_->Find(entry_hash);
   if (post_doom) {
     base::OnceCallback<net::Error(CompletionOnceCallback)> operation =
@@ -902,21 +866,12 @@ net::Error SimpleBackendImpl::DoomEntryFromHash(
   return net::ERR_IO_PENDING;
 }
 
-void SimpleBackendImpl::OnEntryOpenedFromHash(
-    uint64_t hash,
-    const scoped_refptr<SimpleEntryImpl>& simple_entry,
-    EntryResultCallback callback,
-    EntryResult result) {
-  post_open_by_hash_waiting_->OnOperationComplete(hash);
-  std::move(callback).Run(std::move(result));
-}
-
 void SimpleBackendImpl::DoomEntriesComplete(
     std::unique_ptr<std::vector<uint64_t>> entry_hashes,
     CompletionOnceCallback callback,
     int result) {
   for (const uint64_t& entry_hash : *entry_hashes)
-    post_doom_waiting_->OnOperationComplete(entry_hash);
+    post_doom_waiting_->OnDoomComplete(entry_hash);
   std::move(callback).Run(result);
 }
 

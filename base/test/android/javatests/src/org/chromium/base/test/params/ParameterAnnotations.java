@@ -9,7 +9,9 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-/** Annotations for Parameterized Tests */
+/**
+ * Annotations for Parameterized Tests
+ */
 public class ParameterAnnotations {
     /**
      * Annotation for test methods to indicate associated {@link ParameterProvider}.
@@ -49,12 +51,16 @@ public class ParameterAnnotations {
         Class<? extends ParameterProvider> value();
     }
 
-    /** Annotation for static field of a `List<ParameterSet>` for entire test class */
+    /**
+     * Annotation for static field of a `List<ParameterSet>` for entire test class
+     */
     @Retention(RetentionPolicy.RUNTIME)
     @Target(ElementType.FIELD)
     public @interface ClassParameter {}
 
-    /** Annotation for static field of a `List<ParameterSet>` of TestRule */
+    /**
+     * Annotation for static field of a `List<ParameterSet>` of TestRule
+     */
     @Retention(RetentionPolicy.RUNTIME)
     @Target(ElementType.FIELD)
     public @interface RuleParameter {}

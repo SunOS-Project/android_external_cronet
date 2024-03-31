@@ -105,25 +105,25 @@ TYPED_TEST(FileVersionInfoTest, HardCodedProperties) {
 
   int j = 0;
   EXPECT_EQ(kExpectedValues[j++],
-            base::AsWStringView(version_info->company_name()));
+            base::AsWStringPiece(version_info->company_name()));
   EXPECT_EQ(kExpectedValues[j++],
-            base::AsWStringView(version_info->company_short_name()));
+            base::AsWStringPiece(version_info->company_short_name()));
   EXPECT_EQ(kExpectedValues[j++],
-            base::AsWStringView(version_info->product_name()));
+            base::AsWStringPiece(version_info->product_name()));
   EXPECT_EQ(kExpectedValues[j++],
-            base::AsWStringView(version_info->product_short_name()));
+            base::AsWStringPiece(version_info->product_short_name()));
   EXPECT_EQ(kExpectedValues[j++],
-            base::AsWStringView(version_info->internal_name()));
+            base::AsWStringPiece(version_info->internal_name()));
   EXPECT_EQ(kExpectedValues[j++],
-            base::AsWStringView(version_info->product_version()));
+            base::AsWStringPiece(version_info->product_version()));
   EXPECT_EQ(kExpectedValues[j++],
-            base::AsWStringView(version_info->special_build()));
+            base::AsWStringPiece(version_info->special_build()));
   EXPECT_EQ(kExpectedValues[j++],
-            base::AsWStringView(version_info->original_filename()));
+            base::AsWStringPiece(version_info->original_filename()));
   EXPECT_EQ(kExpectedValues[j++],
-            base::AsWStringView(version_info->file_description()));
+            base::AsWStringPiece(version_info->file_description()));
   EXPECT_EQ(kExpectedValues[j++],
-            base::AsWStringView(version_info->file_version()));
+            base::AsWStringPiece(version_info->file_version()));
 }
 
 TYPED_TEST(FileVersionInfoTest, CustomProperties) {

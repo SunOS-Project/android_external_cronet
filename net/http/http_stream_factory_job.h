@@ -13,6 +13,7 @@
 #include "base/time/time.h"
 #include "net/base/completion_repeating_callback.h"
 #include "net/base/net_export.h"
+#include "net/base/proxy_server.h"
 #include "net/base/request_priority.h"
 #include "net/dns/public/resolve_error_info.h"
 #include "net/dns/public/secure_dns_policy.h"
@@ -46,7 +47,6 @@ class HttpNetworkSession;
 class HttpStream;
 class SpdySessionPool;
 class NetLog;
-class ProxyChain;
 struct SSLConfig;
 
 // An HttpStreamRequest exists for each stream which is in progress of being
@@ -157,6 +157,7 @@ class HttpStreamFactory::Job
       RequestPriority priority,
       const ProxyInfo& proxy_info,
       const SSLConfig& server_ssl_config,
+      const SSLConfig& proxy_ssl_config,
       url::SchemeHostPort destination,
       GURL origin_url,
       NextProto alternative_protocol,
@@ -205,7 +206,9 @@ class HttpStreamFactory::Job
 
   const GURL& origin_url() const { return origin_url_; }
   RequestPriority priority() const { return priority_; }
+  bool was_alpn_negotiated() const;
   NextProto negotiated_protocol() const;
+  bool using_spdy() const;
   const NetLogWithSource& net_log() const { return net_log_; }
   HttpStreamRequest::StreamType stream_type() const { return stream_type_; }
 
@@ -339,8 +342,9 @@ class HttpStreamFactory::Job
                               bool is_websocket);
 
   // Called in Job constructor. Use |spdy_session_key_| after construction.
+  // TODO(crbug.com/1491092): Update to take a proxy_chain.
   static SpdySessionKey GetSpdySessionKey(
-      const ProxyChain& proxy_chain,
+      const ProxyServer& proxy_server,
       const GURL& origin_url,
       PrivacyMode privacy_mode,
       const SocketTag& socket_tag,
@@ -364,15 +368,11 @@ class HttpStreamFactory::Job
   // connection attempt to be made to an H2 server at a time.
   bool ShouldThrottleConnectForSpdy() const;
 
-  // True if Job actually uses HTTP/2. Note this describes both using HTTP/2
-  // with an HTTPS origin, and proxying a cleartext HTTP request over an HTTP/2
-  // proxy. This differs from `using_ssl_`, which only describes the origin.
-  bool using_spdy() const;
-
   const HttpRequestInfo request_info_;
   RequestPriority priority_;
   const ProxyInfo proxy_info_;
   SSLConfig server_ssl_config_;
+  SSLConfig base_proxy_ssl_config_;
   const NetLogWithSource net_log_;
 
   const CompletionRepeatingCallback io_callback_;
@@ -408,7 +408,7 @@ class HttpStreamFactory::Job
 
   // True if handling a HTTPS request. Note this only describes the origin URL.
   // If false (an HTTP request), the request may still be sent over an HTTPS
-  // proxy. This differs from `using_quic_` and `using_spdy()`, which also
+  // proxy. This differs from `using_quic_` and `using_spdy_`, which also
   // describe some proxy cases.
   const bool using_ssl_;
 
@@ -425,6 +425,11 @@ class HttpStreamFactory::Job
   // In this case, Job fails if it cannot pool to an existing SpdySession and
   // the server does not negotiate HTTP/2 on a new socket.
   const bool expect_spdy_;
+
+  // True if Job actually uses HTTP/2. Note this describes both using HTTP/2
+  // with an HTTPS origin, and proxying a cleartext HTTP request over an HTTP/2
+  // proxy. This differs from `using_ssl_`, which only describes the origin.
+  bool using_spdy_ = false;
 
   // True if this job might succeed with a different proxy config.
   bool should_reconsider_proxy_ = false;
@@ -450,6 +455,9 @@ class HttpStreamFactory::Job
   std::unique_ptr<WebSocketHandshakeStreamBase> websocket_stream_;
   std::unique_ptr<BidirectionalStreamImpl> bidirectional_stream_impl_;
 
+  // True if we negotiated ALPN.
+  bool was_alpn_negotiated_ = false;
+
   // Protocol negotiated with the server.
   NextProto negotiated_protocol_ = kProtoUnknown;
 
@@ -461,8 +469,7 @@ class HttpStreamFactory::Job
   base::WeakPtr<SpdySession> existing_spdy_session_;
 
   // Which SpdySessions in the pool to use. Note that, if requesting an HTTP URL
-  // through an HTTPS proxy, this key corresponds to the last proxy in the proxy
-  // chain and not the origin server.
+  // through an HTTPS proxy, this key matches the proxy, not the origin server.
   const SpdySessionKey spdy_session_key_;
 
   // Type of stream that is requested.
@@ -498,6 +505,7 @@ class HttpStreamFactory::JobFactory {
       RequestPriority priority,
       const ProxyInfo& proxy_info,
       const SSLConfig& server_ssl_config,
+      const SSLConfig& proxy_ssl_config,
       url::SchemeHostPort destination,
       GURL origin_url,
       bool is_websocket,

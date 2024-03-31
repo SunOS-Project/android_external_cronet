@@ -28,7 +28,6 @@
 #include "absl/base/internal/raw_logging.h"
 #include "absl/base/internal/strerror.h"
 #include "absl/base/macros.h"
-#include "absl/base/no_destructor.h"
 #include "absl/debugging/stacktrace.h"
 #include "absl/debugging/symbolize.h"
 #include "absl/status/internal/status_internal.h"
@@ -91,8 +90,11 @@ std::ostream& operator<<(std::ostream& os, StatusCode code) {
 }
 
 const std::string* Status::EmptyString() {
-  static const absl::NoDestructor<std::string> kEmpty;
-  return kEmpty.get();
+  static union EmptyString {
+    std::string str;
+    ~EmptyString() {}
+  } empty = {{}};
+  return &empty.str;
 }
 
 #ifdef ABSL_INTERNAL_NEED_REDUNDANT_CONSTEXPR_DECL
@@ -100,8 +102,8 @@ constexpr const char Status::kMovedFromString[];
 #endif
 
 const std::string* Status::MovedFromString() {
-  static const absl::NoDestructor<std::string> kMovedFrom(kMovedFromString);
-  return kMovedFrom.get();
+  static std::string* moved_from_string = new std::string(kMovedFromString);
+  return moved_from_string;
 }
 
 Status::Status(absl::StatusCode code, absl::string_view msg)

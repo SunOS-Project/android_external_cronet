@@ -4,12 +4,12 @@
 
 #include "net/base/url_util.h"
 
-#include <optional>
 #include <ostream>
 
 #include "base/format_macros.h"
 #include "base/strings/utf_string_conversions.h"
 #include "testing/gtest/include/gtest/gtest.h"
+#include "third_party/abseil-cpp/absl/types/optional.h"
 #include "url/gurl.h"
 #include "url/scheme_host_port.h"
 #include "url/url_util.h"
@@ -96,20 +96,20 @@ TEST(UrlUtilTest, AppendOrReplaceQueryParameter) {
   EXPECT_EQ("http://example.com/path?abc=xyz",
             AppendOrReplaceQueryParameter(
                 GURL("http://example.com/path?name=value&abc=xyz"), "name",
-                std::nullopt)
+                absl::nullopt)
                 .spec());
 
   // Removes the name-value pair from the URL.
   EXPECT_EQ("http://example.com/path?",
             AppendOrReplaceQueryParameter(
                 GURL("http://example.com/path?existing=one"), "existing",
-                std::nullopt)
+                absl::nullopt)
                 .spec());
 
   // Removes the first name-value pair.
   EXPECT_EQ("http://example.com/path?c=d&e=f",
             AppendOrReplaceQueryParameter(
-                GURL("http://example.com/path?a=b&c=d&e=f"), "a", std::nullopt)
+                GURL("http://example.com/path?a=b&c=d&e=f"), "a", absl::nullopt)
                 .spec());
 
   // Removes a name-value pair in between two query params.
@@ -117,14 +117,14 @@ TEST(UrlUtilTest, AppendOrReplaceQueryParameter) {
       "http://example.com/path?existing=one&hello=world",
       AppendOrReplaceQueryParameter(
           GURL("http://example.com/path?existing=one&replace=sure&hello=world"),
-          "replace", std::nullopt)
+          "replace", absl::nullopt)
           .spec());
 
   // Removes the last name-value pair.
   EXPECT_EQ("http://example.com/path?existing=one",
             AppendOrReplaceQueryParameter(
                 GURL("http://example.com/path?existing=one&replace=sure"),
-                "replace", std::nullopt)
+                "replace", absl::nullopt)
                 .spec());
 
   // Removing a name-value pair with unsafe characters included. The
@@ -133,14 +133,14 @@ TEST(UrlUtilTest, AppendOrReplaceQueryParameter) {
             AppendOrReplaceQueryParameter(
                 GURL("http://example.com/"
                      "path?existing=one&na+me=v.alue%3D&hello=world"),
-                "na me", std::nullopt)
+                "na me", absl::nullopt)
                 .spec());
 
   // Does nothing if the provided query param key does not exist.
   EXPECT_EQ("http://example.com/path?existing=one&name=old",
             AppendOrReplaceQueryParameter(
                 GURL("http://example.com/path?existing=one&name=old"), "old",
-                std::nullopt)
+                absl::nullopt)
                 .spec());
 
   // Remove the value of first parameter with this name only.
@@ -148,7 +148,7 @@ TEST(UrlUtilTest, AppendOrReplaceQueryParameter) {
       "http://example.com/path?existing=one&name=old",
       AppendOrReplaceQueryParameter(
           GURL("http://example.com/path?name=something&existing=one&name=old"),
-          "name", std::nullopt)
+          "name", absl::nullopt)
           .spec());
 
   // Preserve the content of the original params regardless of our failure to
@@ -159,7 +159,7 @@ TEST(UrlUtilTest, AppendOrReplaceQueryParameter) {
       AppendOrReplaceQueryParameter(
           GURL("http://example.com/path?bar&name=old&left=&"
                "=right&=&&name=again"),
-          "name", std::nullopt)
+          "name", absl::nullopt)
           .spec());
 }
 
@@ -910,7 +910,7 @@ TEST(UrlUtilTest, IsLocalHostname) {
 
 TEST(UrlUtilTest, GoogleHostWithAlpnH3) {
   struct {
-    std::string_view host;
+    base::StringPiece host;
     bool expected_output;
   } test_cases[] = {
       {"google.com", true},        {"www.google.com", true},

@@ -16,7 +16,6 @@
 
 #ifdef LIBXML_SCHEMAS_ENABLED
 
-#include <stdio.h>
 #include <libxml/encoding.h>
 #include <libxml/tree.h>
 #include <libxml/xmlerror.h>

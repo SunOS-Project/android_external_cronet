@@ -7,7 +7,6 @@
 
 #include "base/feature_list.h"
 #include "base/metrics/field_trial_params.h"
-#include "base/time/time.h"
 
 namespace metrics::features {
 // This is forward-declared since this file cannot have a direct dependency on
@@ -27,15 +26,9 @@ BASE_DECLARE_FEATURE(kBluetoothSessionizedMetrics);
 // Controls whether fast pair logging is enabled or not.
 BASE_DECLARE_FEATURE(kFastPairMetrics);
 
-// Controls whether nearby share logging is enabled or not.
-BASE_DECLARE_FEATURE(kNearbyShareMetrics);
-
 // Controls whether the structured metrics service is recorder instead of the
 // provider.
 BASE_DECLARE_FEATURE(kEnabledStructuredMetricsService);
-
-// Controls whether Phone Hub Structured Metrics is enabled or not.
-BASE_DECLARE_FEATURE(kPhoneHubStructuredMetrics);
 
 // Controls the minimum number of logs to be stored.
 extern const base::FeatureParam<int> kMinLogQueueCount;
@@ -82,10 +75,6 @@ std::string GetDisabledProjects();
 
 // Retrieves the Structured Metrics upload interval (defaults to 40 minutes).
 int GetUploadInterval();
-
-// Retrieves the collection interval for external metrics (defaults to 10
-// minutes).
-base::TimeDelta GetExternalMetricsCollectionInterval();
 
 }  // namespace metrics::structured
 

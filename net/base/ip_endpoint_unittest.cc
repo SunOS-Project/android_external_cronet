@@ -6,7 +6,6 @@
 
 #include <string.h>
 
-#include <optional>
 #include <string>
 #include <tuple>
 
@@ -23,6 +22,7 @@
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "testing/platform_test.h"
+#include "third_party/abseil-cpp/absl/types/optional.h"
 
 #if BUILDFLAG(IS_WIN)
 #include <winsock2.h>

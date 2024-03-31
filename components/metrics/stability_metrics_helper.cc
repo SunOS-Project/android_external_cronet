@@ -25,6 +25,10 @@
 #include <windows.h>  // Needed for STATUS_* codes
 #endif
 
+#if BUILDFLAG(IS_CHROMEOS)
+#include "components/metrics/system_memory_stats_recorder.h"
+#endif
+
 #if BUILDFLAG(IS_ANDROID)
 #include "base/android/application_status_listener.h"
 #endif
@@ -193,6 +197,9 @@ void StabilityMetricsHelper::LogRendererCrash(bool was_extension_process,
       RecordChildKills(histogram_type);
       base::UmaHistogramExactLinear("BrowserRenderProcessHost.ChildKills.OOM",
                                     was_extension_process ? 2 : 1, 3);
+      RecordMemoryStats(was_extension_process
+                            ? RECORD_MEMORY_STATS_EXTENSIONS_OOM_KILLED
+                            : RECORD_MEMORY_STATS_CONTENTS_OOM_KILLED);
       break;
 #endif
     case base::TERMINATION_STATUS_STILL_RUNNING:

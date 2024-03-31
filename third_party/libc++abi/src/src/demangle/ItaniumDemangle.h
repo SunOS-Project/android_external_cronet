@@ -21,6 +21,7 @@
 #include "Utility.h"
 #include <__cxxabi_config.h>
 #include <algorithm>
+#include <cassert>
 #include <cctype>
 #include <cstdio>
 #include <cstdlib>
@@ -128,12 +129,12 @@ public:
 
   // NOLINTNEXTLINE(readability-identifier-naming)
   void pop_back() {
-    DEMANGLE_ASSERT(Last != First, "Popping empty vector!");
+    assert(Last != First && "Popping empty vector!");
     --Last;
   }
 
   void shrinkToSize(size_t Index) {
-    DEMANGLE_ASSERT(Index <= size(), "shrinkToSize() can't expand!");
+    assert(Index <= size() && "shrinkToSize() can't expand!");
     Last = First + Index;
   }
 
@@ -143,11 +144,11 @@ public:
   bool empty() const { return First == Last; }
   size_t size() const { return static_cast<size_t>(Last - First); }
   T &back() {
-    DEMANGLE_ASSERT(Last != First, "Calling back() on empty vector!");
+    assert(Last != First && "Calling back() on empty vector!");
     return *(Last - 1);
   }
   T &operator[](size_t Index) {
-    DEMANGLE_ASSERT(Index < size(), "Invalid access!");
+    assert(Index < size() && "Invalid access!");
     return *(begin() + Index);
   }
   void clear() { Last = First; }
@@ -886,32 +887,6 @@ public:
     OB.printOpen();
     Types.printWithComma(OB);
     OB.printClose();
-  }
-};
-
-/// Represents the explicitly named object parameter.
-/// E.g.,
-/// \code{.cpp}
-///   struct Foo {
-///     void bar(this Foo && self);
-///   };
-/// \endcode
-class ExplicitObjectParameter final : public Node {
-  Node *Base;
-
-public:
-  ExplicitObjectParameter(Node *Base_)
-      : Node(KExplicitObjectParameter), Base(Base_) {
-    DEMANGLE_ASSERT(
-        Base != nullptr,
-        "Creating an ExplicitObjectParameter without a valid Base Node.");
-  }
-
-  template <typename Fn> void match(Fn F) const { F(Base); }
-
-  void printLeft(OutputBuffer &OB) const override {
-    OB += "this ";
-    Base->print(OB);
   }
 };
 
@@ -1703,7 +1678,7 @@ public:
     std::string_view SV = ExpandedSpecialSubstitution::getBaseName();
     if (isInstantiation()) {
       // The instantiations are typedefs that drop the "basic_" prefix.
-      DEMANGLE_ASSERT(starts_with(SV, "basic_"), "");
+      assert(starts_with(SV, "basic_"));
       SV.remove_prefix(sizeof("basic_") - 1);
     }
     return SV;
@@ -2594,7 +2569,7 @@ void Node::visit(Fn F) const {
     return F(static_cast<const X *>(this));
 #include "ItaniumNodes.def"
   }
-  DEMANGLE_ASSERT(0, "unknown mangling node kind");
+  assert(0 && "unknown mangling node kind");
 }
 
 /// Determine the kind of a node from its type.
@@ -2636,8 +2611,7 @@ template <typename Derived, typename Alloc> struct AbstractManglingParser {
       Parser->TemplateParams.push_back(&Params);
     }
     ~ScopedTemplateParamList() {
-      DEMANGLE_ASSERT(Parser->TemplateParams.size() >= OldNumTemplateParamLists,
-                      "");
+      assert(Parser->TemplateParams.size() >= OldNumTemplateParamLists);
       Parser->TemplateParams.shrinkToSize(OldNumTemplateParamLists);
     }
     TemplateParamList *params() { return &Params; }
@@ -2718,7 +2692,7 @@ template <typename Derived, typename Alloc> struct AbstractManglingParser {
   }
 
   NodeArray popTrailingNodeArray(size_t FromPosition) {
-    DEMANGLE_ASSERT(FromPosition <= Names.size(), "");
+    assert(FromPosition <= Names.size());
     NodeArray res =
         makeNodeArray(Names.begin() + (long)FromPosition, Names.end());
     Names.shrinkToSize(FromPosition);
@@ -2806,7 +2780,6 @@ template <typename Derived, typename Alloc> struct AbstractManglingParser {
     Qualifiers CVQualifiers = QualNone;
     FunctionRefQual ReferenceQualifier = FrefQualNone;
     size_t ForwardTemplateRefsBegin;
-    bool HasExplicitObjectParameter = false;
 
     NameState(AbstractManglingParser *Enclosing)
         : ForwardTemplateRefsBegin(Enclosing->ForwardTemplateRefs.size()) {}
@@ -2886,8 +2859,8 @@ template <typename Derived, typename Alloc> struct AbstractManglingParser {
     std::string_view getSymbol() const {
       std::string_view Res = Name;
       if (Kind < Unnameable) {
-        DEMANGLE_ASSERT(starts_with(Res, "operator"),
-                        "operator name does not start with 'operator'");
+        assert(starts_with(Res, "operator") &&
+               "operator name does not start with 'operator'");
         Res.remove_prefix(sizeof("operator") - 1);
         if (starts_with(Res, ' '))
           Res.remove_prefix(1);
@@ -3465,25 +3438,15 @@ AbstractManglingParser<Derived, Alloc>::parseNestedName(NameState *State) {
   if (!consumeIf('N'))
     return nullptr;
 
-  // 'H' specifies that the encoding that follows
-  // has an explicit object parameter.
-  if (!consumeIf('H')) {
-    Qualifiers CVTmp = parseCVQualifiers();
-    if (State)
-      State->CVQualifiers = CVTmp;
+  Qualifiers CVTmp = parseCVQualifiers();
+  if (State) State->CVQualifiers = CVTmp;
 
-    if (consumeIf('O')) {
-      if (State)
-        State->ReferenceQualifier = FrefQualRValue;
-    } else if (consumeIf('R')) {
-      if (State)
-        State->ReferenceQualifier = FrefQualLValue;
-    } else {
-      if (State)
-        State->ReferenceQualifier = FrefQualNone;
-    }
-  } else if (State) {
-    State->HasExplicitObjectParameter = true;
+  if (consumeIf('O')) {
+    if (State) State->ReferenceQualifier = FrefQualRValue;
+  } else if (consumeIf('R')) {
+    if (State) State->ReferenceQualifier = FrefQualLValue;
+  } else {
+    if (State) State->ReferenceQualifier = FrefQualNone;
   }
 
   Node *SoFar = nullptr;
@@ -3731,7 +3694,7 @@ Node *AbstractManglingParser<Derived, Alloc>::parseUnresolvedName(bool Global) {
     }
   }
 
-  DEMANGLE_ASSERT(SoFar != nullptr, "");
+  assert(SoFar != nullptr);
 
   Node *Base = getDerived().parseBaseUnresolvedName();
   if (Base == nullptr)
@@ -5459,14 +5422,6 @@ Node *AbstractManglingParser<Derived, Alloc>::parseEncoding() {
       Node *Ty = getDerived().parseType();
       if (Ty == nullptr)
         return nullptr;
-
-      const bool IsFirstParam = ParamsBegin == Names.size();
-      if (NameInfo.HasExplicitObjectParameter && IsFirstParam)
-        Ty = make<ExplicitObjectParameter>(Ty);
-
-      if (Ty == nullptr)
-        return nullptr;
-
       Names.push_back(Ty);
     } while (!IsEndOfEncoding() && look() != 'Q');
     Params = popTrailingNodeArray(ParamsBegin);
@@ -5680,8 +5635,7 @@ Node *AbstractManglingParser<Derived, Alloc>::parseTemplateParam() {
     Node *ForwardRef = make<ForwardTemplateReference>(Index);
     if (!ForwardRef)
       return nullptr;
-    DEMANGLE_ASSERT(ForwardRef->getKind() == Node::KForwardTemplateReference,
-                    "");
+    assert(ForwardRef->getKind() == Node::KForwardTemplateReference);
     ForwardTemplateRefs.push_back(
         static_cast<ForwardTemplateReference *>(ForwardRef));
     return ForwardRef;

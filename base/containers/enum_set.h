@@ -13,6 +13,7 @@
 
 #include "base/check.h"
 #include "base/check_op.h"
+#include "base/cxx20_is_constant_evaluated.h"
 #include "base/memory/raw_ptr.h"
 #include "build/build_config.h"
 
@@ -105,9 +106,9 @@ class EnumSet {
     Iterator() : enums_(nullptr), i_(kValueCount) {}
     ~Iterator() = default;
 
-    friend bool operator==(const Iterator& lhs, const Iterator& rhs) {
-      return lhs.i_ == rhs.i_;
-    }
+    bool operator==(const Iterator& other) const { return i_ == other.i_; }
+
+    bool operator!=(const Iterator& other) const { return !(*this == other); }
 
     E operator*() const {
       DCHECK(Good());
@@ -160,7 +161,7 @@ class EnumSet {
   ~EnumSet() = default;
 
   constexpr EnumSet(std::initializer_list<E> values) {
-    if (std::is_constant_evaluated()) {
+    if (base::is_constant_evaluated()) {
       enums_ = bitstring(values);
     } else {
       for (E value : values) {
@@ -173,7 +174,7 @@ class EnumSet {
   // also contains undefined enum values if the enum in question has gaps
   // between kMinValue and kMaxValue.
   static constexpr EnumSet All() {
-    if (std::is_constant_evaluated()) {
+    if (base::is_constant_evaluated()) {
       if (kValueCount == 0) {
         return EnumSet();
       }
@@ -304,7 +305,11 @@ class EnumSet {
   Iterator end() const { return Iterator(); }
 
   // Returns true iff our set and the given set contain exactly the same values.
-  friend bool operator==(const EnumSet&, const EnumSet&) = default;
+  bool operator==(const EnumSet& other) const { return enums_ == other.enums_; }
+
+  // Returns true iff our set and the given set do not contain exactly the same
+  // values.
+  bool operator!=(const EnumSet& other) const { return enums_ != other.enums_; }
 
  private:
   friend constexpr EnumSet Union<E, MinEnumValue, MaxEnumValue>(EnumSet set1,
@@ -336,7 +341,7 @@ class EnumSet {
   // can safely remove the constepxr qualifiers from this file, at the cost of
   // some minor optimizations.
   explicit constexpr EnumSet(EnumBitSet enums) : enums_(enums) {
-    if (std::is_constant_evaluated()) {
+    if (base::is_constant_evaluated()) {
       CHECK(kValueCount <= 64)
           << "Max number of enum values is 64 for constexpr constructor";
     }

@@ -45,13 +45,13 @@ absl::optional<UnguessableToken> UnguessableToken::Deserialize(uint64_t high,
   return UnguessableToken(Token{high, low});
 }
 
-bool operator==(const UnguessableToken& lhs, const UnguessableToken& rhs) {
+bool UnguessableToken::operator==(const UnguessableToken& other) const {
 #if BUILDFLAG(IS_NACL)
   // BoringSSL is unavailable for NaCl builds so it remains timing dependent.
-  return lhs.token_ == rhs.token_;
+  return token_ == other.token_;
 #else
-  auto bytes = lhs.token_.AsBytes();
-  auto other_bytes = rhs.token_.AsBytes();
+  auto bytes = token_.AsBytes();
+  auto other_bytes = other.token_.AsBytes();
   return CRYPTO_memcmp(bytes.data(), other_bytes.data(), bytes.size()) == 0;
 #endif
 }

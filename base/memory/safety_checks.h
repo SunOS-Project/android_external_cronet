@@ -42,9 +42,9 @@ enum class MemorySafetyCheck : uint32_t {
   // Requires PA-E.
   kSchedulerLoopQuarantine = (1u << 1),
 
-  // Enables |FreeFlags::kZap|.
-  // Requires PA-E.
-  kZapOnFree = (1u << 2),
+  // TODO(crbug.com/1462223): Implement more advanced checks and add flags here.
+  // kBRPDereferenceAfterFree = (1u << 2),
+  // kZapOnFree = (1u << 3), etc.
 };
 
 constexpr MemorySafetyCheck operator|(MemorySafetyCheck a,
@@ -62,18 +62,29 @@ constexpr MemorySafetyCheck operator&(MemorySafetyCheck a,
 // Set of checks for ADVANCED_MEMORY_SAFETY_CHECKS() annotated objects.
 constexpr auto kAdvancedMemorySafetyChecks =
     MemorySafetyCheck::kForcePartitionAlloc |
-    MemorySafetyCheck::kSchedulerLoopQuarantine | MemorySafetyCheck::kZapOnFree;
+    MemorySafetyCheck::kSchedulerLoopQuarantine;
 
 // Define type traits to determine type |T|'s memory safety check status.
 namespace {
+
+// Primary template: having |value = 0| (none) as a default.
+template <typename T, typename AlwaysVoid = void>
+struct GetChecksInternal {
+  static constexpr MemorySafetyCheck kValue = static_cast<MemorySafetyCheck>(0);
+};
+
+// Specialization: having |value = T::kMemorySafetyChecks| is present.
+template <typename T>
+struct GetChecksInternal<T, std::void_t<decltype(T::kMemorySafetyChecks)>> {
+  static constexpr MemorySafetyCheck kValue = T::kMemorySafetyChecks;
+};
 
 // Allocator type traits.
 constexpr bool ShouldUsePartitionAlloc(MemorySafetyCheck checks) {
 #if BUILDFLAG(USE_PARTITION_ALLOC_AS_MALLOC)
   return static_cast<bool>(checks &
                            (MemorySafetyCheck::kForcePartitionAlloc |
-                            MemorySafetyCheck::kSchedulerLoopQuarantine |
-                            MemorySafetyCheck::kZapOnFree));
+                            MemorySafetyCheck::kSchedulerLoopQuarantine));
 #else
   return false;
 #endif  // BUILDFLAG(USE_PARTITION_ALLOC_AS_MALLOC)
@@ -91,9 +102,6 @@ constexpr partition_alloc::FreeFlags GetFreeFlags(MemorySafetyCheck checks) {
   if (static_cast<bool>(checks & MemorySafetyCheck::kSchedulerLoopQuarantine)) {
     flags |= partition_alloc::FreeFlags::kSchedulerLoopQuarantine;
   }
-  if (static_cast<bool>(checks & MemorySafetyCheck::kZapOnFree)) {
-    flags |= partition_alloc::FreeFlags::kZap;
-  }
   return flags;
 }
 
@@ -101,16 +109,11 @@ constexpr partition_alloc::FreeFlags GetFreeFlags(MemorySafetyCheck checks) {
 
 // Public utility type traits.
 template <typename T>
-inline constexpr MemorySafetyCheck get_memory_safety_checks = [] {
-  if constexpr (requires { T::kMemorySafetyChecks; }) {
-    return T::kMemorySafetyChecks;
-  } else {
-    return static_cast<MemorySafetyCheck>(0);
-  }
-}();
+constexpr MemorySafetyCheck get_memory_safety_checks =
+    GetChecksInternal<T>::kValue;
 
 template <typename T, MemorySafetyCheck c>
-inline constexpr bool is_memory_safety_checked =
+constexpr bool is_memory_safety_checked =
     (get_memory_safety_checks<T> & c) == c;
 
 // Allocator functions.

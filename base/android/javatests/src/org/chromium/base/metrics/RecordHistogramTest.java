@@ -14,7 +14,9 @@ import org.junit.runner.RunWith;
 import org.chromium.base.library_loader.LibraryLoader;
 import org.chromium.base.test.BaseJUnit4ClassRunner;
 
-/** Tests for the Java API for recording UMA histograms. */
+/**
+ * Tests for the Java API for recording UMA histograms.
+ */
 @RunWith(BaseJUnit4ClassRunner.class)
 public class RecordHistogramTest {
     @Before
@@ -22,7 +24,9 @@ public class RecordHistogramTest {
         LibraryLoader.getInstance().ensureInitialized();
     }
 
-    /** Tests recording of boolean histograms. */
+    /**
+     * Tests recording of boolean histograms.
+     */
     @Test
     @SmallTest
     public void testRecordBooleanHistogram() {
@@ -45,7 +49,9 @@ public class RecordHistogramTest {
         Assert.assertEquals(1, falseCount.getDelta());
     }
 
-    /** Tests recording of enumerated histograms. */
+    /**
+     * Tests recording of enumerated histograms.
+     */
     @Test
     @SmallTest
     public void testRecordEnumeratedHistogram() {
@@ -75,7 +81,9 @@ public class RecordHistogramTest {
         Assert.assertEquals(1, twoCount.getDelta());
     }
 
-    /** Tests recording of count histograms. */
+    /**
+     * Tests recording of count histograms.
+     */
     @Test
     @SmallTest
     public void testRecordCount1MHistogram() {
@@ -115,7 +123,9 @@ public class RecordHistogramTest {
         Assert.assertEquals(1, eightThousandCount.getDelta());
     }
 
-    /** Tests recording of custom times histograms. */
+    /**
+     * Tests recording of custom times histograms.
+     */
     @Test
     @SmallTest
     public void testRecordCustomTimesHistogram() {
@@ -149,7 +159,9 @@ public class RecordHistogramTest {
         Assert.assertEquals(1, twoCount.getDelta());
     }
 
-    /** Tests recording of linear count histograms. */
+    /**
+     * Tests recording of linear count histograms.
+     */
     @Test
     @SmallTest
     public void testRecordLinearCountHistogram() {

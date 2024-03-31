@@ -7,7 +7,6 @@
 #include <winstring.h>
 
 #include <string>
-#include <string_view>
 
 #include "base/strings/utf_string_conversions.h"
 #include "testing/gtest/include/gtest/gtest.h"
@@ -25,7 +24,7 @@ TEST(ScopedHStringTest, Init) {
   ScopedHString hstring = ScopedHString::Create(kTestString1);
   std::string buffer = hstring.GetAsUTF8();
   EXPECT_EQ(kTestString1, UTF8ToWide(buffer));
-  std::wstring_view contents = hstring.Get();
+  WStringPiece contents = hstring.Get();
   EXPECT_EQ(kTestString1, contents);
 
   hstring.reset();

@@ -30,7 +30,9 @@ import java.util.concurrent.Executor;
  * supported in all versions of the API should forgo a version check.
  */
 public class VersionSafeCallbacks {
-    /** Wrap a {@link UrlRequest.Callback} in a version safe manner. */
+    /**
+     * Wrap a {@link UrlRequest.Callback} in a version safe manner.
+     */
     public static final class UrlRequestCallback extends UrlRequest.Callback {
         private final UrlRequest.Callback mWrappedCallback;
 
@@ -71,7 +73,9 @@ public class VersionSafeCallbacks {
         }
     }
 
-    /** Wrap a {@link UrlRequest.StatusListener} in a version safe manner. */
+    /**
+     * Wrap a {@link UrlRequest.StatusListener} in a version safe manner.
+     */
     public static final class UrlRequestStatusListener extends UrlRequest.StatusListener {
         private final UrlRequest.StatusListener mWrappedListener;
 
@@ -85,7 +89,9 @@ public class VersionSafeCallbacks {
         }
     }
 
-    /** Wrap a {@link BidirectionalStream.Callback} in a version safe manner. */
+    /**
+     * Wrap a {@link BidirectionalStream.Callback} in a version safe manner.
+     */
     public static final class BidirectionalStreamCallback extends BidirectionalStream.Callback {
         private final BidirectionalStream.Callback mWrappedCallback;
 
@@ -104,27 +110,19 @@ public class VersionSafeCallbacks {
         }
 
         @Override
-        public void onReadCompleted(
-                BidirectionalStream stream,
-                UrlResponseInfo info,
-                ByteBuffer buffer,
-                boolean endOfStream) {
+        public void onReadCompleted(BidirectionalStream stream, UrlResponseInfo info,
+                ByteBuffer buffer, boolean endOfStream) {
             mWrappedCallback.onReadCompleted(stream, info, buffer, endOfStream);
         }
 
         @Override
-        public void onWriteCompleted(
-                BidirectionalStream stream,
-                UrlResponseInfo info,
-                ByteBuffer buffer,
-                boolean endOfStream) {
+        public void onWriteCompleted(BidirectionalStream stream, UrlResponseInfo info,
+                ByteBuffer buffer, boolean endOfStream) {
             mWrappedCallback.onWriteCompleted(stream, info, buffer, endOfStream);
         }
 
         @Override
-        public void onResponseTrailersReceived(
-                BidirectionalStream stream,
-                UrlResponseInfo info,
+        public void onResponseTrailersReceived(BidirectionalStream stream, UrlResponseInfo info,
                 UrlResponseInfo.HeaderBlock trailers) {
             mWrappedCallback.onResponseTrailersReceived(stream, info, trailers);
         }
@@ -146,7 +144,9 @@ public class VersionSafeCallbacks {
         }
     }
 
-    /** Wrap a {@link UploadDataProvider} in a version safe manner. */
+    /**
+     * Wrap a {@link UploadDataProvider} in a version safe manner.
+     */
     public static final class UploadDataProviderWrapper extends UploadDataProvider {
         private final UploadDataProvider mWrappedProvider;
 
@@ -175,7 +175,9 @@ public class VersionSafeCallbacks {
         }
     }
 
-    /** Wrap a {@link RequestFinishedInfo.Listener} in a version safe manner. */
+    /**
+     * Wrap a {@link RequestFinishedInfo.Listener} in a version safe manner.
+     */
     public static final class RequestFinishedInfoListener extends RequestFinishedInfo.Listener {
         private final RequestFinishedInfo.Listener mWrappedListener;
 
@@ -271,7 +273,9 @@ public class VersionSafeCallbacks {
         }
     }
 
-    /** Wrap a {@link CronetEngine.Builder.LibraryLoader} in a version safe manner. */
+    /**
+     * Wrap a {@link CronetEngine.Builder.LibraryLoader} in a version safe manner.
+     */
     public static final class LibraryLoader extends CronetEngine.Builder.LibraryLoader {
         private final CronetEngine.Builder.LibraryLoader mWrappedLoader;
 

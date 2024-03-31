@@ -437,7 +437,7 @@ public class RequestFinishedInfoTest {
         // Empty headers are invalid and will cause start() to throw an exception.
         UrlRequest request = urlRequestBuilder.addHeader("", "").build();
         IllegalArgumentException e = assertThrows(IllegalArgumentException.class, request::start);
-        assertThat(e).hasMessageThat().isEqualTo("Invalid header with headername: ");
+        assertThat(e).hasMessageThat().isEqualTo("Invalid header =");
     }
 
     @Test

@@ -55,23 +55,10 @@ struct NET_EXPORT CookieAccessParams {
 
 class NET_EXPORT CanonicalCookie {
  public:
-  // StrictlyUniqueCookieKey always populates the cookie's source scheme and
-  // source port.
-  using StrictlyUniqueCookieKey = std::tuple<absl::optional<CookiePartitionKey>,
-                                             /*name=*/std::string,
-                                             /*domain=*/std::string,
-                                             /*path=*/std::string,
-                                             CookieSourceScheme,
-                                             /*source_port=*/int>;
-
-  // Conditionally populates the source scheme and source port depending on the
-  // state of their associated feature.
   using UniqueCookieKey = std::tuple<absl::optional<CookiePartitionKey>,
-                                     /*name=*/std::string,
-                                     /*domain=*/std::string,
-                                     /*path=*/std::string,
-                                     absl::optional<CookieSourceScheme>,
-                                     /*source_port=*/absl::optional<int>>;
+                                     std::string,
+                                     std::string,
+                                     std::string>;
 
   CanonicalCookie();
   CanonicalCookie(const CanonicalCookie& other);
@@ -99,6 +86,7 @@ class NET_EXPORT CanonicalCookie {
                   bool httponly,
                   CookieSameSite same_site,
                   CookiePriority priority,
+                  bool same_party,
                   absl::optional<CookiePartitionKey> partition_key,
                   CookieSourceScheme scheme_secure = CookieSourceScheme::kUnset,
                   int source_port = url::PORT_UNSPECIFIED);
@@ -159,6 +147,7 @@ class NET_EXPORT CanonicalCookie {
       bool http_only,
       CookieSameSite same_site,
       CookiePriority priority,
+      bool same_party,
       absl::optional<CookiePartitionKey> partition_key,
       CookieInclusionStatus* status = nullptr);
 
@@ -182,6 +171,7 @@ class NET_EXPORT CanonicalCookie {
       bool httponly,
       CookieSameSite same_site,
       CookiePriority priority,
+      bool same_party,
       absl::optional<CookiePartitionKey> partition_key,
       CookieSourceScheme source_scheme,
       int source_port);
@@ -201,6 +191,7 @@ class NET_EXPORT CanonicalCookie {
       bool httponly,
       CookieSameSite same_site,
       CookiePriority priority,
+      bool same_party,
       absl::optional<CookiePartitionKey> partition_key = absl::nullopt,
       CookieSourceScheme scheme_secure = CookieSourceScheme::kUnset,
       int source_port = url::PORT_UNSPECIFIED);
@@ -232,6 +223,7 @@ class NET_EXPORT CanonicalCookie {
   bool IsHttpOnly() const { return httponly_; }
   CookieSameSite SameSite() const { return same_site_; }
   CookiePriority Priority() const { return priority_; }
+  bool IsSameParty() const { return same_party_; }
   bool IsPartitioned() const { return partition_key_.has_value(); }
   const absl::optional<CookiePartitionKey>& PartitionKey() const {
     return partition_key_;
@@ -282,18 +274,13 @@ class NET_EXPORT CanonicalCookie {
     return UniqueKey() == ecc.UniqueKey();
   }
 
-  StrictlyUniqueCookieKey StrictlyUniqueKey() const {
-    return std::make_tuple(partition_key_, name_, domain_, path_,
-                           source_scheme_, source_port_);
-  }
-
   // Returns a key such that two cookies with the same UniqueKey() are
   // guaranteed to be equivalent in the sense of IsEquivalent().
   // The `partition_key_` field will always be nullopt when partitioned cookies
   // are not enabled.
-  // The source_scheme and source_port fields depend on whether or not their
-  // associated features are enabled.
-  UniqueCookieKey UniqueKey() const;
+  UniqueCookieKey UniqueKey() const {
+    return std::make_tuple(partition_key_, name_, domain_, path_);
+  }
 
   // Checks a looser set of equivalency rules than 'IsEquivalent()' in order
   // to support the stricter 'Secure' behaviors specified in Step 12 of
@@ -340,7 +327,7 @@ class NET_EXPORT CanonicalCookie {
            last_access_date_ == other.last_access_date_ &&
            expiry_date_ == other.expiry_date_ && secure_ == other.secure_ &&
            httponly_ == other.httponly_ && same_site_ == other.same_site_ &&
-           priority_ == other.priority_ &&
+           priority_ == other.priority_ && same_party_ == other.same_party_ &&
            partition_key_ == other.partition_key_ && name_ == other.name_ &&
            value_ == other.value_ && domain_ == other.domain_ &&
            path_ == other.path_ &&
@@ -354,8 +341,9 @@ class NET_EXPORT CanonicalCookie {
     auto f = [](const CanonicalCookie& c) {
       return std::tie(c.creation_date_, c.last_access_date_, c.expiry_date_,
                       c.secure_, c.httponly_, c.same_site_, c.priority_,
-                      c.partition_key_, c.name_, c.value_, c.domain_, c.path_,
-                      c.last_update_date_, c.source_scheme_, c.source_port_);
+                      c.same_party_, c.partition_key_, c.name_, c.value_,
+                      c.domain_, c.path_, c.last_update_date_, c.source_scheme_,
+                      c.source_port_);
     };
     return f(*this) < f(other);
   }
@@ -602,6 +590,7 @@ class NET_EXPORT CanonicalCookie {
   bool httponly_{false};
   CookieSameSite same_site_{CookieSameSite::NO_RESTRICTION};
   CookiePriority priority_{COOKIE_PRIORITY_MEDIUM};
+  bool same_party_{false};
   // This will be absl::nullopt for all cookies not set with the Partitioned
   // attribute or without a nonce. If the value is non-null, then the cookie
   // will only be delivered when the top-frame site matches the partition key

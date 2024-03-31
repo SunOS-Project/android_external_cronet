@@ -30,6 +30,7 @@
 #include <ranges>
 
 #include "almost_satisfies_types.h"
+#include "boolean_testable.h"
 #include "test_iterators.h"
 
 // SFINAE tests.
@@ -67,7 +68,7 @@ template <std::size_t N, class T, class Iter>
 constexpr void verify_nth(const std::array<T, N>& partially_sorted, std::size_t nth_index, Iter last, T expected_nth) {
   // Note that the exact output of `nth_element` is unspecified and may vary between implementations.
 
-  assert(base(last) == partially_sorted.data() + partially_sorted.size());
+  assert(base(last) == partially_sorted.end());
 
   auto b = partially_sorted.begin();
   auto nth = b + nth_index;
@@ -252,6 +253,25 @@ constexpr bool test() {
       auto in = input;
       auto last = std::ranges::nth_element(in, in.begin() + 1, &S::comparator, &S::projection);
       assert(in[1] == S{2});
+      assert(last == in.end());
+    }
+  }
+
+  { // The comparator can return any type that's convertible to `bool`.
+    const std::array input = {2, 1, 3};
+    auto pred = [](int i, int j) { return BooleanTestable{i < j}; };
+
+    {
+      std::array in = input;
+      auto last = std::ranges::nth_element(in.begin(), in.begin() + 1, in.end(), pred);
+      assert(in[1] == 2);
+      assert(last == in.end());
+    }
+
+    {
+      std::array in = input;
+      auto last = std::ranges::nth_element(in, in.begin() + 1, pred);
+      assert(in[1] == 2);
       assert(last == in.end());
     }
   }

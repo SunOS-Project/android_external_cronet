@@ -148,7 +148,9 @@ class ClampedNumeric {
 
   // These perform the actual math operations on the ClampedNumerics.
   // Binary arithmetic operations.
-  template <template <typename, typename> class M, typename L, typename R>
+  template <template <typename, typename, typename> class M,
+            typename L,
+            typename R>
   static constexpr ClampedNumeric MathOp(const L lhs, const R rhs) {
     using Math = typename MathWrapper<M, L, R>::math;
     return ClampedNumeric<T>(
@@ -156,7 +158,7 @@ class ClampedNumeric {
   }
 
   // Assignment arithmetic operations.
-  template <template <typename, typename> class M, typename R>
+  template <template <typename, typename, typename> class M, typename R>
   constexpr ClampedNumeric& MathOp(const R rhs) {
     using Math = typename MathWrapper<M, T, R>::math;
     *this =
@@ -197,7 +199,9 @@ constexpr ClampedNumeric<typename UnderlyingType<T>::type> MakeClampedNum(
 }
 
 // These implement the variadic wrapper for the math operations.
-template <template <typename, typename> class M, typename L, typename R>
+template <template <typename, typename, typename> class M,
+          typename L,
+          typename R>
 constexpr ClampedNumeric<typename MathWrapper<M, L, R>::type> ClampMathOp(
     const L lhs,
     const R rhs) {
@@ -207,7 +211,7 @@ constexpr ClampedNumeric<typename MathWrapper<M, L, R>::type> ClampMathOp(
 }
 
 // General purpose wrapper template for arithmetic operations.
-template <template <typename, typename> class M,
+template <template <typename, typename, typename> class M,
           typename L,
           typename R,
           typename... Args>

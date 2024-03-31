@@ -12,7 +12,6 @@
 #include <wchar.h>
 
 #include <string>
-#include <string_view>
 #include <vector>
 
 #include "base/check.h"
@@ -86,17 +85,17 @@ inline const char16_t* as_u16cstr(const wchar_t* str) {
   return reinterpret_cast<const char16_t*>(str);
 }
 
-inline const char16_t* as_u16cstr(std::wstring_view str) {
+inline const char16_t* as_u16cstr(WStringPiece str) {
   return reinterpret_cast<const char16_t*>(str.data());
 }
 
-// Utility functions to convert between std::wstring_view and
+// Utility functions to convert between base::WStringPiece and
 // base::StringPiece16.
-inline std::wstring_view AsWStringView(StringPiece16 str) {
-  return std::wstring_view(as_wcstr(str.data()), str.size());
+inline WStringPiece AsWStringPiece(StringPiece16 str) {
+  return WStringPiece(as_wcstr(str.data()), str.size());
 }
 
-inline StringPiece16 AsStringPiece16(std::wstring_view str) {
+inline StringPiece16 AsStringPiece16(WStringPiece str) {
   return StringPiece16(as_u16cstr(str.data()), str.size());
 }
 
@@ -104,100 +103,95 @@ inline std::wstring AsWString(StringPiece16 str) {
   return std::wstring(as_wcstr(str.data()), str.size());
 }
 
-inline std::u16string AsString16(std::wstring_view str) {
+inline std::u16string AsString16(WStringPiece str) {
   return std::u16string(as_u16cstr(str.data()), str.size());
 }
 
 // The following section contains overloads of the cross-platform APIs for
-// std::wstring and std::wstring_view.
-BASE_EXPORT bool IsStringASCII(std::wstring_view str);
+// std::wstring and base::WStringPiece.
+BASE_EXPORT bool IsStringASCII(WStringPiece str);
 
-BASE_EXPORT std::wstring ToLowerASCII(std::wstring_view str);
+BASE_EXPORT std::wstring ToLowerASCII(WStringPiece str);
 
-BASE_EXPORT std::wstring ToUpperASCII(std::wstring_view str);
+BASE_EXPORT std::wstring ToUpperASCII(WStringPiece str);
 
-BASE_EXPORT int CompareCaseInsensitiveASCII(std::wstring_view a,
-                                            std::wstring_view b);
+BASE_EXPORT int CompareCaseInsensitiveASCII(WStringPiece a, WStringPiece b);
 
-inline bool EqualsCaseInsensitiveASCII(std::wstring_view a,
-                                       std::wstring_view b) {
+inline bool EqualsCaseInsensitiveASCII(WStringPiece a, WStringPiece b) {
   return internal::EqualsCaseInsensitiveASCIIT(a, b);
 }
-inline bool EqualsCaseInsensitiveASCII(std::wstring_view a, StringPiece b) {
+inline bool EqualsCaseInsensitiveASCII(WStringPiece a, StringPiece b) {
   return internal::EqualsCaseInsensitiveASCIIT(a, b);
 }
-inline bool EqualsCaseInsensitiveASCII(StringPiece a, std::wstring_view b) {
+inline bool EqualsCaseInsensitiveASCII(StringPiece a, WStringPiece b) {
   return internal::EqualsCaseInsensitiveASCIIT(a, b);
 }
 
-BASE_EXPORT bool RemoveChars(std::wstring_view input,
-                             std::wstring_view remove_chars,
+BASE_EXPORT bool RemoveChars(WStringPiece input,
+                             WStringPiece remove_chars,
                              std::wstring* output);
 
-BASE_EXPORT bool ReplaceChars(std::wstring_view input,
-                              std::wstring_view replace_chars,
-                              std::wstring_view replace_with,
+BASE_EXPORT bool ReplaceChars(WStringPiece input,
+                              WStringPiece replace_chars,
+                              WStringPiece replace_with,
                               std::wstring* output);
 
-BASE_EXPORT bool TrimString(std::wstring_view input,
-                            std::wstring_view trim_chars,
+BASE_EXPORT bool TrimString(WStringPiece input,
+                            WStringPiece trim_chars,
                             std::wstring* output);
 
-BASE_EXPORT std::wstring_view TrimString(std::wstring_view input,
-                                         std::wstring_view trim_chars,
-                                         TrimPositions positions);
+BASE_EXPORT WStringPiece TrimString(WStringPiece input,
+                                    WStringPiece trim_chars,
+                                    TrimPositions positions);
 
-BASE_EXPORT TrimPositions TrimWhitespace(std::wstring_view input,
+BASE_EXPORT TrimPositions TrimWhitespace(WStringPiece input,
                                          TrimPositions positions,
                                          std::wstring* output);
 
-BASE_EXPORT std::wstring_view TrimWhitespace(std::wstring_view input,
-                                             TrimPositions positions);
+BASE_EXPORT WStringPiece TrimWhitespace(WStringPiece input,
+                                        TrimPositions positions);
 
 BASE_EXPORT std::wstring CollapseWhitespace(
-    std::wstring_view text,
+    WStringPiece text,
     bool trim_sequences_with_line_breaks);
 
-BASE_EXPORT bool ContainsOnlyChars(std::wstring_view input,
-                                   std::wstring_view characters);
+BASE_EXPORT bool ContainsOnlyChars(WStringPiece input, WStringPiece characters);
 
 BASE_EXPORT bool EqualsASCII(StringPiece16 str, StringPiece ascii);
 
 BASE_EXPORT bool StartsWith(
-    std::wstring_view str,
-    std::wstring_view search_for,
+    WStringPiece str,
+    WStringPiece search_for,
     CompareCase case_sensitivity = CompareCase::SENSITIVE);
 
 BASE_EXPORT bool EndsWith(
-    std::wstring_view str,
-    std::wstring_view search_for,
+    WStringPiece str,
+    WStringPiece search_for,
     CompareCase case_sensitivity = CompareCase::SENSITIVE);
 
-BASE_EXPORT void ReplaceFirstSubstringAfterOffset(
-    std::wstring* str,
-    size_t start_offset,
-    std::wstring_view find_this,
-    std::wstring_view replace_with);
+BASE_EXPORT void ReplaceFirstSubstringAfterOffset(std::wstring* str,
+                                                  size_t start_offset,
+                                                  WStringPiece find_this,
+                                                  WStringPiece replace_with);
 
 BASE_EXPORT void ReplaceSubstringsAfterOffset(std::wstring* str,
                                               size_t start_offset,
-                                              std::wstring_view find_this,
-                                              std::wstring_view replace_with);
+                                              WStringPiece find_this,
+                                              WStringPiece replace_with);
 
 BASE_EXPORT wchar_t* WriteInto(std::wstring* str, size_t length_with_null);
 
 BASE_EXPORT std::wstring JoinString(span<const std::wstring> parts,
-                                    std::wstring_view separator);
+                                    WStringPiece separator);
 
-BASE_EXPORT std::wstring JoinString(span<const std::wstring_view> parts,
-                                    std::wstring_view separator);
+BASE_EXPORT std::wstring JoinString(span<const WStringPiece> parts,
+                                    WStringPiece separator);
 
-BASE_EXPORT std::wstring JoinString(
-    std::initializer_list<std::wstring_view> parts,
-    std::wstring_view separator);
+BASE_EXPORT std::wstring JoinString(std::initializer_list<WStringPiece> parts,
+                                    WStringPiece separator);
 
 BASE_EXPORT std::wstring ReplaceStringPlaceholders(
-    std::wstring_view format_string,
+    WStringPiece format_string,
     const std::vector<std::wstring>& subst,
     std::vector<size_t>* offsets);
 

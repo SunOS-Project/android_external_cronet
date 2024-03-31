@@ -19,7 +19,7 @@
 // Check that we ensure that `[it, sent)` is a valid range.
 
 // REQUIRES: has-unix-headers
-// UNSUPPORTED: libcpp-hardening-mode=none
+// UNSUPPORTED: libcpp-hardening-mode=unchecked
 // XFAIL: availability-verbose_abort-missing
 
 #include <array>

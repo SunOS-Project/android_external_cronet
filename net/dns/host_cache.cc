@@ -17,7 +17,6 @@
 #include <vector>
 
 #include "base/check_op.h"
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/metrics/field_trial.h"
 #include "base/metrics/histogram_macros.h"
@@ -405,7 +404,8 @@ std::vector<HostResolverEndpointResult> HostCache::Entry::GetEndpoints() const {
     // Currently Chrome uses HTTPS records only when A and AAAA records are at
     // the same canonical name and that matches the HTTPS target name.
     for (ConnectionEndpointMetadata& metadata : metadatas) {
-      if (!base::Contains(canonical_names_, metadata.target_name)) {
+      if (canonical_names_.find(metadata.target_name) ==
+          canonical_names_.end()) {
         continue;
       }
       endpoints.emplace_back();

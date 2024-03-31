@@ -31,10 +31,6 @@
 #include "testing/gtest/include/gtest/gtest.h"
 #include "testing/platform_test.h"
 
-#if DCHECK_IS_ON()
-#include "base/threading/thread_restrictions.h"
-#endif
-
 using ::testing::NotNull;
 
 using ThreadTest = PlatformTest;
@@ -165,10 +161,6 @@ TEST_F(ThreadTest, StartWithOptions_StackSize) {
   // The first time an LSAN disable is fired on a thread, the LSAN Mac runtime
   // initializes a 56k object on the stack.
   additional_space += 56 * 1024;
-#endif
-#if DCHECK_IS_ON()
-  // The thread restrictions add four BooleanWithStacks (which are ~2k each).
-  additional_space += sizeof(BooleanWithStack) * 4;
 #endif
 
   Thread a("StartWithStackSize");

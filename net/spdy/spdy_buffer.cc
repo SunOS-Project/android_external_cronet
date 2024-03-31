@@ -53,8 +53,7 @@ class SpdyBuffer::SharedFrameIOBuffer : public IOBuffer {
 
  private:
   ~SharedFrameIOBuffer() override {
-    // Prevent `data_` from dangling should this destructor remove the
-    // last reference to `shared_frame`.
+    // Prevent ~IOBuffer() from trying to delete |data_|.
     data_ = nullptr;
   }
 

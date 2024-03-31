@@ -4,7 +4,9 @@
 
 package org.chromium.base.library_loader;
 
-/** The exception that is thrown when the initialization of a process has failed. */
+/**
+ * The exception that is thrown when the initialization of a process has failed.
+ */
 public class ProcessInitException extends RuntimeException {
     /**
      * @param errorCode This will be one of the LoaderErrors error codes.

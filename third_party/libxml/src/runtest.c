@@ -359,7 +359,7 @@ xmlParserPrintFileContextInternal(xmlParserInputPtr input ,
 }
 
 static void
-testStructuredErrorHandler(void *ctx ATTRIBUTE_UNUSED, const xmlError *err) {
+testStructuredErrorHandler(void *ctx  ATTRIBUTE_UNUSED, xmlErrorPtr err) {
     char *file = NULL;
     int line = 0;
     int code = -1;
@@ -839,12 +839,6 @@ static xmlSAXHandler emptySAXHandlerStruct = {
     NULL  /* xmlStructuredErrorFunc */
 };
 
-typedef struct {
-    const char *filename;
-    xmlHashTablePtr generalEntities;
-    xmlHashTablePtr parameterEntities;
-} debugContext;
-
 static xmlSAXHandlerPtr emptySAXHandler = &emptySAXHandlerStruct;
 static int callbacks = 0;
 static int quiet = 0;
@@ -1003,16 +997,13 @@ resolveEntityDebug(void *ctx ATTRIBUTE_UNUSED, const xmlChar *publicId, const xm
  * Returns the xmlParserInputPtr if inlined or NULL for DOM behaviour.
  */
 static xmlEntityPtr
-getEntityDebug(void *ctx, const xmlChar *name)
+getEntityDebug(void *ctx ATTRIBUTE_UNUSED, const xmlChar *name)
 {
-    debugContext *ctxt = ctx;
-
     callbacks++;
     if (quiet)
 	return(NULL);
     fprintf(SAXdebug, "SAX.getEntity(%s)\n", name);
-
-    return(xmlHashLookup(ctxt->generalEntities, name));
+    return(NULL);
 }
 
 /**
@@ -1025,16 +1016,13 @@ getEntityDebug(void *ctx, const xmlChar *name)
  * Returns the xmlParserInputPtr
  */
 static xmlEntityPtr
-getParameterEntityDebug(void *ctx, const xmlChar *name)
+getParameterEntityDebug(void *ctx ATTRIBUTE_UNUSED, const xmlChar *name)
 {
-    debugContext *ctxt = ctx;
-
     callbacks++;
     if (quiet)
 	return(NULL);
     fprintf(SAXdebug, "SAX.getParameterEntity(%s)\n", name);
-
-    return(xmlHashLookup(ctxt->parameterEntities, name));
+    return(NULL);
 }
 
 
@@ -1050,13 +1038,10 @@ getParameterEntityDebug(void *ctx, const xmlChar *name)
  * An entity definition has been parsed
  */
 static void
-entityDeclDebug(void *ctx, const xmlChar *name, int type,
+entityDeclDebug(void *ctx ATTRIBUTE_UNUSED, const xmlChar *name, int type,
           const xmlChar *publicId, const xmlChar *systemId, xmlChar *content)
 {
-    debugContext *ctxt = ctx;
-    xmlEntityPtr ent;
-    const xmlChar *nullstr = BAD_CAST "(null)";
-
+const xmlChar *nullstr = BAD_CAST "(null)";
     /* not all libraries handle printing null pointers nicely */
     if (publicId == NULL)
         publicId = nullstr;
@@ -1069,16 +1054,6 @@ entityDeclDebug(void *ctx, const xmlChar *name, int type,
 	return;
     fprintf(SAXdebug, "SAX.entityDecl(%s, %d, %s, %s, %s)\n",
             name, type, publicId, systemId, content);
-
-    ent = xmlNewEntity(NULL, name, type, publicId, systemId, content);
-    if (systemId != NULL)
-        ent->URI = xmlBuildURI(systemId, (const xmlChar *) ctxt->filename);
-
-    if ((type == XML_INTERNAL_PARAMETER_ENTITY) ||
-        (type == XML_EXTERNAL_PARAMETER_ENTITY))
-        xmlHashAddEntry(ctxt->parameterEntities, name, ent);
-    else
-        xmlHashAddEntry(ctxt->generalEntities, name, ent);
 }
 
 /**
@@ -1736,13 +1711,6 @@ static xmlSAXHandler debugHTMLSAXHandlerStruct = {
 static xmlSAXHandlerPtr debugHTMLSAXHandler = &debugHTMLSAXHandlerStruct;
 #endif /* LIBXML_HTML_ENABLED */
 
-static void
-hashFreeEntity(void *payload, const xmlChar *name ATTRIBUTE_UNUSED) {
-    xmlEntityPtr ent = payload;
-
-    xmlFreeEntity(ent);
-}
-
 /**
  * saxParseTest:
  * @filename: the file to parse
@@ -1816,24 +1784,16 @@ saxParseTest(const char *filename, const char *result,
     } else
 #endif
     {
-        debugContext userData;
         xmlParserCtxtPtr ctxt = xmlCreateFileParserCtxt(filename);
-
         if (options & XML_PARSE_SAX1) {
             memcpy(ctxt->sax, debugSAXHandler, sizeof(xmlSAXHandler));
             options -= XML_PARSE_SAX1;
         } else {
             memcpy(ctxt->sax, debugSAX2Handler, sizeof(xmlSAXHandler));
         }
-        userData.filename = filename;
-        userData.generalEntities = xmlHashCreate(0);
-        userData.parameterEntities = xmlHashCreate(0);
-        ctxt->userData = &userData;
         xmlCtxtUseOptions(ctxt, options);
         xmlParseDocument(ctxt);
         ret = ctxt->wellFormed ? 0 : ctxt->errNo;
-        xmlHashFree(userData.generalEntities, hashFreeEntity);
-        xmlHashFree(userData.parameterEntities, hashFreeEntity);
         xmlFreeDoc(ctxt->myDoc);
         xmlFreeParserCtxt(ctxt);
     }
@@ -4430,10 +4390,6 @@ thread_specific_data(void *private_data)
     xmlThreadParams *params = (xmlThreadParams *) private_data;
     const char *filename = params->filename;
     int okay = 1;
-
-#ifdef LIBXML_THREAD_ALLOC_ENABLED
-    xmlMemSetup(xmlMemFree, xmlMemMalloc, xmlMemRealloc, xmlMemoryStrdup);
-#endif
 
     myDoc = xmlReadFile(filename, NULL, XML_PARSE_NOENT | XML_PARSE_DTDLOAD);
     if (myDoc) {

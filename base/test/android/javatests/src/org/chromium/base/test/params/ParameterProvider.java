@@ -6,9 +6,6 @@ package org.chromium.base.test.params;
 
 /**
  * Generator to use generate arguments for parameterized test methods.
- *
  * @see ParameterAnnotations.UseMethodParameter
  */
-public interface ParameterProvider {
-    Iterable<ParameterSet> getParameters();
-}
+public interface ParameterProvider { Iterable<ParameterSet> getParameters(); }

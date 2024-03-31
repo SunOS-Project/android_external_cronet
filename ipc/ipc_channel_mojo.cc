@@ -312,7 +312,7 @@ void ChannelMojo::OnBrokenDataReceived() {
 // static
 MojoResult ChannelMojo::ReadFromMessageAttachmentSet(
     Message* message,
-    std::optional<std::vector<mojo::native::SerializedHandlePtr>>* handles) {
+    absl::optional<std::vector<mojo::native::SerializedHandlePtr>>* handles) {
   DCHECK(!*handles);
 
   MojoResult result = MOJO_RESULT_OK;
@@ -341,7 +341,7 @@ MojoResult ChannelMojo::ReadFromMessageAttachmentSet(
 
 // static
 MojoResult ChannelMojo::WriteToMessageAttachmentSet(
-    std::optional<std::vector<mojo::native::SerializedHandlePtr>> handles,
+    absl::optional<std::vector<mojo::native::SerializedHandlePtr>> handles,
     Message* message) {
   if (!handles)
     return MOJO_RESULT_OK;
@@ -390,10 +390,6 @@ void ChannelMojo::GetRemoteAssociatedInterface(
     // dropped).
     mojo::AssociateWithDisconnectedPipe(receiver.PassHandle());
   }
-}
-
-void ChannelMojo::SetUrgentMessageObserver(UrgentMessageObserver* observer) {
-  bootstrap_->SetUrgentMessageObserver(observer);
 }
 
 }  // namespace IPC

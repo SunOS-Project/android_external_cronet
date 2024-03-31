@@ -533,7 +533,7 @@ TEST_F(WebSocketEndToEndTest, MAYBE_ProxyPacUsed) {
   const auto& info = proxy_delegate_->resolved_proxy_info();
   EXPECT_EQ(ws_url, info.url);
   EXPECT_TRUE(info.proxy_info.is_http());
-  EXPECT_EQ(info.proxy_info.ToDebugString(),
+  EXPECT_EQ(info.proxy_info.ToPacString(),
             base::StrCat({"PROXY ", proxy_server.host_port_pair().ToString()}));
 }
 

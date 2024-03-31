@@ -13,7 +13,9 @@ import org.chromium.base.task.PostTask;
 
 import java.util.concurrent.TimeUnit;
 
-/** Allows tests to manually schedule background tasks posted via PostTask APIs. */
+/**
+ * Allows tests to manually schedule background tasks posted via PostTask APIs.
+ */
 public class PausedExecutorTestRule extends ExternalResource {
     private final PausedExecutorService mPausedExecutor = new PausedExecutorService();
 

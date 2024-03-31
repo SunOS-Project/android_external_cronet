@@ -23,7 +23,9 @@ import org.chromium.base.test.UiThreadTest;
 
 import java.lang.ref.WeakReference;
 
-/** Tests for {@link GarbageCollectionTestUtils}. */
+/**
+ * Tests for {@link GarbageCollectionTestUtils}.
+ */
 @RunWith(BaseJUnit4ClassRunner.class)
 public class GarbageCollectionTestUtilsTest {
     @Test

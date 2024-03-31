@@ -6,7 +6,6 @@
 
 #include <limits>
 #include <memory>
-#include <optional>
 #include <string>
 #include <utility>
 
@@ -14,6 +13,7 @@
 #include "absl/strings/numbers.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 #include "quiche/http2/http2_constants.h"
 #include "quiche/quic/core/http/http_constants.h"
 #include "quiche/quic/core/http/http_decoder.h"
@@ -1117,7 +1117,7 @@ void QuicSpdyStream::OnWebTransportStreamFrameType(
   QuicStreamOffset offset = sequencer()->NumBytesConsumed();
   sequencer()->MarkConsumed(header_length);
 
-  std::optional<WebTransportHttp3Version> version =
+  absl::optional<WebTransportHttp3Version> version =
       spdy_session_->SupportedWebTransportVersion();
   QUICHE_DCHECK(version.has_value());
   if (version == WebTransportHttp3Version::kDraft02) {

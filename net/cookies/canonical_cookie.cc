@@ -369,6 +369,7 @@ CanonicalCookie::CanonicalCookie(
     bool httponly,
     CookieSameSite same_site,
     CookiePriority priority,
+    bool same_party,
     absl::optional<CookiePartitionKey> partition_key,
     CookieSourceScheme source_scheme,
     int source_port)
@@ -384,6 +385,7 @@ CanonicalCookie::CanonicalCookie(
       httponly_(httponly),
       same_site_(same_site),
       priority_(priority),
+      same_party_(same_party),
       partition_key_(std::move(partition_key)),
       source_scheme_(source_scheme),
       source_port_(source_port) {}
@@ -682,7 +684,8 @@ std::unique_ptr<CanonicalCookie> CanonicalCookie::Create(
       cookie_expires, creation_time,
       /*last_update=*/base::Time::Now(), parsed_cookie.IsSecure(),
       parsed_cookie.IsHttpOnly(), samesite, parsed_cookie.Priority(),
-      cookie_partition_key, source_scheme, source_port);
+      parsed_cookie.IsSameParty(), cookie_partition_key, source_scheme,
+      source_port);
 
   // TODO(chlily): Log metrics.
   if (!cc->IsCanonical()) {
@@ -703,7 +706,7 @@ std::unique_ptr<CanonicalCookie> CanonicalCookie::Create(
   // Check for "__" prefixed names, excluding the cookie prefixes.
   bool name_prefixed_with_underscores =
       (prefix_case_insensitive == CanonicalCookie::COOKIE_PREFIX_NONE) &&
-      parsed_cookie.Name().starts_with("__");
+      base::StartsWith(parsed_cookie.Name(), "__");
 
   UMA_HISTOGRAM_BOOLEAN("Cookie.DoubleUnderscorePrefixedName",
                         name_prefixed_with_underscores);
@@ -729,6 +732,7 @@ std::unique_ptr<CanonicalCookie> CanonicalCookie::CreateSanitizedCookie(
     bool http_only,
     CookieSameSite same_site,
     CookiePriority priority,
+    bool same_party,
     absl::optional<CookiePartitionKey> partition_key,
     CookieInclusionStatus* status) {
   // Put a pointer on the stack so the rest of the function can assign to it if
@@ -897,7 +901,7 @@ std::unique_ptr<CanonicalCookie> CanonicalCookie::CreateSanitizedCookie(
       base::PassKey<CanonicalCookie>(), name, value, cookie_domain,
       encoded_cookie_path, creation_time, expiration_time, last_access_time,
       /*last_update=*/base::Time::Now(), secure, http_only, same_site, priority,
-      partition_key, source_scheme, source_port);
+      same_party, partition_key, source_scheme, source_port);
   DCHECK(cc->IsCanonical());
 
   return cc;
@@ -917,6 +921,7 @@ std::unique_ptr<CanonicalCookie> CanonicalCookie::FromStorage(
     bool httponly,
     CookieSameSite same_site,
     CookiePriority priority,
+    bool same_party,
     absl::optional<CookiePartitionKey> partition_key,
     CookieSourceScheme source_scheme,
     int source_port) {
@@ -931,8 +936,8 @@ std::unique_ptr<CanonicalCookie> CanonicalCookie::FromStorage(
   auto cc = std::make_unique<CanonicalCookie>(
       base::PassKey<CanonicalCookie>(), std::move(name), std::move(value),
       std::move(domain), std::move(path), creation, expiration, last_access,
-      last_update, secure, httponly, same_site, priority, partition_key,
-      source_scheme, validated_port);
+      last_update, secure, httponly, same_site, priority, same_party,
+      partition_key, source_scheme, validated_port);
 
   if (cc->IsCanonicalForFromStorage()) {
     // This will help capture the number of times a cookie is canonical but does
@@ -961,13 +966,14 @@ std::unique_ptr<CanonicalCookie> CanonicalCookie::CreateUnsafeCookieForTesting(
     bool httponly,
     CookieSameSite same_site,
     CookiePriority priority,
+    bool same_party,
     absl::optional<CookiePartitionKey> partition_key,
     CookieSourceScheme source_scheme,
     int source_port) {
   return std::make_unique<CanonicalCookie>(
       base::PassKey<CanonicalCookie>(), name, value, domain, path, creation,
       expiration, last_access, last_update, secure, httponly, same_site,
-      priority, partition_key, source_scheme, source_port);
+      priority, same_party, partition_key, source_scheme, source_port);
 }
 
 bool CanonicalCookie::IsFirstPartyPartitioned() const {
@@ -987,19 +993,6 @@ std::string CanonicalCookie::DomainWithoutDot() const {
 
 void CanonicalCookie::SetSourcePort(int port) {
   source_port_ = ValidateAndAdjustSourcePort(port);
-}
-
-CanonicalCookie::UniqueCookieKey CanonicalCookie::UniqueKey() const {
-  absl::optional<CookieSourceScheme> source_scheme =
-      cookie_util::IsSchemeBoundCookiesEnabled()
-          ? absl::make_optional(source_scheme_)
-          : absl::nullopt;
-  absl::optional<int> source_port = cookie_util::IsPortBoundCookiesEnabled()
-                                        ? absl::make_optional(source_port_)
-                                        : absl::nullopt;
-
-  return std::make_tuple(partition_key_, name_, domain_, path_, source_scheme,
-                         source_port);
 }
 
 bool CanonicalCookie::IsEquivalentForSecureCookieMatching(
@@ -1207,6 +1200,7 @@ CookieAccessResult CanonicalCookie::IncludeForRequestURL(
         CookieInclusionStatus::EXCLUDE_SAMESITE_NONE_INSECURE);
   }
 
+  // Only apply SameSite-related warnings if SameParty is not in effect.
   ApplySameSiteCookieWarningToStatus(SameSite(), effective_same_site,
                                      IsSecure(),
                                      options.same_site_cookie_context(),
@@ -1380,6 +1374,7 @@ CookieAccessResult CanonicalCookie::IsSetPermittedInContext(
       break;
   }
 
+  // Only apply SameSite-related warnings if SameParty is not in effect.
   ApplySameSiteCookieWarningToStatus(
       SameSite(), access_result.effective_same_site, IsSecure(),
       options.same_site_cookie_context(), &access_result.status,

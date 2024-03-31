@@ -326,7 +326,8 @@ TEST_F(UDPSocketTest, PartialRecv) {
   // Read just 2 bytes. Read() is expected to return the first 2 bytes from the
   // packet and discard the rest.
   const int kPartialReadSize = 2;
-  auto buffer = base::MakeRefCounted<IOBufferWithSize>(kPartialReadSize);
+  scoped_refptr<IOBuffer> buffer =
+      base::MakeRefCounted<IOBuffer>(kPartialReadSize);
   int rv =
       server_socket.RecvFrom(buffer.get(), kPartialReadSize,
                              &recv_from_address_, recv_callback.callback());

@@ -80,27 +80,13 @@ public class BaseActivityTestRule<T extends Activity> implements TestRule {
         //
         // TODO(AccessibilityChecks): Complete above audits and ideally suppress no checks.
         try {
-            AccessibilityChecks.enable()
-                    .setSuppressingResultMatcher(
-                            anyOf(
-                                    matchesCheckNames(
-                                            is(TouchTargetSizeViewCheck.class.getSimpleName())),
-                                    matchesCheckNames(
-                                            is(ClickableSpanViewCheck.class.getSimpleName())),
-                                    matchesCheckNames(
-                                            is(EditableContentDescViewCheck.class.getSimpleName())),
-                                    matchesCheckNames(
-                                            is(
-                                                    DuplicateClickableBoundsViewCheck.class
-                                                            .getSimpleName())),
-                                    matchesCheckNames(
-                                            is(
-                                                    SpeakableTextPresentInfoCheck.class
-                                                            .getSimpleName())),
-                                    matchesCheckNames(
-                                            is(
-                                                    SpeakableTextPresentViewCheck.class
-                                                            .getSimpleName()))));
+            AccessibilityChecks.enable().setSuppressingResultMatcher(anyOf(
+                    matchesCheckNames(is(TouchTargetSizeViewCheck.class.getSimpleName())),
+                    matchesCheckNames(is(ClickableSpanViewCheck.class.getSimpleName())),
+                    matchesCheckNames(is(EditableContentDescViewCheck.class.getSimpleName())),
+                    matchesCheckNames(is(DuplicateClickableBoundsViewCheck.class.getSimpleName())),
+                    matchesCheckNames(is(SpeakableTextPresentInfoCheck.class.getSimpleName())),
+                    matchesCheckNames(is(SpeakableTextPresentViewCheck.class.getSimpleName()))));
         } catch (IllegalStateException e) {
             // Suppress IllegalStateException for AccessibilityChecks already enabled.
         }
@@ -139,7 +125,9 @@ public class BaseActivityTestRule<T extends Activity> implements TestRule {
         return mActivity;
     }
 
-    /** Set the Activity to be used by this TestRule. */
+    /**
+     * Set the Activity to be used by this TestRule.
+     */
     public void setActivity(T activity) {
         mActivity = activity;
     }
@@ -157,12 +145,10 @@ public class BaseActivityTestRule<T extends Activity> implements TestRule {
             startIntent = getActivityIntent();
         } else {
             String packageName = ContextUtils.getApplicationContext().getPackageName();
-            Assert.assertTrue(
-                    TextUtils.equals(startIntent.getPackage(), packageName)
-                            || (startIntent.getComponent() != null
-                                    && TextUtils.equals(
-                                            startIntent.getComponent().getPackageName(),
-                                            packageName)));
+            Assert.assertTrue(TextUtils.equals(startIntent.getPackage(), packageName)
+                    || (startIntent.getComponent() != null
+                            && TextUtils.equals(
+                                    startIntent.getComponent().getPackageName(), packageName)));
         }
 
         startIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
@@ -170,11 +156,8 @@ public class BaseActivityTestRule<T extends Activity> implements TestRule {
         Log.d(TAG, String.format("Launching activity %s", mActivityClass.getName()));
 
         final Intent intent = startIntent;
-        mActivity =
-                ApplicationTestUtils.waitForActivityWithClass(
-                        mActivityClass,
-                        Stage.CREATED,
-                        () -> ContextUtils.getApplicationContext().startActivity(intent));
+        mActivity = ApplicationTestUtils.waitForActivityWithClass(mActivityClass, Stage.CREATED,
+                () -> ContextUtils.getApplicationContext().startActivity(intent));
     }
 
     /**

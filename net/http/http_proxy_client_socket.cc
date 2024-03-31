@@ -133,6 +133,12 @@ bool HttpProxyClientSocket::WasEverUsed() const {
   return false;
 }
 
+bool HttpProxyClientSocket::WasAlpnNegotiated() const {
+  // Do not delegate to `socket_`. While `socket_` may negotiate ALPN with the
+  // proxy, this object represents the tunneled TCP connection to the origin.
+  return false;
+}
+
 NextProto HttpProxyClientSocket::GetNegotiatedProtocol() const {
   // Do not delegate to `socket_`. While `socket_` may negotiate ALPN with the
   // proxy, this object represents the tunneled TCP connection to the origin.
@@ -220,7 +226,7 @@ int HttpProxyClientSocket::PrepareForAuthRestart() {
   // If the auth request had a body, need to drain it before reusing the socket.
   if (!http_stream_parser_->IsResponseBodyComplete()) {
     next_state_ = STATE_DRAIN_BODY;
-    drain_buf_ = base::MakeRefCounted<IOBufferWithSize>(kDrainBodyBufferSize);
+    drain_buf_ = base::MakeRefCounted<IOBuffer>(kDrainBodyBufferSize);
     return OK;
   }
 

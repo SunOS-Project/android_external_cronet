@@ -16,8 +16,7 @@ namespace base {
 using HistogramEnumEntryMap = std::map<HistogramBase::Sample, std::string>;
 
 // Find and read the enum with the given |enum_name| (with integer values) from
-// tools/metrics/histograms/enums.xml, or from enums.xml in the given
-// |subdirectory| of tools/metrics/histograms/metadata.
+// tools/metrics/histograms/enums.xml.
 //
 // Returns map { value => label } so that:
 //   <int value="9" label="enable-pinch-virtual-viewport"/>
@@ -25,8 +24,7 @@ using HistogramEnumEntryMap = std::map<HistogramBase::Sample, std::string>;
 //   { 9 => "enable-pinch-virtual-viewport" }
 // Returns empty absl::nullopt on failure.
 absl::optional<HistogramEnumEntryMap> ReadEnumFromEnumsXml(
-    const std::string& enum_name,
-    const absl::optional<std::string>& subdirectory = absl::nullopt);
+    const std::string& enum_name);
 
 }  // namespace base
 

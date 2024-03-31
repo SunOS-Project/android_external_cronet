@@ -29,9 +29,8 @@ TEST_CONSTEXPR_CXX20 inline typename std::allocator_traits<Alloc>::size_type all
 struct test_allocator_statistics {
   int time_to_throw = 0;
   int throw_after = INT_MAX;
-  int count           = 0; // the number of active instances
-  int alloc_count     = 0; // the number of allocations not deallocating
-  int allocated_size  = 0; // the size of allocated elements
+  int count = 0;
+  int alloc_count = 0;
   int construct_count = 0; // the number of times that ::construct was called
   int destroy_count = 0; // the number of times that ::destroy was called
   int copied = 0;
@@ -43,7 +42,6 @@ struct test_allocator_statistics {
     count = 0;
     time_to_throw = 0;
     alloc_count = 0;
-    allocated_size  = 0;
     construct_count = 0;
     destroy_count = 0;
     throw_after = INT_MAX;
@@ -157,17 +155,14 @@ public:
         TEST_THROW(std::bad_alloc());
       ++stats_->time_to_throw;
       ++stats_->alloc_count;
-      stats_->allocated_size += n;
     }
     return std::allocator<value_type>().allocate(n);
   }
 
   TEST_CONSTEXPR_CXX14 void deallocate(pointer p, size_type s) {
     assert(data_ != test_alloc_base::destructed_value);
-    if (stats_ != nullptr) {
+    if (stats_ != nullptr)
       --stats_->alloc_count;
-      stats_->allocated_size -= s;
-    }
     std::allocator<value_type>().deallocate(p, s);
   }
 
@@ -280,7 +275,6 @@ public:
   }
 
   TEST_CONSTEXPR_CXX14 friend bool operator!=(const other_allocator& x, const other_allocator& y) { return !(x == y); }
-  TEST_CONSTEXPR int get_data() const { return data_; }
 
   typedef std::true_type propagate_on_container_copy_assignment;
   typedef std::true_type propagate_on_container_move_assignment;

@@ -28,8 +28,6 @@
 
 namespace IPC {
 
-class UrgentMessageObserver;
-
 // Mojo-based IPC::Channel implementation over a Mojo message pipe.
 //
 // ChannelMojo builds a Mojo MessagePipe using the provided message pipe
@@ -78,16 +76,15 @@ class COMPONENT_EXPORT(IPC) ChannelMojo
   void Close() override;
   bool Send(Message* message) override;
   Channel::AssociatedInterfaceSupport* GetAssociatedInterfaceSupport() override;
-  void SetUrgentMessageObserver(UrgentMessageObserver* observer) override;
 
   // These access protected API of IPC::Message, which has ChannelMojo
   // as a friend class.
   static MojoResult WriteToMessageAttachmentSet(
-      std::optional<std::vector<mojo::native::SerializedHandlePtr>> handles,
+      absl::optional<std::vector<mojo::native::SerializedHandlePtr>> handles,
       Message* message);
   static MojoResult ReadFromMessageAttachmentSet(
       Message* message,
-      std::optional<std::vector<mojo::native::SerializedHandlePtr>>* handles);
+      absl::optional<std::vector<mojo::native::SerializedHandlePtr>>* handles);
 
   // MessagePipeReader::Delegate
   void OnPeerPidReceived(int32_t peer_pid) override;

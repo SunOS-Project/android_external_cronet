@@ -30,9 +30,6 @@ public abstract class MethodParamRule implements MethodRule {
         return applyParameterAndValues(base, target, parameterProvider, values);
     }
 
-    protected abstract Statement applyParameterAndValues(
-            final Statement base,
-            Object target,
-            Class<? extends ParameterProvider> parameterProvider,
-            List<Object> values);
+    protected abstract Statement applyParameterAndValues(final Statement base, Object target,
+            Class<? extends ParameterProvider> parameterProvider, List<Object> values);
 }

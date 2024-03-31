@@ -321,12 +321,13 @@ void SpdyProxyClientSocketTest::AssertConnectionEstablished() {
   // values.
   net::SSLInfo ssl_info;
   EXPECT_FALSE(sock_->GetSSLInfo(&ssl_info));
+  EXPECT_FALSE(sock_->WasAlpnNegotiated());
   EXPECT_EQ(sock_->GetNegotiatedProtocol(), NextProto::kProtoUnknown);
 }
 
 void SpdyProxyClientSocketTest::AssertSyncReadEquals(const char* data,
                                                      int len) {
-  auto buf = base::MakeRefCounted<IOBufferWithSize>(len);
+  scoped_refptr<IOBuffer> buf = base::MakeRefCounted<IOBuffer>(len);
   if (use_read_if_ready()) {
     ASSERT_EQ(len,
               sock_->ReadIfReady(buf.get(), len, CompletionOnceCallback()));
@@ -349,7 +350,7 @@ void SpdyProxyClientSocketTest::AssertAsyncReadEquals(const char* data,
                                                       int len,
                                                       bool fin) {
   // Issue the read, which will be completed asynchronously
-  auto buf = base::MakeRefCounted<IOBufferWithSize>(len);
+  scoped_refptr<IOBuffer> buf = base::MakeRefCounted<IOBuffer>(len);
   if (use_read_if_ready()) {
     ASSERT_EQ(ERR_IO_PENDING,
               sock_->ReadIfReady(buf.get(), len, read_callback_.callback()));
@@ -380,7 +381,7 @@ void SpdyProxyClientSocketTest::AssertAsyncReadEquals(const char* data,
 
 void SpdyProxyClientSocketTest::AssertReadStarts(const char* data, int len) {
   // Issue the read, which will be completed asynchronously.
-  read_buf_ = base::MakeRefCounted<IOBufferWithSize>(len);
+  read_buf_ = base::MakeRefCounted<IOBuffer>(len);
   if (use_read_if_ready()) {
     ASSERT_EQ(ERR_IO_PENDING, sock_->ReadIfReady(read_buf_.get(), len,
                                                  read_callback_.callback()));
@@ -1214,7 +1215,7 @@ TEST_P(SpdyProxyClientSocketTest, ReadOnClosedSocketReturnsBufferedData) {
   ResumeAndRun();
 
   ASSERT_FALSE(sock_->IsConnected());
-  auto buf = base::MakeRefCounted<IOBufferWithSize>(kLen1);
+  scoped_refptr<IOBuffer> buf = base::MakeRefCounted<IOBuffer>(kLen1);
   ASSERT_EQ(kLen1, sock_->Read(buf.get(), kLen1, CompletionOnceCallback()));
   ASSERT_EQ(std::string(kMsg1, kLen1), std::string(buf->data(), kLen1));
 
@@ -1369,7 +1370,7 @@ TEST_P(SpdyProxyClientSocketTest, DisconnectWithReadPending) {
 
   EXPECT_TRUE(sock_->IsConnected());
 
-  auto buf = base::MakeRefCounted<IOBufferWithSize>(kLen1);
+  scoped_refptr<IOBuffer> buf = base::MakeRefCounted<IOBuffer>(kLen1);
   ASSERT_EQ(ERR_IO_PENDING,
             sock_->Read(buf.get(), kLen1, read_callback_.callback()));
 
@@ -1404,7 +1405,7 @@ TEST_P(SpdyProxyClientSocketTest, RstWithReadAndWritePending) {
 
   EXPECT_TRUE(sock_->IsConnected());
 
-  auto read_buf = base::MakeRefCounted<IOBufferWithSize>(kLen1);
+  scoped_refptr<IOBuffer> read_buf = base::MakeRefCounted<IOBuffer>(kLen1);
   ASSERT_EQ(ERR_IO_PENDING,
             sock_->Read(read_buf.get(), kLen1, read_callback_.callback()));
 
@@ -1534,7 +1535,7 @@ TEST_P(SpdyProxyClientSocketTest, RstWithReadAndWritePendingDelete) {
 
   DeleteSockCallback read_callback(&sock_);
 
-  auto read_buf = base::MakeRefCounted<IOBufferWithSize>(kLen1);
+  scoped_refptr<IOBuffer> read_buf = base::MakeRefCounted<IOBuffer>(kLen1);
   ASSERT_EQ(ERR_IO_PENDING,
             sock_->Read(read_buf.get(), kLen1, read_callback.callback()));
 

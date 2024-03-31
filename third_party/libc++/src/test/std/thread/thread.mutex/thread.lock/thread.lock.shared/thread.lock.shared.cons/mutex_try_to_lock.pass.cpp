@@ -10,6 +10,8 @@
 // UNSUPPORTED: c++03, c++11
 // ALLOW_RETRIES: 2
 
+// XFAIL: availability-shared_mutex-missing
+
 // <shared_mutex>
 
 // template <class Mutex> class shared_lock;

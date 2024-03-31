@@ -21,7 +21,9 @@ public class Origin {
     private final long mTokenHighBits;
     private final long mTokenLowBits;
 
-    /** Constructs an opaque origin. */
+    /**
+     * Constructs an opaque origin.
+     */
     public static Origin createOpaqueOrigin() {
         return OriginJni.get().createOpaque();
     }
@@ -59,12 +61,7 @@ public class Origin {
     }
 
     @CalledByNative
-    private Origin(
-            String scheme,
-            String host,
-            short port,
-            boolean isOpaque,
-            long tokenHighBits,
+    private Origin(String scheme, String host, short port, boolean isOpaque, long tokenHighBits,
             long tokenLowBits) {
         mScheme = scheme;
         mHost = host;
@@ -96,8 +93,8 @@ public class Origin {
 
     @CalledByNative
     private long toNativeOrigin() {
-        return OriginJni.get()
-                .createNative(mScheme, mHost, mPort, mIsOpaque, mTokenHighBits, mTokenLowBits);
+        return OriginJni.get().createNative(
+                mScheme, mHost, mPort, mIsOpaque, mTokenHighBits, mTokenLowBits);
     }
 
     @NativeMethods
@@ -108,13 +105,10 @@ public class Origin {
         /** Constructs an Origin from a GURL. */
         Origin createFromGURL(GURL gurl);
 
-        /** Reconstructs the native Origin for this Java Origin, returning its native pointer. */
-        long createNative(
-                String scheme,
-                String host,
-                short port,
-                boolean isOpaque,
-                long tokenHighBits,
-                long tokenLowBits);
+        /**
+         * Reconstructs the native Origin for this Java Origin, returning its native pointer.
+         */
+        long createNative(String scheme, String host, short port, boolean isOpaque,
+                long tokenHighBits, long tokenLowBits);
     }
 }

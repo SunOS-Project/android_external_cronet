@@ -14,7 +14,10 @@ FirstPartySetsCacheFilter::MatchInfo::MatchInfo(
 FirstPartySetsCacheFilter::MatchInfo::MatchInfo::~MatchInfo() = default;
 
 bool FirstPartySetsCacheFilter::MatchInfo::operator==(
-    const FirstPartySetsCacheFilter::MatchInfo& other) const = default;
+    const FirstPartySetsCacheFilter::MatchInfo& other) const {
+  return std::tie(clear_at_run_id, browser_run_id) ==
+         std::tie(other.clear_at_run_id, other.browser_run_id);
+}
 
 FirstPartySetsCacheFilter::FirstPartySetsCacheFilter() = default;
 FirstPartySetsCacheFilter::FirstPartySetsCacheFilter(
@@ -32,7 +35,10 @@ FirstPartySetsCacheFilter& FirstPartySetsCacheFilter::operator=(
 FirstPartySetsCacheFilter::~FirstPartySetsCacheFilter() = default;
 
 bool FirstPartySetsCacheFilter::operator==(
-    const FirstPartySetsCacheFilter& other) const = default;
+    const FirstPartySetsCacheFilter& other) const {
+  return std::tie(filter_, browser_run_id_) ==
+         std::tie(other.filter_, other.browser_run_id_);
+}
 
 FirstPartySetsCacheFilter FirstPartySetsCacheFilter::Clone() const {
   return FirstPartySetsCacheFilter(filter_, browser_run_id_);

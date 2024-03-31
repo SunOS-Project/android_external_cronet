@@ -15,6 +15,8 @@ namespace {
 // this array refer to features defined in base_features.h.
 const base::Feature* const kFeaturesExposedToJava[] = {
     &features::kBrowserProcessMemoryPurge,
+    &features::kCrashBrowserOnChildMismatchIfBrowserChanged,
+    &features::kCrashBrowserOnAnyChildMismatch,
 };  // namespace
 
 // static

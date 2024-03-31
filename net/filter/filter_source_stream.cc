@@ -89,7 +89,7 @@ FilterSourceStream::SourceType FilterSourceStream::ParseEncodingType(
     const std::string& encoding) {
   std::string lower_encoding = base::ToLowerASCII(encoding);
   static constexpr auto kEncodingMap =
-      base::MakeFixedFlatMap<base::StringPiece, SourceType>({
+      base::MakeFixedFlatMapSorted<base::StringPiece, SourceType>({
           {"", TYPE_NONE},
           {kBrotli, TYPE_BROTLI},
           {kDeflate, TYPE_DEFLATE},

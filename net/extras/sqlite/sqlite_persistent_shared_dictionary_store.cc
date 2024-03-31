@@ -11,7 +11,6 @@
 #include "base/pickle.h"
 #include "base/strings/strcat.h"
 #include "base/task/sequenced_task_runner.h"
-#include "base/types/expected_macros.h"
 #include "net/base/network_isolation_key.h"
 #include "net/extras/shared_dictionary/shared_dictionary_isolation_key.h"
 #include "net/extras/sqlite/sqlite_persistent_store_backend_base.h"
@@ -564,7 +563,10 @@ SQLitePersistentSharedDictionaryStore::Backend::RegisterDictionaryImpl(
     return base::unexpected(error);
   }
 
-  ASSIGN_OR_RETURN(uint64_t total_dictionary_count, GetTotalDictionaryCount());
+  SizeOrError total_dictionary_count_result = GetTotalDictionaryCount();
+  if (!total_dictionary_count_result.has_value()) {
+    return base::unexpected(total_dictionary_count_result.error());
+  }
 
   if (!transaction.Commit()) {
     return base::unexpected(Error::kFailedToCommitTransaction);
@@ -573,7 +575,7 @@ SQLitePersistentSharedDictionaryStore::Backend::RegisterDictionaryImpl(
       id, replaced_disk_cache_key_token,
       std::set<base::UnguessableToken>(evicted_disk_cache_key_tokens.begin(),
                                        evicted_disk_cache_key_tokens.end()),
-      total_dictionary_size, total_dictionary_count});
+      total_dictionary_size, total_dictionary_count_result.value()});
 }
 
 SQLitePersistentSharedDictionaryStore::Error
@@ -622,32 +624,35 @@ SQLitePersistentSharedDictionaryStore::Backend::
   CHECK(primary_keys_out->empty());
   CHECK(tokens_out->empty());
   CHECK_EQ(0, *total_size_of_candidates_out);
-
-  ASSIGN_OR_RETURN(uint64_t size_per_site,
-                   GetDictionarySizePerSite(top_frame_site));
-  ASSIGN_OR_RETURN(uint64_t count_per_site,
-                   GetDictionaryCountPerSite(top_frame_site));
+  SizeOrError size_per_site = GetDictionarySizePerSite(top_frame_site);
+  if (!size_per_site.has_value()) {
+    return size_per_site.error();
+  }
+  SizeOrError count_per_site = GetDictionaryCountPerSite(top_frame_site);
+  if (!count_per_site.has_value()) {
+    return count_per_site.error();
+  }
 
   base::UmaHistogramMemoryKB(
       base::StrCat({kHistogramPrefix, "DictionarySizeKBPerSiteWhenAdded"}),
-      size_per_site);
+      size_per_site.value());
   base::UmaHistogramCounts1000(
       base::StrCat({kHistogramPrefix, "DictionaryCountPerSiteWhenAdded"}),
-      count_per_site);
+      count_per_site.value());
 
-  if ((max_size_per_site == 0 || size_per_site <= max_size_per_site) &&
-      count_per_site <= max_count_per_site) {
+  if ((max_size_per_site == 0 || size_per_site.value() <= max_size_per_site) &&
+      count_per_site.value() <= max_count_per_site) {
     return Error::kOk;
   }
 
   uint64_t to_be_removed_count = 0;
-  if (count_per_site > max_count_per_site) {
-    to_be_removed_count = count_per_site - max_count_per_site;
+  if (count_per_site.value() > max_count_per_site) {
+    to_be_removed_count = count_per_site.value() - max_count_per_site;
   }
 
   int64_t to_be_removed_size = 0;
-  if (max_size_per_site != 0 && size_per_site > max_size_per_site) {
-    to_be_removed_size = size_per_site - max_size_per_site;
+  if (max_size_per_site != 0 && size_per_site.value() > max_size_per_site) {
+    to_be_removed_size = size_per_site.value() - max_size_per_site;
   }
   static constexpr char kQuery[] =
       // clang-format off
@@ -1335,9 +1340,17 @@ SQLitePersistentSharedDictionaryStore::Backend::SelectEvictionCandidates(
     std::vector<int64_t>* primary_keys_out,
     std::vector<base::UnguessableToken>* tokens_out,
     int64_t* total_size_after_eviction_out) {
-  ASSIGN_OR_RETURN(uint64_t total_dictionary_size,
-                   GetTotalDictionarySizeImpl());
-  ASSIGN_OR_RETURN(uint64_t total_dictionary_count, GetTotalDictionaryCount());
+  SizeOrError total_dictionary_size_result = GetTotalDictionarySizeImpl();
+  if (!total_dictionary_size_result.has_value()) {
+    return total_dictionary_size_result.error();
+  }
+  uint64_t total_dictionary_size = total_dictionary_size_result.value();
+
+  SizeOrError total_dictionary_count_result = GetTotalDictionaryCount();
+  if (!total_dictionary_count_result.has_value()) {
+    return total_dictionary_count_result.error();
+  }
+  uint64_t total_dictionary_count = total_dictionary_count_result.value();
 
   if ((cache_max_size == 0 || total_dictionary_size <= cache_max_size) &&
       total_dictionary_count <= cache_max_count) {
@@ -1429,19 +1442,20 @@ SQLitePersistentSharedDictionaryStore::Backend::
     return Error::kFailedToBeginTransaction;
   }
 
-  base::CheckedNumeric<int64_t> checked_total_deleted_dictionary_size;
+  base::CheckedNumeric<int64_t> checked_total_dictionary_size;
   for (const auto& token : disk_cache_key_tokens) {
-    ASSIGN_OR_RETURN(uint64_t deleted_dictionary_size,
-                     DeleteDictionaryByDiskCacheToken(token));
-    checked_total_deleted_dictionary_size += deleted_dictionary_size;
+    SizeOrError result = DeleteDictionaryByDiskCacheToken(token);
+    if (!result.has_value()) {
+      return result.error();
+    }
+    checked_total_dictionary_size += result.value();
   }
 
-  int64_t total_deleted_dictionary_size =
-      checked_total_deleted_dictionary_size.ValueOrDie();
-  if (total_deleted_dictionary_size != 0) {
+  int64_t deleted_size = checked_total_dictionary_size.ValueOrDie();
+  if (deleted_size != 0u) {
     uint64_t total_dictionary_size = 0;
-    Error error = UpdateTotalDictionarySizeInMetaTable(
-        -total_deleted_dictionary_size, &total_dictionary_size);
+    Error error = UpdateTotalDictionarySizeInMetaTable(-deleted_size,
+                                                       &total_dictionary_size);
     if (error != Error::kOk) {
       return error;
     }
@@ -1610,10 +1624,13 @@ SQLitePersistentSharedDictionaryStore::Backend::
     UpdateTotalDictionarySizeInMetaTable(int64_t size_delta,
                                          uint64_t* total_dictionary_size_out) {
   CHECK(background_task_runner()->RunsTasksInCurrentSequence());
-  ASSIGN_OR_RETURN(uint64_t total_dictionary_size,
-                   GetTotalDictionarySizeImpl());
+  SizeOrError total_dictionary_size_or_error = GetTotalDictionarySizeImpl();
+  if (!total_dictionary_size_or_error.has_value()) {
+    return total_dictionary_size_or_error.error();
+  }
+
   base::CheckedNumeric<uint64_t> checked_total_dictionary_size =
-      total_dictionary_size;
+      total_dictionary_size_or_error.value();
   checked_total_dictionary_size += size_delta;
   if (!checked_total_dictionary_size.IsValid()) {
     LOG(ERROR) << "Invalid total_dict_size detected.";

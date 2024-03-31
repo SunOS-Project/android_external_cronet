@@ -45,7 +45,8 @@ TEST(HttpStreamRequestTest, SetPriority) {
       /* is_websocket = */ false,
       /* enable_ip_based_pooling = */ true,
       /* enable_alternative_services = */ true,
-      /* delay_main_job_with_available_spdy_session = */ true, SSLConfig());
+      /* delay_main_job_with_available_spdy_session = */ true, SSLConfig(),
+      SSLConfig());
   HttpStreamFactory::JobController* job_controller_raw_ptr =
       job_controller.get();
   factory->job_controller_set_.insert(std::move(job_controller));

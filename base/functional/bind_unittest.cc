@@ -1875,11 +1875,10 @@ void HandleOOM(size_t unused_size) {
 // Basic set of options to mostly only enable `BackupRefPtr::kEnabled`.
 // This avoids the boilerplate of having too much options enabled for simple
 // testing purpose.
-static constexpr auto kOnlyEnableBackupRefPtrOptions = []() {
-  partition_alloc::PartitionOptions opts;
-  opts.backup_ref_ptr = partition_alloc::PartitionOptions::kEnabled;
-  return opts;
-}();
+static constexpr partition_alloc::PartitionOptions
+    kOnlyEnableBackupRefPtrOptions = {
+        .backup_ref_ptr = partition_alloc::PartitionOptions::kEnabled,
+};
 
 class BindUnretainedDanglingInternalFixture : public BindTest {
  public:

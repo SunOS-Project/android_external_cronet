@@ -5,8 +5,6 @@
 component("common") {
   defines = [ "IS_MIRACLE_PARAMETER_IMPL" ]
 
-  output_name = "miracle_parameter_common"
-
   sources = [
     "public/miracle_parameter.cc",
     "public/miracle_parameter.h",

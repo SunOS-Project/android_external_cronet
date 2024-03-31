@@ -27,7 +27,6 @@ TCPServerSocket::TCPServerSocket(std::unique_ptr<TCPSocket> socket)
     : socket_(std::move(socket)) {}
 
 int TCPServerSocket::AdoptSocket(SocketDescriptor socket) {
-  adopted_opened_socket_ = true;
   return socket_->AdoptUnconnectedSocket(socket);
 }
 
@@ -36,13 +35,9 @@ TCPServerSocket::~TCPServerSocket() = default;
 int TCPServerSocket::Listen(const IPEndPoint& address,
                             int backlog,
                             absl::optional<bool> ipv6_only) {
-  int result = OK;
-  if (!adopted_opened_socket_) {
-    result = socket_->Open(address.GetFamily());
-    if (result != OK) {
-      return result;
-    }
-  }
+  int result = socket_->Open(address.GetFamily());
+  if (result != OK)
+    return result;
 
   if (ipv6_only.has_value()) {
     CHECK_EQ(address.address(), net::IPAddress::IPv6AllZeros());

@@ -49,8 +49,7 @@ public final class ApiHelperForQ {
     public static void requestCellInfoUpdate(
             TelephonyManager telephonyManager, Callback<List<CellInfo>> callback) {
         telephonyManager.requestCellInfoUpdate(
-                AsyncTask.THREAD_POOL_EXECUTOR,
-                new TelephonyManager.CellInfoCallback() {
+                AsyncTask.THREAD_POOL_EXECUTOR, new TelephonyManager.CellInfoCallback() {
                     @Override
                     @SuppressLint("Override")
                     public void onCellInfo(List<CellInfo> cellInfos) {
@@ -59,13 +58,8 @@ public final class ApiHelperForQ {
                 });
     }
 
-    public static boolean bindIsolatedService(
-            Context context,
-            Intent intent,
-            int flags,
-            String instanceName,
-            Executor executor,
-            ServiceConnection connection) {
+    public static boolean bindIsolatedService(Context context, Intent intent, int flags,
+            String instanceName, Executor executor, ServiceConnection connection) {
         return context.bindIsolatedService(intent, flags, instanceName, executor, connection);
     }
 

@@ -8,7 +8,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <initializer_list>
-#include <optional>
 #include <string>
 #include <type_traits>
 
@@ -16,6 +15,7 @@
 #include "absl/numeric/int128.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 #include "absl/types/span.h"
 #include "quiche/quic/core/crypto/quic_random.h"
 #include "quiche/quic/core/frames/quic_frame.h"
@@ -259,9 +259,9 @@ class QUICHE_EXPORT BitMask {
   bool Any() const { return mask_ != 0; }
 
   // Returns the highest bit set, or nullopt if the mask is all zeroes.
-  std::optional<Index> Max() const {
+  absl::optional<Index> Max() const {
     if (!Any()) {
-      return std::nullopt;
+      return absl::nullopt;
     }
     return static_cast<Index>(NumBits() - absl::countl_zero(mask_) - 1);
   }

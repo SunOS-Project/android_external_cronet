@@ -16,7 +16,8 @@ import org.jni_zero.NativeMethods;
 @JNINamespace("testing::android")
 public final class MainRunner {
     // Prevents instantiation.
-    private MainRunner() {}
+    private MainRunner() {
+    }
 
     // Maps the file descriptors and executes the main method with the passed in command line.
     public static int runMain(String[] commandLine) {

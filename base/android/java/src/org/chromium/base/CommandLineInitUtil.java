@@ -13,7 +13,9 @@ import org.chromium.base.supplier.Supplier;
 
 import java.io.File;
 
-/** Provides implementation of command line initialization for Android. */
+/**
+ * Provides implementation of command line initialization for Android.
+ */
 public final class CommandLineInitUtil {
     /**
      * The location of the command line file needs to be in a protected
@@ -32,12 +34,17 @@ public final class CommandLineInitUtil {
      */
     private static final String COMMAND_LINE_FILE_PATH_DEBUG_APP = "/data/local/tmp";
 
-    /** The name of the command line file to pull arguments from. */
+    /**
+     * The name of the command line file to pull arguments from.
+     */
     private static String sFilenameOverrideForTesting;
 
-    private CommandLineInitUtil() {}
+    private CommandLineInitUtil() {
+    }
 
-    /** Set the filename to use. */
+    /**
+     * Set the filename to use.
+     */
     public static void setFilenameOverrideForTesting(String value) {
         sFilenameOverrideForTesting = value;
     }
@@ -86,12 +93,11 @@ public final class CommandLineInitUtil {
     }
 
     private static String getDebugApp(Context context) {
-        boolean adbEnabled =
-                Settings.Global.getInt(context.getContentResolver(), Settings.Global.ADB_ENABLED, 0)
-                        == 1;
+        boolean adbEnabled = Settings.Global.getInt(context.getContentResolver(),
+                Settings.Global.ADB_ENABLED, 0) == 1;
         if (adbEnabled) {
-            return Settings.Global.getString(
-                    context.getContentResolver(), Settings.Global.DEBUG_APP);
+            return Settings.Global.getString(context.getContentResolver(),
+                    Settings.Global.DEBUG_APP);
         }
         return null;
     }
