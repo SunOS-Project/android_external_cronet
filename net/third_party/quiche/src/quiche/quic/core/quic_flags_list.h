@@ -35,8 +35,6 @@ QUIC_FLAG(quic_restart_flag_spdy_testonly_default_true, false)
 QUIC_FLAG(quic_reloadable_flag_quic_block_until_settings_received_copt, true)
 // If trrue, early return before write control frame in OnCanWrite() if the connection is already closed.
 QUIC_FLAG(quic_reloadable_flag_quic_no_write_control_frame_upon_connection_close, true)
-// If true and defer_send_in_response_to_packets is enabled, QuicConnection will schedule send alarms at the end of packet processing only if it\'s necessary.
-QUIC_FLAG(quic_reloadable_flag_quic_no_send_alarm_unless_necessary, true)
 // If true, QUIC server will not respond to gQUIC probing packet(PING + PADDING) but treat it as a regular packet.
 QUIC_FLAG(quic_reloadable_flag_quic_ignore_gquic_probing, true)
 // If true, QUIC will default enable MTU discovery at server, with a target of 1450 bytes.
@@ -48,7 +46,7 @@ QUIC_FLAG(quic_reloadable_flag_quic_can_send_ack_frequency, true)
 // If true, allow client to enable BBRv2 on server via connection option \'B2ON\'.
 QUIC_FLAG(quic_reloadable_flag_quic_allow_client_enabled_bbr_v2, true)
 // If true, always bundle qpack decoder data with other frames opportunistically.
-QUIC_FLAG(quic_restart_flag_quic_opport_bundle_qpack_decoder_data, false)
+QUIC_FLAG(quic_restart_flag_quic_opport_bundle_qpack_decoder_data2, false)
 // If true, an endpoint does not detect path degrading or blackholing until handshake gets confirmed.
 QUIC_FLAG(quic_reloadable_flag_quic_no_path_degrading_before_handshake_confirmed, true)
 // If true, default-enable 5RTO blachole detection.
@@ -71,6 +69,8 @@ QUIC_FLAG(quic_reloadable_flag_quic_colon_invalid_in_header_name, true)
 QUIC_FLAG(quic_reloadable_flag_quic_discard_initial_packet_with_key_dropped, true)
 // If true, dispatcher sends error code QUIC_HANDSHAKE_FAILED_PACKETS_BUFFERED_TOO_LONG when handshake fails due to packets buffered for too long.
 QUIC_FLAG(quic_reloadable_flag_quic_new_error_code_when_packets_buffered_too_long, true)
+// If true, do not return from QuicSpdyClientStream::OnBodyAvailable() if visitor is nullptr.
+QUIC_FLAG(quic_reloadable_flag_quic_skip_return_on_null_visitor, true)
 // If true, do not send MAX_STREAM frames if there are already 2 outstanding.
 QUIC_FLAG(quic_reloadable_flag_quic_limit_sending_max_streams2, false)
 // If true, enable server retransmittable on wire PING.
@@ -89,8 +89,6 @@ QUIC_FLAG(quic_reloadable_flag_quic_priority_respect_incremental, false)
 QUIC_FLAG(quic_reloadable_flag_quic_disable_batch_write, false)
 // If true, set burst token to 2 in cwnd bootstrapping experiment.
 QUIC_FLAG(quic_reloadable_flag_quic_conservative_bursts, false)
-// If true, then the HTTP/3 max streams limit will not be increased after sending a GOAWAY
-QUIC_FLAG(quic_reloadable_flag_quic_do_not_increase_max_streams_after_h3_goaway, true)
 // If true, use BBRv2 as the default congestion controller. Takes precedence over --quic_default_to_bbr.
 QUIC_FLAG(quic_reloadable_flag_quic_default_to_bbr_v2, false)
 // If true, use a LRU cache to record client addresses of packets received on server\'s original address.

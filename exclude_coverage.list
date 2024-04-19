@@ -1,0 +1,5 @@
+# Temporary disable coverage profiling for functions below due to b/330508686.
+# TODO(b/332489473): Undo this once Mainline compiles in main.
+[clang]
+source:external/cronet/base/time/time.h=forbid
+default:allow
