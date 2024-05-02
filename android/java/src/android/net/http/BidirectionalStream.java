@@ -171,7 +171,11 @@ public abstract class BidirectionalStream {
          * BidirectionalStream#read read()} to start reading data. Consumer may call {@link
          * BidirectionalStream#write write()} to start writing data.
          *
-         * @param stream the stream that is ready.
+         * @param stream the stream that is ready. <strong>This is not guaranteed to be the same
+         *        object as the one received by other callbacks, nor is it guaranteed to be the one
+         *        returned by {@link BidirectionalStream.Builder#build}.</strong> However, method
+         *        calls on this object will have the same effects as calls on the original
+         *        {@link BidirectionalStream}.
          */
         void onStreamReady(@NonNull BidirectionalStream stream);
 
@@ -181,7 +185,11 @@ public abstract class BidirectionalStream {
          * BidirectionalStream#read read()} to start reading. Consumer may call {@link
          * BidirectionalStream#write write()} to start writing or close the stream.
          *
-         * @param stream the stream on which response headers were received.
+         * @param stream the stream on which response headers were received. <strong>This is not
+         *        guaranteed to be the same object as the one received by other callbacks, nor is
+         *        it guaranteed to be the one returned by {@link BidirectionalStream.Builder#build}.
+         *        </strong> However, method calls on this object will have the same effects as
+         *        calls on the original {@link BidirectionalStream}.
          * @param info the response information.
          */
         void onResponseHeadersReceived(@NonNull BidirectionalStream stream,
@@ -194,10 +202,13 @@ public abstract class BidirectionalStream {
          * onResponseTrailersReceived()}, if there was pending read data before trailers were
          * received.
          *
-         * @param stream the stream on which the read completed
+         * @param stream the stream on which the read completed. <strong>This is not guaranteed to
+         *        be the same object as the one received by other callbacks, nor is it guaranteed
+         *        to be the one returned by {@link BidirectionalStream.Builder#build}.</strong>
+         *        However, method calls on this object will have the same effects as calls on the
+         *        original {@link BidirectionalStream}.
          * @param info the response information
          * @param buffer the buffer that was passed to {@link BidirectionalStream#read read()}, now
-         * containing the received data. The buffer's limit is not changed. The buffer's position is
          * set to the end of the received data. If position is not updated, it means the remote side
          * has signaled that it will send no more data.
          * @param endOfStream if true, this is the last read data, remote will not send more data,
@@ -213,7 +224,11 @@ public abstract class BidirectionalStream {
          * limit is not changed. To continue writing, call {@link BidirectionalStream#write
          * write()}.
          *
-         * @param stream the stream on which the write completed
+         * @param stream the stream on which the write completed. <strong>This is not guaranteed to
+         *        be the same object as the one received by other callbacks, nor is it guaranteed
+         *        to be the one returned by {@link BidirectionalStream.Builder#build}.</strong>
+         *        However, method calls on this object will have the same effects as calls on the
+         *        original {@link BidirectionalStream}.
          * @param info the response information
          * @param buffer the buffer that was passed to {@link BidirectionalStream#write write()}.
          *         The
@@ -231,7 +246,11 @@ public abstract class BidirectionalStream {
          *
          * Default implementation takes no action.
          *
-         * @param stream the stream on which response trailers were received
+         * @param stream the stream on which response trailers were received. <strong>This is not
+         *        guaranteed to be the same object as the one received by other callbacks, nor is
+         *        it guaranteed to be the one returned by {@link BidirectionalStream.Builder#build}.
+         *        </strong> However, method calls on this object will have the same effects as calls
+         *        on the original {@link BidirectionalStream}.
          * @param info the response information
          * @param trailers the trailers received
          */
@@ -243,7 +262,11 @@ public abstract class BidirectionalStream {
          * remotely and locally. Once invoked, no further {@link BidirectionalStream.Callback}
          * methods will be invoked.
          *
-         * @param stream the stream which is closed successfully
+         * @param stream the stream which is closed successfully. <strong>This is not guaranteed to
+         *        be the same object as the one received by other callbacks, nor is it guaranteed
+         *        to be the one returned by {@link BidirectionalStream.Builder#build}.</strong>
+         *        However, method calls on this object will have the same effects as calls on the
+         *        original {@link BidirectionalStream}.
          * @param info the response information
          */
         void onSucceeded(@NonNull BidirectionalStream stream, @NonNull UrlResponseInfo info);
@@ -254,7 +277,11 @@ public abstract class BidirectionalStream {
          * mapped to {@link NetworkException#getErrorCode} codes. Once invoked,
          * no further {@link BidirectionalStream.Callback} methods will be invoked.
          *
-         * @param stream the stream which has failed
+         * @param stream the stream which has failed. <strong>This is not guaranteed to
+         *        be the same object as the one received by other callbacks, nor is it guaranteed
+         *        to be the one returned by {@link BidirectionalStream.Builder#build}.</strong>
+         *        However, method calls on this object will have the same effects as calls on the
+         *        original {@link BidirectionalStream}.
          * @param info the response information. May be {@code null} if no response was received.
          * @param error information about the failure
          */
@@ -266,7 +293,11 @@ public abstract class BidirectionalStream {
          * no further {@link BidirectionalStream.Callback} methods will be invoked. Default
          * implementation takes no action.
          *
-         * @param stream the stream that was canceled
+         * @param stream the stream that was canceled. <strong>This is not guaranteed to
+         *        be the same object as the one received by other callbacks, nor is it guaranteed
+         *        to be the one returned by {@link BidirectionalStream.Builder#build}.</strong>
+         *        However, method calls on this object will have the same effects as calls on the
+         *        original {@link BidirectionalStream}.
          * @param info the response information. May be {@code null} if no response was received.
          */
         void onCanceled(@NonNull BidirectionalStream stream, @Nullable UrlResponseInfo info);

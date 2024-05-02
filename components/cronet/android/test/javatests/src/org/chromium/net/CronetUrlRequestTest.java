@@ -6,10 +6,10 @@ package org.chromium.net;
 
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
+import static com.google.common.truth.TruthJUnit.assume;
 
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.fail;
-import static org.junit.Assume.assumeTrue;
 
 import static org.chromium.net.truth.UrlResponseInfoSubject.assertThat;
 
@@ -39,6 +39,7 @@ import org.chromium.net.NetworkChangeNotifierAutoDetect.ConnectivityManagerDeleg
 import org.chromium.net.TestUrlRequestCallback.FailureType;
 import org.chromium.net.TestUrlRequestCallback.ResponseStep;
 import org.chromium.net.apihelpers.UploadDataProviders;
+import org.chromium.net.impl.CronetExceptionImpl;
 import org.chromium.net.impl.CronetUrlRequest;
 import org.chromium.net.impl.NetworkExceptionImpl;
 import org.chromium.net.impl.UrlResponseInfoImpl;
@@ -128,9 +129,6 @@ public class CronetUrlRequestTest {
 
     @Test
     @SmallTest
-    @IgnoreFor(
-            implementations = {CronetImplementation.AOSP_PLATFORM},
-            reason = "crbug.com/1494845")
     public void testBuilderChecks() throws Exception {
         TestUrlRequestCallback callback = new TestUrlRequestCallback();
 
@@ -179,9 +177,6 @@ public class CronetUrlRequestTest {
 
     @Test
     @SmallTest
-    @IgnoreFor(
-            implementations = {CronetImplementation.AOSP_PLATFORM},
-            reason = "crbug.com/1497531: Figure out what how to handle getProxy checks")
     public void testSimpleGet() throws Exception {
         String url = NativeTestServer.getEchoMethodURL();
         TestUrlRequestCallback callback = startAndWaitForComplete(url);
@@ -282,9 +277,6 @@ public class CronetUrlRequestTest {
      */
     @Test
     @SmallTest
-    @IgnoreFor(
-            implementations = {CronetImplementation.AOSP_PLATFORM},
-            reason = "crbug.com/1497531: Figure out what how to handle getProxy checks")
     public void testRedirectAsync() throws Exception {
         // Start the request and wait to see the redirect.
         TestUrlRequestCallback callback = new TestUrlRequestCallback();
@@ -511,10 +503,8 @@ public class CronetUrlRequestTest {
     @Test
     @SmallTest
     @IgnoreFor(
-            implementations = {CronetImplementation.FALLBACK, CronetImplementation.AOSP_PLATFORM},
-            reason =
-                    "No canonical exception to assert on. "
-                            + "crbug.com/1497531: Figure out what how to handle getProxy checks")
+            implementations = {CronetImplementation.FALLBACK},
+            reason = "No canonical exception to assert on")
     public void testContentLengthMismatchFailsOnce() throws Exception {
         String url = NativeTestServer.getFileURL("/content_length_mismatch.html");
         TestUrlRequestCallback callback = startAndWaitForComplete(url);
@@ -586,7 +576,13 @@ public class CronetUrlRequestTest {
         builder.addHeader("header:name", "headervalue");
         IllegalArgumentException e =
                 assertThrows(IllegalArgumentException.class, () -> builder.build().start());
-        assertThat(e).hasMessageThat().isEqualTo("Invalid header header:name=headervalue");
+        if (mTestRule.implementationUnderTest() == CronetImplementation.AOSP_PLATFORM &&
+                !mTestRule.isRunningInAOSP()) {
+            // TODO(b/307234565): Remove check once chromium emulator has latest changes.
+            assertThat(e).hasMessageThat().isEqualTo("Invalid header header:name=headervalue");
+        } else {
+            assertThat(e).hasMessageThat().isEqualTo("Invalid header with headername: header:name");
+        }
     }
 
     @Test
@@ -620,7 +616,15 @@ public class CronetUrlRequestTest {
         builder.addHeader("headername", "bad header\r\nvalue");
         IllegalArgumentException e =
                 assertThrows(IllegalArgumentException.class, () -> builder.build().start());
-        assertThat(e).hasMessageThat().isEqualTo("Invalid header headername=bad header\r\nvalue");
+        if (mTestRule.implementationUnderTest() == CronetImplementation.AOSP_PLATFORM &&
+                !mTestRule.isRunningInAOSP()) {
+            // TODO(b/307234565): Remove check once chromium emulator has latest changes.
+            assertThat(e)
+                    .hasMessageThat()
+                    .isEqualTo("Invalid header headername=bad header\r\nvalue");
+        } else {
+            assertThat(e).hasMessageThat().isEqualTo("Invalid header with headername: headername");
+        }
     }
 
     @Test
@@ -1019,10 +1023,8 @@ public class CronetUrlRequestTest {
     @Test
     @SmallTest
     @IgnoreFor(
-            implementations = {CronetImplementation.FALLBACK, CronetImplementation.AOSP_PLATFORM},
-            reason =
-                    "No canonical exception to assert on. "
-                            + "crbug.com/1497531: Figure out what how to handle getProxy checks")
+            implementations = {CronetImplementation.FALLBACK},
+            reason = "No canonical exception to assert on")
     public void testSimpleGetBufferUpdates() throws Exception {
         TestUrlRequestCallback callback = new TestUrlRequestCallback();
         callback.setAutoAdvance(false);
@@ -1312,9 +1314,6 @@ public class CronetUrlRequestTest {
 
     @Test
     @SmallTest
-    @IgnoreFor(
-            implementations = {CronetImplementation.AOSP_PLATFORM},
-            reason = "crbug.com/1494845")
     public void testUploadSetDataProvider() throws Exception {
         TestUrlRequestCallback callback = new TestUrlRequestCallback();
         UrlRequest.Builder builder =
@@ -1834,7 +1833,7 @@ public class CronetUrlRequestTest {
     @SmallTest
     @IgnoreFor(
             implementations = {CronetImplementation.AOSP_PLATFORM},
-            reason = "crbug.com/1494845")
+            reason = "b/311163531: Re-enable once HttpEngine propagates UploadDataProvider#close")
     public void testDirectExecutorProhibitedByDefault() throws Exception {
         TestUrlRequestCallback callback = new TestUrlRequestCallback();
         Executor myExecutor =
@@ -2703,9 +2702,6 @@ public class CronetUrlRequestTest {
     @Test
     @SmallTest
     @RequiresMinAndroidApi(Build.VERSION_CODES.N)
-    @IgnoreFor(
-            implementations = {CronetImplementation.AOSP_PLATFORM},
-            reason = "crbug.com/1494845")
     // Used for Android's NetworkSecurityPolicy added in Nougat
     public void testCleartextTrafficBlocked() throws Exception {
         final int cleartextNotPermitted = -29;
@@ -2717,7 +2713,9 @@ public class CronetUrlRequestTest {
         TestUrlRequestCallback callback = startAndWaitForComplete(url);
         assertThat(callback.getResponseInfo()).isNull();
         assertThat(callback.mError).isNotNull();
-        if (!mTestRule.testingJavaImpl()) {
+        // NetworkException#getCronetInternalErrorCode is exposed only by the native
+        // implementation.
+        if (mTestRule.implementationUnderTest() == CronetImplementation.STATICALLY_LINKED) {
             assertThat(((NetworkException) callback.mError).getCronetInternalErrorCode())
                     .isEqualTo(cleartextNotPermitted);
         }
@@ -2912,44 +2910,55 @@ public class CronetUrlRequestTest {
     }
 
     @Test
-    @SmallTest
     @RequiresMinAndroidApi(Build.VERSION_CODES.M)
-    @IgnoreFor(
-            implementations = {CronetImplementation.AOSP_PLATFORM},
-            reason = "crbug.com/1494845")
-    public void testBindToNetwork() {
+    public void testBindToInvalidNetworkFails() {
         String url = NativeTestServer.getEchoMethodURL();
-        // bind to invalid network handle
-        CronetEngine cronetEngine = mTestRule.getTestFramework().getEngine();
+        ExperimentalCronetEngine cronetEngine = mTestRule.getTestFramework().getEngine();
         TestUrlRequestCallback callback = new TestUrlRequestCallback();
-        UrlRequest.Builder builder =
-                cronetEngine
-                        .newUrlRequestBuilder(url, callback, callback.getExecutor())
-                        .bindToNetwork(-150 /* invalid network handle */);
+        ExperimentalUrlRequest.Builder builder =
+                cronetEngine.newUrlRequestBuilder(url, callback, callback.getExecutor());
+
+        if (mTestRule.implementationUnderTest() == CronetImplementation.AOSP_PLATFORM) {
+            // android.net.http.UrlRequestBuilder#bindToNetwork requires an android.net.Network
+            // object. So, in this case, it will be the wrapper layer that will fail to translate
+            // that to a Network, not something in net's code. Hence, the failure will manifest
+            // itself at bind time, not at request execution time.
+            // Note: this will never happen in prod, as translation failure can only happen if we're
+            // given a fake networkHandle.
+            assertThrows(
+                    IllegalArgumentException.class,
+                    () -> builder.bindToNetwork(-150 /* invalid network handle */));
+            return;
+        }
+
+        builder.bindToNetwork(-150 /* invalid network handle */);
         builder.build().start();
         callback.blockForDone();
-
-        if (mTestRule.testingJavaImpl()) {
-            assertThat(callback.mError)
-                    .isInstanceOf(org.chromium.net.impl.CronetExceptionImpl.class);
+        assertThat(callback.mError).isNotNull();
+        if (mTestRule.implementationUnderTest() == CronetImplementation.FALLBACK) {
+            assertThat(callback.mError).isInstanceOf(CronetExceptionImpl.class);
             assertThat(callback.mError).hasCauseThat().isInstanceOf(NetworkExceptionImpl.class);
         } else {
             assertThat(callback.mError).isInstanceOf(NetworkExceptionImpl.class);
         }
+    }
 
-        // bind to the default network
+    @Test
+    @RequiresMinAndroidApi(Build.VERSION_CODES.M)
+    public void testBindToDefaultNetworkSucceeds() {
+        String url = NativeTestServer.getEchoMethodURL();
         ConnectivityManagerDelegate delegate =
                 new ConnectivityManagerDelegate(mTestRule.getTestFramework().getContext());
         Network defaultNetwork = delegate.getDefaultNetwork();
-        assumeTrue(defaultNetwork != null);
-        callback = new TestUrlRequestCallback();
-        builder =
-                cronetEngine
-                        .newUrlRequestBuilder(url, callback, callback.getExecutor())
-                        .bindToNetwork(defaultNetwork.getNetworkHandle());
+        assume().that(defaultNetwork).isNotNull();
+
+        ExperimentalCronetEngine cronetEngine = mTestRule.getTestFramework().getEngine();
+        TestUrlRequestCallback callback = new TestUrlRequestCallback();
+        ExperimentalUrlRequest.Builder builder =
+                cronetEngine.newUrlRequestBuilder(url, callback, callback.getExecutor());
+        builder.bindToNetwork(defaultNetwork.getNetworkHandle());
         builder.build().start();
         callback.blockForDone();
-
         assertThat(callback.getResponseInfoWithChecks()).hasHttpStatusCodeThat().isEqualTo(200);
     }
 
