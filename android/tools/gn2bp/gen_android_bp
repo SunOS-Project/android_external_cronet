@@ -303,16 +303,16 @@ def enable_boringssl(module, arch):
   shared_libs.add('//external/cronet/third_party/boringssl:libpki')
 
 def add_androidx_experimental_java_deps(module, arch):
-  module.libs.add("androidx.annotation_annotation-experimental-nodeps")
+  module.libs.add("androidx.annotation_annotation-experimental")
 
 def add_androidx_annotation_java_deps(module, arch):
-  module.libs.add("androidx.annotation_annotation-nodeps")
+  module.libs.add("androidx.annotation_annotation")
 
 def add_protobuf_lite_runtime_java_deps(module, arch):
   module.static_libs.add("libprotobuf-java-lite")
 
 def add_androidx_core_java_deps(module, arch):
-  module.libs.add("androidx.core_core-nodeps")
+  module.libs.add("androidx.core_core")
 
 def add_jsr305_java_deps(module, arch):
   module.libs.add("jsr305")
@@ -321,7 +321,7 @@ def add_errorprone_annotation_java_deps(module, arch):
   module.libs.add("error_prone_annotations")
 
 def add_androidx_collection_java_deps(module, arch):
-  module.libs.add("androidx.collection_collection-nodeps")
+  module.libs.add("androidx.collection_collection")
 
 def add_junit_java_deps(module, arch):
   module.static_libs.add("junit")
@@ -1557,7 +1557,7 @@ def merge_cmd(modules, genrule_type):
     raise Exception(f'{genrule_type} can not have different cmd between archs')
 
   merged_cmd = []
-  for arch, module in modules.items():
+  for arch, module in sorted(modules.items()):
     merged_cmd.append(f'if [[ {get_cmd_condition(arch)} ]];')
     merged_cmd.append('then')
     merged_cmd.append(module.cmd + ';')
