@@ -31,7 +31,6 @@
 #include "net/traffic_annotation/network_traffic_annotation_test_helper.h"
 #include "net/url_request/url_request.h"
 #include "net/url_request/url_request_test_util.h"
-#include "net/base/cronet_buildflags.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "testing/platform_test.h"
 #include "url/gurl.h"
@@ -190,7 +189,7 @@ TEST_F(URLRequestContextBuilderTest, CustomHttpAuthHandlerFactory) {
                 host_resolver_.get(), &handler));
 }
 
-#if BUILDFLAG(ENABLE_REPORTING) && !BUILDFLAG(CRONET_BUILD)
+#if BUILDFLAG(ENABLE_REPORTING)
 // See crbug.com/935209. This test ensures that shutdown occurs correctly and
 // does not crash while destoying the NEL and Reporting services in the process
 // of destroying the URLRequestContext whilst Reporting has a pending upload.

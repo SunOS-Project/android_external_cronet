@@ -7,7 +7,6 @@
 #include <algorithm>
 #include <memory>
 #include <utility>
-#include <zlib.h>
 
 #include "base/bit_cast.h"
 #include "base/check_op.h"
@@ -17,6 +16,7 @@
 #include "base/notreached.h"
 #include "base/numerics/checked_math.h"
 #include "net/base/io_buffer.h"
+#include "third_party/zlib/zlib.h"
 
 namespace net {
 

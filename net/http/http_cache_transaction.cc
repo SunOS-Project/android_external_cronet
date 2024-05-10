@@ -32,7 +32,6 @@
 #include "base/strings/string_util.h"  // For EqualsCaseInsensitiveASCII.
 #include "base/task/single_thread_task_runner.h"
 #include "base/time/clock.h"
-#include "base/trace_event/base_tracing.h"
 #include "base/trace_event/common/trace_event_common.h"
 #include "base/values.h"
 #include "net/base/auth.h"

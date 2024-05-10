@@ -27,7 +27,6 @@
 #include "base/rand_util.h"
 #include "base/strings/string_piece.h"
 #include "base/synchronization/lock.h"
-#include "base/trace_event/base_tracing.h"
 #include "base/task/sequenced_task_runner.h"
 #include "base/values.h"
 #include "build/build_config.h"
