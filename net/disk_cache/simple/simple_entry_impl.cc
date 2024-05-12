@@ -9,7 +9,6 @@
 #include <limits>
 #include <utility>
 #include <vector>
-#include <zlib.h>
 
 #include "base/check_op.h"
 #include "base/functional/bind.h"
@@ -37,6 +36,7 @@
 #include "net/log/net_log.h"
 #include "net/log/net_log_source_type.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
+#include "third_party/zlib/zlib.h"
 
 namespace disk_cache {
 namespace {

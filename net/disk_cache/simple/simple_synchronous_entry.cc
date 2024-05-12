@@ -7,7 +7,6 @@
 #include <cstring>
 #include <functional>
 #include <limits>
-#include <zlib.h>
 
 #include "base/compiler_specific.h"
 #include "base/files/file_util.h"
@@ -35,6 +34,7 @@
 #include "net/disk_cache/simple/simple_util.h"
 #include "third_party/abseil-cpp/absl/container/inlined_vector.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
+#include "third_party/zlib/zlib.h"
 
 using base::FilePath;
 using base::Time;

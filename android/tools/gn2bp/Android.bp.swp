@@ -34501,7 +34501,6 @@ java_library {
         "testing/android/native_test/java/src/org/chromium/native_test/NativeUnitTest.java",
         "testing/android/native_test/java/src/org/chromium/native_test/NativeUnitTestActivity.java",
         "testing/android/native_test/java/src/org/chromium/native_test/NativeUnitTestNativeActivity.java",
-        "testing/android/native_test/java/src/org/chromium/native_test/SignalMaskInfo.java",
     ],
     static_libs: [
         "androidx.fragment_fragment",
