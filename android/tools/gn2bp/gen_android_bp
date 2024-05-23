@@ -1158,7 +1158,6 @@ class BaseActionSanitizer():
 class WriteBuildDateHeaderSanitizer(BaseActionSanitizer):
   def _sanitize_args(self):
     self._set_arg_at(0, '$(out)')
-    self._set_arg_at(1, '`date +%s`')
     super()._sanitize_args()
 
 class WriteBuildFlagHeaderSanitizer(BaseActionSanitizer):
