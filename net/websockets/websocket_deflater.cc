@@ -8,12 +8,12 @@
 
 #include <algorithm>
 #include <vector>
-#include <zlib.h>
 
 #include "base/check.h"
 #include "base/check_op.h"
 #include "base/containers/circular_deque.h"
 #include "net/base/io_buffer.h"
+#include "third_party/zlib/zlib.h"
 
 namespace net {
 

@@ -192,11 +192,6 @@ additional_args = {
         # This is necessary because net-tests-utils compiles against private SDK.
         ('sdk_version', ""),
     ],
-    'cronet_aml_testing_android_native_test_native_test_java__testing': [
-        ('srcs', {
-            'testing/android/native_test/java/src/org/chromium/native_test/SignalMaskInfo.java',
-        }),
-    ],
     'cronet_aml_components_cronet_android_cronet__testing': [
         ('target',  ('android_riscv64', {'stem': "libmainlinecronet_riscv64"})),
         ('comment', """TODO: remove stem for riscv64
@@ -1163,7 +1158,6 @@ class BaseActionSanitizer():
 class WriteBuildDateHeaderSanitizer(BaseActionSanitizer):
   def _sanitize_args(self):
     self._set_arg_at(0, '$(out)')
-    self._set_arg_at(1, '`date +%s`')
     super()._sanitize_args()
 
 class WriteBuildFlagHeaderSanitizer(BaseActionSanitizer):
