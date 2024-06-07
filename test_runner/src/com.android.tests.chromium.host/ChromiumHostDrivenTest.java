@@ -36,6 +36,8 @@ import com.android.tradefed.device.ITestDevice;
 import com.android.tradefed.invoker.TestInformation;
 import com.android.tradefed.log.LogUtil;
 import com.android.tradefed.result.ITestInvocationListener;
+import com.android.tradefed.result.LogDataType;
+import com.android.tradefed.result.FileInputStreamSource;
 import com.android.tradefed.testtype.GTestListTestParser;
 import com.android.tradefed.testtype.GTestResultParser;
 import com.android.tradefed.testtype.IDeviceTest;
@@ -68,8 +70,16 @@ public class ChromiumHostDrivenTest implements IRemoteTest, IDeviceTest, ITestCo
     private static final String GTEST_FLAG_FILTER = "--gtest_filter";
     private static final String GTEST_FLAG_LIST_TESTS = "--gtest_list_tests";
     private static final String GTEST_FLAG_FILE = "--gtest_flagfile";
-    private final Set<String> includeFilters = new LinkedHashSet<>();
-    private final Set<String> excludeFilters = new LinkedHashSet<>();
+    @Option(
+        name = "include-filter",
+        description = "The set of annotations a test must have to be run.")
+    private Set<String> includeFilters = new LinkedHashSet<>();
+    @Option(
+        name = "exclude-filter",
+        description =
+            "The set of annotations to exclude tests from running. A test must have "
+                + "none of the annotations in this list to run.")
+    private Set<String> excludeFilters = new LinkedHashSet<>();
     private boolean collectTestsOnly = false;
     private ITestDevice device = null;
 
@@ -264,6 +274,10 @@ public class ChromiumHostDrivenTest implements IRemoteTest, IDeviceTest, ITestCo
         if (resultFile == null) {
             throw new FailedChromiumGTestException(
                     "Failed to retrieve gtest results file from device.");
+        }
+        try (FileInputStreamSource data = new FileInputStreamSource(resultFile)) {
+            listener.testLog(
+                String.format("gtest_output_%s", resultFile.getName()), LogDataType.TEXT, data);
         }
         // Loading all the lines is fine since this is done on the host-machine.
         String[] lines;
