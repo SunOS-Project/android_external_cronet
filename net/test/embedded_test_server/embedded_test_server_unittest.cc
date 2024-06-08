@@ -350,7 +350,7 @@ TEST_P(EmbeddedTestServerTest, ConnectionListenerRead) {
 #else
 #define MAYBE_ConnectionListenerComplete ConnectionListenerComplete
 #endif
-TEST_P(EmbeddedTestServerTest, DISABLED_ConnectionListenerComplete) {
+TEST_P(EmbeddedTestServerTest, MAYBE_ConnectionListenerComplete) {
   // OnResponseCompletedSuccessfully() makes the assumption that a connection is
   // "finished" before the socket is closed, and in the case of HTTP/2 this is
   // not supported

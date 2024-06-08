@@ -20,6 +20,8 @@ import com.android.tradefed.invoker.IInvocationContext;
 import com.android.tradefed.metrics.proto.MetricMeasurement;
 import com.android.tradefed.result.FailureDescription;
 import com.android.tradefed.result.ITestInvocationListener;
+import com.android.tradefed.result.InputStreamSource;
+import com.android.tradefed.result.LogDataType;
 import com.android.tradefed.result.TestDescription;
 import com.android.tradefed.result.TestSummary;
 import com.android.tradefed.util.proto.TfMetricProtoUtil;
@@ -169,6 +171,12 @@ public class TestListenerWithTime implements ITestInvocationListener {
     public void testEnded(TestDescription test,
             HashMap<String, MetricMeasurement.Metric> testMetrics) {
         delegate.testEnded(test, testMetrics);
+    }
+
+    @Override
+    public void testLog(String dataName, LogDataType dataType,
+        InputStreamSource dataStream) {
+        delegate.testLog(dataName, dataType, dataStream);
     }
 
     @Override
