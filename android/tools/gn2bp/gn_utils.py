@@ -371,8 +371,9 @@ class GnParser(object):
       return self.name[self.name.find(":") + 1:]
 
 
-  def __init__(self, builtin_deps):
+  def __init__(self, builtin_deps, build_script_outputs):
     self.builtin_deps = builtin_deps
+    self.build_script_outputs = build_script_outputs
     self.all_targets = {}
     self.jni_java_sources = set()
 
@@ -400,17 +401,17 @@ class GnParser(object):
 
   def _get_arch(self, toolchain):
     if toolchain == '//build/toolchain/android:android_clang_x86':
-      return 'android_x86'
+      return 'android_x86', 'x86'
     elif toolchain == '//build/toolchain/android:android_clang_x64':
-      return 'android_x86_64'
+      return 'android_x86_64', 'x64'
     elif toolchain == '//build/toolchain/android:android_clang_arm':
-      return 'android_arm'
+      return 'android_arm', 'arm'
     elif toolchain == '//build/toolchain/android:android_clang_arm64':
-      return 'android_arm64'
+      return 'android_arm64', 'arm64'
     elif toolchain == '//build/toolchain/android:android_clang_riscv64':
-      return 'android_riscv64'
+      return 'android_riscv64', 'riscv64'
     else:
-      return 'host'
+      return 'host', 'host'
 
   def get_target(self, gn_target_name):
     """Returns a Target object from the fully qualified GN target name.
@@ -434,7 +435,7 @@ class GnParser(object):
     target_name = label_without_toolchain(gn_target_name)
     desc = gn_desc[gn_target_name]
     type_ = desc['type']
-    arch = self._get_arch(desc['toolchain'])
+    arch, chromium_arch = self._get_arch(desc['toolchain'])
     metadata = desc.get("metadata", {})
 
     if is_test_target:
@@ -546,6 +547,11 @@ class GnParser(object):
     target.crate_name = desc.get("crate_name", None)
     target.crate_root = desc.get("crate_root", None)
     target.arch[arch].rust_flags = desc.get("rustflags", list())
+    target.arch[arch].rust_flags.extend(
+        self.build_script_outputs
+        .get(label_without_toolchain(gn_target_name), {})
+        .get(chromium_arch, list())
+    )
     if target.type == "executable" and target.crate_root:
       # Find a more decisive way to figure out that this is a rust executable.
       # TODO: Add a metadata to the executable from Chromium side.
