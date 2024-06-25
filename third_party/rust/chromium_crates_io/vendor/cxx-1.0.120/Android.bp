@@ -36,8 +36,8 @@ license {
 }
 
 // GN: //third_party/rust/cxx/v1:lib
-rust_library_rlib {
-    name: "libcxx_cronet_aml_third_party_rust_cxx_v1_lib",
+rust_ffi_static {
+    name: "libcxx_cronet_aml_third_party_rust_cxx_v1_lib__FFI",
     srcs: [
         "src/c_char.rs",
         "src/cxx_string.rs",
@@ -222,6 +222,212 @@ rust_library_rlib {
 // GN: //third_party/rust/cxx/v1:lib__testing
 rust_library_rlib {
     name: "libcxx_cronet_aml_third_party_rust_cxx_v1_lib__testing",
+    srcs: [
+        "src/c_char.rs",
+        "src/cxx_string.rs",
+        "src/cxx_vector.rs",
+        "src/exception.rs",
+        "src/extern_type.rs",
+        "src/fmt.rs",
+        "src/function.rs",
+        "src/hash.rs",
+        "src/lib.rs",
+        "src/lossy.rs",
+        "src/macros/assert.rs",
+        "src/macros/mod.rs",
+        "src/memory.rs",
+        "src/opaque.rs",
+        "src/result.rs",
+        "src/rust_slice.rs",
+        "src/rust_str.rs",
+        "src/rust_string.rs",
+        "src/rust_type.rs",
+        "src/rust_vec.rs",
+        "src/shared_ptr.rs",
+        "src/sip.rs",
+        "src/symbols/exception.rs",
+        "src/symbols/mod.rs",
+        "src/symbols/rust_slice.rs",
+        "src/symbols/rust_str.rs",
+        "src/symbols/rust_string.rs",
+        "src/symbols/rust_vec.rs",
+        "src/type_id.rs",
+        "src/unique_ptr.rs",
+        "src/unwind.rs",
+        "src/vector.rs",
+        "src/weak_ptr.rs",
+    ],
+    host_supported: true,
+    apex_available: [
+        "com.android.tethering",
+    ],
+    min_sdk_version: "30",
+    visibility: [
+        "//external/cronet:__subpackages__",
+    ],
+    crate_name: "cxx",
+    crate_root: "src/lib.rs",
+    proc_macros: [
+        "libcxxbridge_macro_cronet_aml_third_party_rust_cxxbridge_macro_v1_lib__proc_macro__testing",
+    ],
+    target: {
+        android_arm: {
+            edition: "2021",
+            cfgs: [
+                "cr_rustc_revision=\"ab71ee7a9214c2793108a41efb065aa77aeb7326-2-llvmorg-19-init-8091-gab037c4f\"",
+            ],
+            features: [
+                "alloc",
+                "std",
+            ],
+            flags: [
+                "-Cmetadata=cxx-1",
+                "-Cforce-unwind-tables=no",
+                "-Crelocation-model=pic",
+                "-Coverflow-checks=on",
+                "-Cdefault-linker-libraries",
+                "-Clto=no",
+                "-Ccodegen-units=1",
+                "-Copt-level=s",
+                "-Cdebuginfo=1",
+                "--cap-lints=allow",
+                "-Dunsafe_op_in_unsafe_fn",
+                "-Dwarnings",
+                "-Aunused-imports",
+            ],
+        },
+        android_arm64: {
+            edition: "2021",
+            cfgs: [
+                "cr_rustc_revision=\"ab71ee7a9214c2793108a41efb065aa77aeb7326-2-llvmorg-19-init-8091-gab037c4f\"",
+            ],
+            features: [
+                "alloc",
+                "std",
+            ],
+            flags: [
+                "-Cmetadata=cxx-1",
+                "-Cforce-unwind-tables=no",
+                "-Crelocation-model=pic",
+                "-Coverflow-checks=on",
+                "-Cdefault-linker-libraries",
+                "-Clto=no",
+                "-Ccodegen-units=1",
+                "-Copt-level=3",
+                "-Cdebuginfo=1",
+                "--cap-lints=allow",
+                "-Dunsafe_op_in_unsafe_fn",
+                "-Dwarnings",
+                "-Aunused-imports",
+            ],
+        },
+        android_riscv64: {
+            edition: "2021",
+            cfgs: [
+                "cr_rustc_revision=\"ab71ee7a9214c2793108a41efb065aa77aeb7326-2-llvmorg-19-init-8091-gab037c4f\"",
+            ],
+            features: [
+                "alloc",
+                "std",
+            ],
+            flags: [
+                "-Cmetadata=cxx-1",
+                "-Cforce-unwind-tables=no",
+                "-Crelocation-model=pic",
+                "-Coverflow-checks=on",
+                "-Cdefault-linker-libraries",
+                "-Clto=no",
+                "-Ccodegen-units=1",
+                "-Copt-level=s",
+                "-Cdebuginfo=1",
+                "--cap-lints=allow",
+                "-Dunsafe_op_in_unsafe_fn",
+                "-Dwarnings",
+                "-Aunused-imports",
+            ],
+        },
+        android_x86: {
+            edition: "2021",
+            cfgs: [
+                "cr_rustc_revision=\"ab71ee7a9214c2793108a41efb065aa77aeb7326-2-llvmorg-19-init-8091-gab037c4f\"",
+            ],
+            features: [
+                "alloc",
+                "std",
+            ],
+            flags: [
+                "-Cmetadata=cxx-1",
+                "-Cforce-unwind-tables=no",
+                "-Crelocation-model=pic",
+                "-Coverflow-checks=on",
+                "-Cdefault-linker-libraries",
+                "-Clto=no",
+                "-Ccodegen-units=1",
+                "-Copt-level=s",
+                "-Cdebuginfo=1",
+                "--cap-lints=allow",
+                "-Dunsafe_op_in_unsafe_fn",
+                "-Dwarnings",
+                "-Aunused-imports",
+            ],
+        },
+        android_x86_64: {
+            edition: "2021",
+            cfgs: [
+                "cr_rustc_revision=\"ab71ee7a9214c2793108a41efb065aa77aeb7326-2-llvmorg-19-init-8091-gab037c4f\"",
+            ],
+            features: [
+                "alloc",
+                "std",
+            ],
+            flags: [
+                "-Cmetadata=cxx-1",
+                "-Cforce-unwind-tables=no",
+                "-Crelocation-model=pic",
+                "-Coverflow-checks=on",
+                "-Cdefault-linker-libraries",
+                "-Clto=no",
+                "-Ccodegen-units=1",
+                "-Copt-level=s",
+                "-Cdebuginfo=1",
+                "--cap-lints=allow",
+                "-Dunsafe_op_in_unsafe_fn",
+                "-Dwarnings",
+                "-Aunused-imports",
+            ],
+        },
+        host: {
+            edition: "2021",
+            cfgs: [
+                "cr_rustc_revision=\"ab71ee7a9214c2793108a41efb065aa77aeb7326-2-llvmorg-19-init-8091-gab037c4f\"",
+            ],
+            features: [
+                "alloc",
+                "std",
+            ],
+            flags: [
+                "-Cmetadata=cxx-1",
+                "-Cforce-unwind-tables=no",
+                "-Crelocation-model=pic",
+                "-Coverflow-checks=on",
+                "-Cdefault-linker-libraries",
+                "-Clto=no",
+                "-Ccodegen-units=1",
+                "-Copt-level=3",
+                "-Cdebuginfo=1",
+                "--cap-lints=allow",
+                "-Dunsafe_op_in_unsafe_fn",
+                "-Dwarnings",
+                "-Aunused-imports",
+            ],
+            compile_multilib: "64",
+        },
+    },
+}
+
+// GN: //third_party/rust/cxx/v1:lib__testing
+rust_ffi_static {
+    name: "libcxx_cronet_aml_third_party_rust_cxx_v1_lib__testing__FFI",
     srcs: [
         "src/c_char.rs",
         "src/cxx_string.rs",
