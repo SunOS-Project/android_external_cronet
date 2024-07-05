@@ -4,12 +4,101 @@
       "path": "packages/modules/Connectivity"
     }
   ],
+  "captiveportal-networkstack-resolve-tethering-mainline-presubmit": [
+    // Runs both NetHttpTests and CtsNetHttpTestCases
+    {
+     "name": "NetHttpCoverageTests",
+     "options": [
+       {
+         "exclude-annotation": "com.android.testutils.SkipPresubmit"
+       },
+       {
+         // These sometimes take longer than 1 min which is the presubmit timeout
+         "exclude-annotation": "androidx.test.filters.LargeTest"
+       }
+     ]
+    }
+  ],
   "presubmit": [
     {
-      "name": "net_unittests_tester"
+      "name": "net_unittests_tester",
+      "options": [
+        // Use exclude-filter once (b/342355769) has been fixed
+        {
+          "set-option": "exclude-filter:HttpAuthNegotiateAndroidTest.GenerateAuthToken"
+        },
+        {
+          "set-option": "exclude-filter:MerkleAuditProofDeathTest.DiesIfLeafIndexIsGreaterThanOrEqualToTreeSize"
+        },
+        {
+          "set-option": "exclude-filter:CertNetFetcherURLRequestTest.ParallelFetchDuplicates"
+        },
+        {
+          "set-option": "exclude-filter:DiskCacheBackendTest.SimpleDoomRecent"
+        },
+        {
+          "set-option": "exclude-filter:HttpAuthHandlerNegotiateTest.DisableCname"
+        },
+        {
+          "set-option": "exclude-filter:HttpAuthHandlerNegotiateTest.DisableCnameStandardPort"
+        },
+        {
+          "set-option": "exclude-filter:HttpAuthHandlerNegotiateTest.DisableCnameNonstandardPort"
+        },
+        {
+          "set-option": "exclude-filter:HttpAuthHandlerNegotiateTest.CnameSync"
+        },
+        {
+          "set-option": "exclude-filter:HttpAuthHandlerNegotiateTest.CnameAsync"
+        },
+        {
+          "set-option": "exclude-filter:HttpAuthHandlerNegotiateTest.ServerNotInKerberosDatabase"
+        },
+        {
+          "set-option": "exclude-filter:HttpAuthHandlerNegotiateTest.NoKerberosCredentials"
+        },
+        {
+          "set-option": "exclude-filter:EmbeddedTestServerTestInstantiation/EmbeddedTestServerTest#ConnectionListenerComplete/*"
+        }
+      ]
     },
     {
       "name": "cronet_unittests_tester"
+    },
+    // Runs both NetHttpTests and CtsNetHttpTestCases
+    {
+     "name": "NetHttpCoverageTests",
+     "options": [
+       {
+         "exclude-annotation": "com.android.testutils.SkipPresubmit"
+       },
+       {
+         // These sometimes take longer than 1 min which is the presubmit timeout
+         "exclude-annotation": "androidx.test.filters.LargeTest"
+       }
+     ]
     }
+  ],
+  "postsubmit": [
+    {
+      "name": "NetHttpCoverageTests"
+    },
+    {
+      "name": "net_unittests_tester"
+    }
+  ],
+  "mainline-presubmit": [
+   {
+     "name": "NetHttpCoverageTests[CaptivePortalLoginGoogle.apk+NetworkStackGoogle.apk+com.google.android.resolv.apex+com.google.android.tethering.apex]",
+     "options": [
+       {
+         "exclude-annotation": "com.android.testutils.SkipPresubmit"
+       },
+       {
+         // These sometimes take longer than 1 min which is the presubmit timeout
+         "exclude-annotation": "androidx.test.filters.LargeTest"
+       }
+     ]
+   }
   ]
 }

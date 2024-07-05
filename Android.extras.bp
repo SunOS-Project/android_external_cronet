@@ -88,7 +88,6 @@ java_library {
     sdk_version: "module_current",
     min_sdk_version: "30",
     visibility: [
-        "//packages/modules/Connectivity:__subpackages__",
         "//external/cronet/android:__subpackages__",
     ],
     apex_available: [
@@ -170,7 +169,7 @@ filegroup {
     "components/cronet/testing/test_server/data/**/*",
   ],
   visibility: [
-      "//packages/modules/Connectivity:__subpackages__",
+      "//external/cronet/android/tests:__subpackages__",
   ],
 }
 
@@ -201,7 +200,7 @@ android_library {
     ],
     lint: { test: true },
     visibility: [
-        "//packages/modules/Connectivity:__subpackages__",
+        "//external/cronet/android/tests:__subpackages__",
     ],
 }
 
