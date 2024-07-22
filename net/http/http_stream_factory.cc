@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <tuple>
 #include <utility>
+#include <vector>
 
 #include "base/check.h"
 #include "base/metrics/histogram_macros.h"
@@ -17,9 +18,13 @@
 #include "base/time/time.h"
 #include "net/base/host_mapping_rules.h"
 #include "net/base/host_port_pair.h"
+#include "net/base/network_anonymization_key.h"
 #include "net/base/network_isolation_key.h"
 #include "net/base/parse_number.h"
 #include "net/base/port_util.h"
+#include "net/base/privacy_mode.h"
+#include "net/base/upload_data_stream.h"
+#include "net/dns/public/secure_dns_policy.h"
 #include "net/http/http_network_session.h"
 #include "net/http/http_response_headers.h"
 #include "net/http/http_server_properties.h"
@@ -27,8 +32,10 @@
 #include "net/http/http_stream_factory_job_controller.h"
 #include "net/http/transport_security_state.h"
 #include "net/quic/quic_http_utils.h"
+#include "net/socket/socket_tag.h"
 #include "net/spdy/bidirectional_stream_spdy_impl.h"
 #include "net/spdy/spdy_http_stream.h"
+#include "net/ssl/ssl_config.h"
 #include "net/third_party/quiche/src/quiche/quic/core/quic_packets.h"
 #include "net/third_party/quiche/src/quiche/quic/core/quic_server_id.h"
 #include "net/third_party/quiche/src/quiche/spdy/core/spdy_alt_svc_wire_format.h"
@@ -42,6 +49,32 @@ namespace {
 const char kAlternativeServiceHeader[] = "Alt-Svc";
 
 }  // namespace
+
+HttpStreamFactory::StreamRequestInfo::StreamRequestInfo() = default;
+
+HttpStreamFactory::StreamRequestInfo::StreamRequestInfo(
+    const HttpRequestInfo& http_request_info)
+    : method(http_request_info.method),
+      network_anonymization_key(http_request_info.network_anonymization_key),
+      is_http1_allowed(!http_request_info.upload_data_stream ||
+                       http_request_info.upload_data_stream->AllowHTTP1()),
+      load_flags(http_request_info.load_flags),
+      privacy_mode(http_request_info.privacy_mode),
+      secure_dns_policy(http_request_info.secure_dns_policy),
+      socket_tag(http_request_info.socket_tag) {}
+
+HttpStreamFactory::StreamRequestInfo::StreamRequestInfo(
+    const StreamRequestInfo& other) = default;
+HttpStreamFactory::StreamRequestInfo&
+HttpStreamFactory::StreamRequestInfo::operator=(
+    const StreamRequestInfo& other) = default;
+HttpStreamFactory::StreamRequestInfo::StreamRequestInfo(
+    StreamRequestInfo&& other) = default;
+HttpStreamFactory::StreamRequestInfo&
+HttpStreamFactory::StreamRequestInfo::operator=(StreamRequestInfo&& other) =
+    default;
+
+HttpStreamFactory::StreamRequestInfo::~StreamRequestInfo() = default;
 
 HttpStreamFactory::HttpStreamFactory(HttpNetworkSession* session)
     : session_(session), job_factory_(std::make_unique<JobFactory>()) {}
@@ -87,12 +120,12 @@ url::SchemeHostPort HttpStreamFactory::RewriteHost(
 std::unique_ptr<HttpStreamRequest> HttpStreamFactory::RequestStream(
     const HttpRequestInfo& request_info,
     RequestPriority priority,
-    const SSLConfig& server_ssl_config,
+    const std::vector<SSLConfig::CertAndStatus>& allowed_bad_certs,
     HttpStreamRequest::Delegate* delegate,
     bool enable_ip_based_pooling,
     bool enable_alternative_services,
     const NetLogWithSource& net_log) {
-  return RequestStreamInternal(request_info, priority, server_ssl_config,
+  return RequestStreamInternal(request_info, priority, allowed_bad_certs,
                                delegate, nullptr,
                                HttpStreamRequest::HTTP_STREAM,
                                /*is_websocket=*/false, enable_ip_based_pooling,
@@ -103,14 +136,14 @@ std::unique_ptr<HttpStreamRequest>
 HttpStreamFactory::RequestWebSocketHandshakeStream(
     const HttpRequestInfo& request_info,
     RequestPriority priority,
-    const SSLConfig& server_ssl_config,
+    const std::vector<SSLConfig::CertAndStatus>& allowed_bad_certs,
     HttpStreamRequest::Delegate* delegate,
     WebSocketHandshakeStreamBase::CreateHelper* create_helper,
     bool enable_ip_based_pooling,
     bool enable_alternative_services,
     const NetLogWithSource& net_log) {
   DCHECK(create_helper);
-  return RequestStreamInternal(request_info, priority, server_ssl_config,
+  return RequestStreamInternal(request_info, priority, allowed_bad_certs,
                                delegate, create_helper,
                                HttpStreamRequest::HTTP_STREAM,
                                /*is_websocket=*/true, enable_ip_based_pooling,
@@ -121,14 +154,14 @@ std::unique_ptr<HttpStreamRequest>
 HttpStreamFactory::RequestBidirectionalStreamImpl(
     const HttpRequestInfo& request_info,
     RequestPriority priority,
-    const SSLConfig& server_ssl_config,
+    const std::vector<SSLConfig::CertAndStatus>& allowed_bad_certs,
     HttpStreamRequest::Delegate* delegate,
     bool enable_ip_based_pooling,
     bool enable_alternative_services,
     const NetLogWithSource& net_log) {
   DCHECK(request_info.url.SchemeIs(url::kHttpsScheme));
 
-  return RequestStreamInternal(request_info, priority, server_ssl_config,
+  return RequestStreamInternal(request_info, priority, allowed_bad_certs,
                                delegate, nullptr,
                                HttpStreamRequest::BIDIRECTIONAL_STREAM,
                                /*is_websocket=*/false, enable_ip_based_pooling,
@@ -138,7 +171,7 @@ HttpStreamFactory::RequestBidirectionalStreamImpl(
 std::unique_ptr<HttpStreamRequest> HttpStreamFactory::RequestStreamInternal(
     const HttpRequestInfo& request_info,
     RequestPriority priority,
-    const SSLConfig& server_ssl_config,
+    const std::vector<SSLConfig::CertAndStatus>& allowed_bad_certs,
     HttpStreamRequest::Delegate* delegate,
     WebSocketHandshakeStreamBase::CreateHelper*
         websocket_handshake_stream_create_helper,
@@ -147,6 +180,10 @@ std::unique_ptr<HttpStreamRequest> HttpStreamFactory::RequestStreamInternal(
     bool enable_ip_based_pooling,
     bool enable_alternative_services,
     const NetLogWithSource& net_log) {
+  // This is only needed in the non-preconnect path, as preconnects do not
+  // require a NetworkIsolationKey.
+  DCHECK(request_info.IsConsistent());
+
   auto job_controller = std::make_unique<JobController>(
       this, delegate, session_, job_factory_.get(), request_info,
       /* is_preconnect = */ false, is_websocket, enable_ip_based_pooling,
@@ -154,7 +191,7 @@ std::unique_ptr<HttpStreamRequest> HttpStreamFactory::RequestStreamInternal(
       session_->context()
           .quic_context->params()
           ->delay_main_job_with_available_spdy_session,
-      server_ssl_config);
+      allowed_bad_certs);
   JobController* job_controller_raw_ptr = job_controller.get();
   job_controller_set_.insert(std::move(job_controller));
   return job_controller_raw_ptr->Start(delegate,
@@ -175,7 +212,7 @@ void HttpStreamFactory::PreconnectStreams(int num_streams,
       session_->context()
           .quic_context->params()
           ->delay_main_job_with_available_spdy_session,
-      /*server_ssl_config=*/SSLConfig());
+      /*allowed_bad_certs=*/std::vector<SSLConfig::CertAndStatus>());
   JobController* job_controller_raw_ptr = job_controller.get();
   job_controller_set_.insert(std::move(job_controller));
   job_controller_raw_ptr->Preconnect(num_streams);

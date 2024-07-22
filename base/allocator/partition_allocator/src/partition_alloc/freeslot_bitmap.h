@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef BASE_ALLOCATOR_PARTITION_ALLOCATOR_SRC_PARTITION_ALLOC_FREESLOT_BITMAP_H_
-#define BASE_ALLOCATOR_PARTITION_ALLOCATOR_SRC_PARTITION_ALLOC_FREESLOT_BITMAP_H_
+#ifndef PARTITION_ALLOC_FREESLOT_BITMAP_H_
+#define PARTITION_ALLOC_FREESLOT_BITMAP_H_
 
 #include <climits>
 #include <cstdint>
@@ -113,6 +113,7 @@ PA_ALWAYS_INLINE void FreeSlotBitmapReset(uintptr_t begin_addr,
   if (begin_cell == end_cell) {
     PA_DCHECK((*begin_cell & (~CellWithTrailingOnes(begin_bit_index) &
                               CellWithTrailingOnes(end_bit_index))) == 0u);
+    return;
   }
 
   if (begin_bit_index != 0) {
@@ -127,7 +128,7 @@ PA_ALWAYS_INLINE void FreeSlotBitmapReset(uintptr_t begin_addr,
     PA_DCHECK((*end_cell & CellWithTrailingOnes(end_bit_index)) == 0u);
   }
 
-  for (FreeSlotBitmapCellType* cell = begin_cell; cell != end_cell; ++cell) {
+  for (FreeSlotBitmapCellType* cell = begin_cell; cell < end_cell; ++cell) {
     PA_DCHECK(*cell == 0u);
   }
 #endif  // BUILDFLAG(PA_DCHECK_IS_ON)
@@ -137,4 +138,4 @@ PA_ALWAYS_INLINE void FreeSlotBitmapReset(uintptr_t begin_addr,
 
 #endif  // BUILDFLAG(USE_FREESLOT_BITMAP)
 
-#endif  // BASE_ALLOCATOR_PARTITION_ALLOCATOR_SRC_PARTITION_ALLOC_FREESLOT_BITMAP_H_
+#endif  // PARTITION_ALLOC_FREESLOT_BITMAP_H_

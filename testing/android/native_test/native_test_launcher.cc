@@ -43,7 +43,7 @@
 extern "C" int __llvm_profile_dump(void);
 #endif
 
-using base::android::JavaParamRef;
+using jni_zero::JavaParamRef;
 
 // The main function of the program to be wrapped as a test apk.
 extern int main(int argc, char** argv);
@@ -91,7 +91,7 @@ static void JNI_NativeTest_RunTests(
   base::ScopedAllowBlockingForTesting allow;
 
   // Required for DEATH_TESTS.
-  pthread_atfork(nullptr, nullptr, base::android::DisableJvmForTesting);
+  pthread_atfork(nullptr, nullptr, jni_zero::DisableJvmForTesting);
 
   // Command line initialized basically, will be fully initialized later.
   static const char* const kInitialArgv[] = { "ChromeTestActivity" };

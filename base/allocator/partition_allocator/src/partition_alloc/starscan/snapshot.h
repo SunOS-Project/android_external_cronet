@@ -2,18 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef BASE_ALLOCATOR_PARTITION_ALLOCATOR_SRC_PARTITION_ALLOC_STARSCAN_SNAPSHOT_H_
-#define BASE_ALLOCATOR_PARTITION_ALLOCATOR_SRC_PARTITION_ALLOC_STARSCAN_SNAPSHOT_H_
+#ifndef PARTITION_ALLOC_STARSCAN_SNAPSHOT_H_
+#define PARTITION_ALLOC_STARSCAN_SNAPSHOT_H_
 
 #include <memory>
 #include <utility>
 
+#include "partition_alloc/internal_allocator_forward.h"
 #include "partition_alloc/starscan/pcscan_internal.h"
 #include "partition_alloc/starscan/raceful_worklist.h"
 
 namespace partition_alloc::internal {
 
-class StarScanSnapshot final : public AllocatedOnPCScanMetadataPartition {
+class StarScanSnapshot final : public InternalPartitionAllocated {
  public:
   using SuperPageBase = uintptr_t;
   using SuperPagesWorklist = RacefulWorklist<SuperPageBase>;
@@ -91,4 +92,4 @@ StarScanSnapshot::UnprotectingView::UnprotectingView(StarScanSnapshot& snapshot)
 
 }  // namespace partition_alloc::internal
 
-#endif  // BASE_ALLOCATOR_PARTITION_ALLOCATOR_SRC_PARTITION_ALLOC_STARSCAN_SNAPSHOT_H_
+#endif  // PARTITION_ALLOC_STARSCAN_SNAPSHOT_H_

@@ -25,10 +25,13 @@ namespace {
 // Returns true if |first_cert| and |second_cert| represent the same certificate
 // (with the same chain), or if they're both NULL.
 bool AreCertificatesEqual(const scoped_refptr<X509Certificate>& first_cert,
-                          const scoped_refptr<X509Certificate>& second_cert) {
+                          const scoped_refptr<X509Certificate>& second_cert,
+                          bool include_chain = true) {
   return (!first_cert && !second_cert) ||
          (first_cert && second_cert &&
-          first_cert->EqualsIncludingChain(second_cert.get()));
+          (include_chain
+               ? first_cert->EqualsIncludingChain(second_cert.get())
+               : first_cert->EqualsExcludingChain(second_cert.get())));
 }
 
 // Returns a base::Value::Dict value NetLog parameter with the expected format
@@ -37,12 +40,27 @@ base::Value::Dict NetLogClearCachedClientCertParams(
     const net::HostPortPair& host,
     const scoped_refptr<net::X509Certificate>& cert,
     bool is_cleared) {
-  base::Value::Dict dict;
-  dict.Set("host", host.ToString());
-  dict.Set("certificates", cert ? net::NetLogX509CertificateList(cert.get())
+  return base::Value::Dict()
+      .Set("host", host.ToString())
+      .Set("certificates", cert ? net::NetLogX509CertificateList(cert.get())
+                                : base::Value(base::Value::List()))
+      .Set("is_cleared", is_cleared);
+}
+
+// Returns a base::Value::Dict value NetLog parameter with the expected format
+// for events of type CLEAR_MATCHING_CACHED_CLIENT_CERT.
+base::Value::Dict NetLogClearMatchingCachedClientCertParams(
+    const base::flat_set<net::HostPortPair>& hosts,
+    const scoped_refptr<net::X509Certificate>& cert) {
+  base::Value::List hosts_values;
+  for (const auto& host : hosts) {
+    hosts_values.Append(host.ToString());
+  }
+
+  return base::Value::Dict()
+      .Set("hosts", base::Value(std::move(hosts_values)))
+      .Set("certificates", cert ? net::NetLogX509CertificateList(cert.get())
                                 : base::Value(base::Value::List()));
-  dict.Set("is_cleared", is_cleared);
-  return dict;
 }
 
 }  // namespace
@@ -81,18 +99,15 @@ SSLClientContext::SSLClientContext(
     SSLConfigService* ssl_config_service,
     CertVerifier* cert_verifier,
     TransportSecurityState* transport_security_state,
-    CTPolicyEnforcer* ct_policy_enforcer,
     SSLClientSessionCache* ssl_client_session_cache,
     SCTAuditingDelegate* sct_auditing_delegate)
     : ssl_config_service_(ssl_config_service),
       cert_verifier_(cert_verifier),
       transport_security_state_(transport_security_state),
-      ct_policy_enforcer_(ct_policy_enforcer),
       ssl_client_session_cache_(ssl_client_session_cache),
       sct_auditing_delegate_(sct_auditing_delegate) {
   CHECK(cert_verifier_);
   CHECK(transport_security_state_);
-  CHECK(ct_policy_enforcer_);
 
   if (ssl_config_service_) {
     config_ = ssl_config_service_->GetSSLContextConfig();
@@ -218,6 +233,43 @@ void SSLClientContext::ClearClientCertificateIfNeeded(
   }
 
   NotifySSLConfigForServersChanged({host});
+}
+
+void SSLClientContext::ClearMatchingClientCertificate(
+    const scoped_refptr<net::X509Certificate>& certificate) {
+  CHECK(certificate);
+
+  base::flat_set<HostPortPair> cleared_servers;
+  for (const auto& server : ssl_client_auth_cache_.GetCachedServers()) {
+    scoped_refptr<X509Certificate> cached_certificate;
+    scoped_refptr<SSLPrivateKey> cached_private_key;
+    if (ssl_client_auth_cache_.Lookup(server, &cached_certificate,
+                                      &cached_private_key) &&
+        AreCertificatesEqual(cached_certificate, certificate,
+                             /*include_chain=*/false)) {
+      cleared_servers.insert(cleared_servers.end(), server);
+    }
+  }
+
+  net::NetLog::Get()->AddGlobalEntry(
+      NetLogEventType::CLEAR_MATCHING_CACHED_CLIENT_CERT, [&]() {
+        return NetLogClearMatchingCachedClientCertParams(cleared_servers,
+                                                         certificate);
+      });
+
+  if (cleared_servers.empty()) {
+    return;
+  }
+
+  for (const auto& server_to_clear : cleared_servers) {
+    ssl_client_auth_cache_.Remove(server_to_clear);
+  }
+
+  if (ssl_client_session_cache_) {
+    ssl_client_session_cache_->FlushForServers(cleared_servers);
+  }
+
+  NotifySSLConfigForServersChanged(cleared_servers);
 }
 
 void SSLClientContext::NotifySSLConfigChanged(SSLConfigChangeType change_type) {

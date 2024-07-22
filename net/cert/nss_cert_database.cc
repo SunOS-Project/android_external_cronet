@@ -238,9 +238,10 @@ int NSSCertDatabase::ImportFromPKCS12(
   return result;
 }
 
+// static
 int NSSCertDatabase::ExportToPKCS12(const ScopedCERTCertificateList& certs,
                                     const std::u16string& password,
-                                    std::string* output) const {
+                                    std::string* output) {
   return psm::nsPKCS12Blob_Export(output, certs, password);
 }
 
@@ -277,7 +278,7 @@ int NSSCertDatabase::ImportUserCert(const std::string& data) {
   if (certificates.empty())
     return ERR_CERT_INVALID;
 
-  int result = psm::ImportUserCert(certificates[0].get());
+  int result = psm::ImportUserCert(certificates[0].get(), GetPublicSlot());
 
   if (result == OK) {
     NotifyObserversClientCertStoreChanged();
@@ -287,7 +288,7 @@ int NSSCertDatabase::ImportUserCert(const std::string& data) {
 }
 
 int NSSCertDatabase::ImportUserCert(CERTCertificate* cert) {
-  int result = psm::ImportUserCert(cert);
+  int result = psm::ImportUserCert(cert, GetPublicSlot());
 
   if (result == OK) {
     NotifyObserversClientCertStoreChanged();

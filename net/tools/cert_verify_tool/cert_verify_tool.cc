@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <iostream>
+#include <string_view>
 
 #include "base/at_exit.h"
 #include "base/command_line.h"
@@ -20,6 +21,7 @@
 #include "net/cert/cert_verify_proc.h"
 #include "net/cert/cert_verify_proc_builtin.h"
 #include "net/cert/crl_set.h"
+#include "net/cert/do_nothing_ct_verifier.h"
 #include "net/cert/internal/system_trust_store.h"
 #include "net/cert/x509_util.h"
 #include "net/cert_net/cert_net_fetcher_url_request.h"
@@ -204,6 +206,11 @@ class DummySystemTrustStore : public net::SystemTrustStore {
 
 #if BUILDFLAG(CHROME_ROOT_STORE_SUPPORTED)
   int64_t chrome_root_store_version() const override { return 0; }
+
+  base::span<const net::ChromeRootCertConstraints> GetChromeRootConstraints(
+      const bssl::ParsedCertificate* cert) const override {
+    return {};
+  }
 #endif
 
  private:
@@ -211,7 +218,7 @@ class DummySystemTrustStore : public net::SystemTrustStore {
 };
 
 std::unique_ptr<net::SystemTrustStore> CreateSystemTrustStore(
-    base::StringPiece impl_name,
+    std::string_view impl_name,
     RootStoreType root_store_type) {
   switch (root_store_type) {
 #if BUILDFLAG(IS_FUCHSIA)
@@ -240,7 +247,7 @@ std::unique_ptr<net::SystemTrustStore> CreateSystemTrustStore(
 
 // Creates an subclass of CertVerifyImpl based on its name, or returns nullptr.
 std::unique_ptr<CertVerifyImpl> CreateCertVerifyImplFromName(
-    base::StringPiece impl_name,
+    std::string_view impl_name,
     scoped_refptr<net::CertNetFetcher> cert_net_fetcher,
     scoped_refptr<net::CRLSet> crl_set,
     RootStoreType root_store_type) {
@@ -264,6 +271,9 @@ std::unique_ptr<CertVerifyImpl> CreateCertVerifyImplFromName(
         "CertVerifyProcBuiltin",
         net::CreateCertVerifyProcBuiltin(
             std::move(cert_net_fetcher), std::move(crl_set),
+            // TODO(https://crbug.com/848277): support CT.
+            std::make_unique<net::DoNothingCTVerifier>(),
+            base::MakeRefCounted<net::DefaultCTPolicyEnforcer>(),
             CreateSystemTrustStore(impl_name, root_store_type), {}));
   }
 
@@ -502,7 +512,7 @@ int main(int argc, char** argv) {
     bssl::CertificateTrust trust = bssl::CertificateTrust::ForTrustedLeaf();
     std::string trust_str = command_line.GetSwitchValueASCII("trust-leaf-cert");
     if (!trust_str.empty()) {
-      absl::optional<bssl::CertificateTrust> parsed_trust =
+      std::optional<bssl::CertificateTrust> parsed_trust =
           bssl::CertificateTrust::FromDebugString(trust_str);
       if (!parsed_trust) {
         std::cerr << "ERROR: invalid leaf trust string " << trust_str << "\n";
@@ -519,7 +529,7 @@ int main(int argc, char** argv) {
 
   if (command_line.HasSwitch("root-trust")) {
     std::string trust_str = command_line.GetSwitchValueASCII("root-trust");
-    absl::optional<bssl::CertificateTrust> parsed_trust =
+    std::optional<bssl::CertificateTrust> parsed_trust =
         bssl::CertificateTrust::FromDebugString(trust_str);
     if (!parsed_trust) {
       std::cerr << "ERROR: invalid root trust string " << trust_str << "\n";

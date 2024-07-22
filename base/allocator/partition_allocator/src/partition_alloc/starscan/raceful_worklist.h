@@ -2,17 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef BASE_ALLOCATOR_PARTITION_ALLOCATOR_SRC_PARTITION_ALLOC_STARSCAN_RACEFUL_WORKLIST_H_
-#define BASE_ALLOCATOR_PARTITION_ALLOCATOR_SRC_PARTITION_ALLOC_STARSCAN_RACEFUL_WORKLIST_H_
+#ifndef PARTITION_ALLOC_STARSCAN_RACEFUL_WORKLIST_H_
+#define PARTITION_ALLOC_STARSCAN_RACEFUL_WORKLIST_H_
 
 #include <algorithm>
 #include <atomic>
 #include <vector>
 
+#include "partition_alloc/internal_allocator_forward.h"
 #include "partition_alloc/partition_alloc_base/compiler_specific.h"
 #include "partition_alloc/partition_alloc_base/rand_util.h"
 #include "partition_alloc/partition_alloc_check.h"
-#include "partition_alloc/starscan/metadata_allocator.h"
 
 namespace partition_alloc::internal {
 
@@ -30,7 +30,7 @@ class RacefulWorklist {
     std::atomic<bool> is_being_visited{false};
     std::atomic<bool> is_visited{false};
   };
-  using Underlying = std::vector<Node, MetadataAllocator<Node>>;
+  using Underlying = std::vector<Node, internal::InternalAllocator<Node>>;
 
  public:
   class RandomizedView {
@@ -88,7 +88,7 @@ template <typename Function>
 void RacefulWorklist<T>::RandomizedView::Visit(Function f) {
   auto& data = worklist_.data_;
   std::vector<typename Underlying::iterator,
-              MetadataAllocator<typename Underlying::iterator>>
+              internal::InternalAllocator<typename Underlying::iterator>>
       to_revisit;
 
   // To avoid worklist iteration, quick check if the worklist was already
@@ -145,4 +145,4 @@ void RacefulWorklist<T>::RandomizedView::Visit(Function f) {
 
 }  // namespace partition_alloc::internal
 
-#endif  // BASE_ALLOCATOR_PARTITION_ALLOCATOR_SRC_PARTITION_ALLOC_STARSCAN_RACEFUL_WORKLIST_H_
+#endif  // PARTITION_ALLOC_STARSCAN_RACEFUL_WORKLIST_H_

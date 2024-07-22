@@ -45,7 +45,7 @@ CRONET_LICENSE_NAME = "external_cronet_license"
 DEFAULT_TARGETS = [
     "//components/cronet/android:cronet_api_java",
     '//components/cronet/android:cronet',
-    '//components/cronet/android:cronet_impl_native_base_java',
+    '//components/cronet/android:cronet_impl_native_java',
     '//components/cronet/android:cronet_jni_registration_java',
 ]
 
@@ -340,11 +340,15 @@ def add_androidx_junit_java_deps(module, arch):
 def add_androidx_test_runner_java_deps(module, arch):
   module.static_libs.add("androidx.test.runner")
 
+def add_androidx_test_rules_java_deps(module, arch):
+    module.static_libs.add("androidx.test.rules")
+
 def add_android_test_base_java_deps(module, arch):
   module.libs.add("android.test.base")
 
 def add_accessibility_test_framework_java_deps(module, arch):
-  module.static_libs.add("accessibility-test-framework")
+    # BaseActivityTestRule.java depends on this but BaseActivityTestRule.java is not used in aosp.
+    pass
 
 def add_espresso_java_deps(module, arch):
   module.static_libs.add("androidx.test.espresso.contrib")
@@ -417,6 +421,8 @@ _builtin_deps = {
         add_android_test_base_java_deps,
     '//third_party/accessibility_test_framework:accessibility_test_framework_java':
         add_accessibility_test_framework_java_deps,
+    '//third_party/accessibility_test_framework:accessibility_core_java':
+        add_accessibility_test_framework_java_deps,
     '//third_party/android_deps:espresso_java':
         add_espresso_java_deps,
     '//third_party/android_sdk:android_test_mock_java':
@@ -437,6 +443,8 @@ _builtin_deps = {
         add_androidx_activity_activity,
     '//third_party/androidx:androidx_fragment_fragment_java':
         add_androidx_fragment_fragment,
+    '//third_party/androidx:androidx_test_rules_java':
+        add_androidx_test_rules_java_deps,
 }
 builtin_deps = {"{}{}".format(key, suffix): value for key, value in _builtin_deps.items() for suffix in ["", gn_utils.TESTING_SUFFIX] }
 
@@ -1230,6 +1238,7 @@ class JniGeneratorSanitizer(BaseActionSanitizer):
     self._update_value_arg('--srcjar-path', self._sanitize_filepath, False)
     self._update_value_arg('--output-dir', self._sanitize_filepath)
     self._update_value_arg('--extra-include', self._sanitize_filepath, False)
+    self._update_value_arg('--placeholder-srcjar-path', self._sanitize_filepath, False)
     self._update_list_arg('--input-file', self._sanitize_filepath)
     self._update_list_arg('--input-file', self._add_location_tag_to_filepath)
     if not self.is_test_target and not self._has_arg('--jar-file'):
@@ -1241,8 +1250,15 @@ class JniGeneratorSanitizer(BaseActionSanitizer):
     super()._sanitize_args()
 
   def get_outputs(self):
-    # fix target.output directory to match #include statements.
-    return {re.sub('^jni_headers/', '', out) for out in super().get_outputs()}
+    outputs = set()
+    for out in super().get_outputs():
+      # placeholder.srcjar contains empty placeholder classes used to compile generated java files
+      # without any other deps. This is not used in aosp.
+      if out.endswith("_placeholder.srcjar"):
+        continue
+      # fix target.output directory to match #include statements.
+      outputs.add(re.sub('^jni_headers/', '', out))
+    return outputs
 
   def get_tool_files(self):
     tool_files = super().get_tool_files()
@@ -1252,6 +1268,13 @@ class JniGeneratorSanitizer(BaseActionSanitizer):
                   for file in tool_files }
     # Filter bin/javap
     tool_files = {file for file in tool_files if not file.endswith('bin/javap') }
+
+    # TODO: Remove once https://chromium-review.googlesource.com/c/chromium/src/+/5370266 has made
+    #       its way to AOSP
+    # Files not specified in anywhere but jni_generator.py imports this file
+    tool_files.add('third_party/jni_zero/codegen/header_common.py')
+    tool_files.add('third_party/jni_zero/codegen/placeholder_java_type.py')
+
     return tool_files
 
   def get_tools(self):
@@ -1296,12 +1319,21 @@ class JniRegistrationGeneratorSanitizer(BaseActionSanitizer):
     self.target.inputs = [file for file in self.target.inputs if not file.startswith('//out/')]
 
   def get_outputs(self):
-    return {re.sub('^jni_headers/', '', out) for out in super().get_outputs()}
+    outputs = set()
+    for out in super().get_outputs():
+      # placeholder.srcjar contains empty placeholder classes used to compile generated java files
+       # without any other deps. This is not used in aosp.
+       if out.endswith("_placeholder.srcjar"):
+         continue
+       # fix target.output directory to match #include statements.
+       outputs.add(re.sub('^jni_headers/', '', out))
+    return outputs
 
   def _sanitize_args(self):
     self._update_value_arg('--depfile', self._sanitize_filepath)
     self._update_value_arg('--srcjar-path', self._sanitize_filepath)
     self._update_value_arg('--header-path', self._sanitize_filepath)
+    self._update_value_arg('--placeholder-srcjar-path', self._sanitize_filepath, False)
     self._delete_value_arg('--depfile', False)
     self._set_value_arg('--java-sources-file', '$(genDir)/java.sources')
     if not self.is_test_target:
@@ -1325,6 +1357,15 @@ class JniRegistrationGeneratorSanitizer(BaseActionSanitizer):
 
     return self.get_pre_cmd() + NEWLINE.join(commands)
 
+  def get_tool_files(self):
+      tool_files = super().get_tool_files()
+      # TODO: Remove once https://chromium-review.googlesource.com/c/chromium/src/+/5370266 has made
+      #       its way to AOSP
+      # Files not specified in anywhere but jni_generator.py imports this file
+      tool_files.add('third_party/jni_zero/codegen/header_common.py')
+      tool_files.add('third_party/jni_zero/codegen/placeholder_java_type.py')
+      return tool_files
+
 class JavaJniRegistrationGeneratorSanitizer(JniRegistrationGeneratorSanitizer):
   def get_name(self):
     name = super().get_name() + "__java"
@@ -1343,8 +1384,11 @@ class VersionSanitizer(BaseActionSanitizer):
     # args for the version.py contain file path without leading --arg key. So apply sanitize
     # function for all the args.
     self._update_all_args(self._sanitize_filepath_with_location_tag)
-    self._set_value_arg('-e', "'%s'" % self._get_value_arg('-e'))
+    self._update_list_arg('-e', self._sanitize_eval)
     super()._sanitize_args()
+
+  def _sanitize_eval(self, eval_arg):
+      return "'%s'" % eval_arg.replace("\'", "\\\"")
 
   def get_tool_files(self):
     tool_files = super().get_tool_files()
@@ -1917,6 +1961,9 @@ def create_blueprint_for_targets(gn, targets, test_targets):
       '-Wno-unreachable-code-loop-increment', # needed for icui18n
       '-fPIC',
       '-Wno-c++11-narrowing',
+      # Needed for address_space_randomization.h on riscv
+      # Can be removed after 125.0.6375.0 is imported
+      '-Wno-invalid-constexpr',
       # b/330508686 disable coverage profiling for files or function in this list.
       '-fprofile-list=external/cronet/exclude_coverage.list',
   ]

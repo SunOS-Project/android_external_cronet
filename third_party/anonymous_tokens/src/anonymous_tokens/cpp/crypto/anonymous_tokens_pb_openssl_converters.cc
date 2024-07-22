@@ -26,14 +26,14 @@
 #include <openssl/digest.h>
 #include <openssl/rand.h>
 
-
 namespace anonymous_tokens {
 
 absl::StatusOr<std::string> GenerateMask(
     const RSABlindSignaturePublicKey& public_key) {
   std::string mask;
   if (public_key.message_mask_type() == AT_MESSAGE_MASK_CONCAT &&
-      public_key.message_mask_size() >= kRsaMessageMaskSizeInBytes32) {
+      static_cast<size_t>(public_key.message_mask_size()) >=
+          kRsaMessageMaskSizeInBytes32) {
     mask = std::string(public_key.message_mask_size(), '\0');
     RAND_bytes(reinterpret_cast<uint8_t*>(mask.data()), mask.size());
   } else if (public_key.message_mask_type() == AT_MESSAGE_MASK_NO_MASK &&
@@ -87,4 +87,3 @@ absl::StatusOr<bssl::UniquePtr<RSA>> AnonymousTokensRSAPublicKeyToRSA(
 }
 
 }  // namespace anonymous_tokens
-

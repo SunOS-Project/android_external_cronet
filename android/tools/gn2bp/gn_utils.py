@@ -43,6 +43,8 @@ JAVA_FILES_TO_IGNORE = (
   "//components/cronet/android/test/javatests/src/org/chromium/net/apihelpers/ContentTypeParametersParserTest.java",
   # androidx-multidex is disabled on unbundled branches.
   "//base/test/android/java/src/org/chromium/base/multidex/ChromiumMultiDexInstaller.java",
+  # This file is not used in aosp and depends on newer accessibility_test_framework.
+  "//base/test/android/javatests/src/org/chromium/base/test/BaseActivityTestRule.java",
 )
 RESPONSE_FILE = '{{response_file_name}}'
 TESTING_SUFFIX = "__testing"

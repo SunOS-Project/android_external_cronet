@@ -5,14 +5,17 @@
 #include "base/task/sequence_manager/sequence_manager_impl.h"
 
 #include <stddef.h>
+
 #include <memory>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <utility>
 #include <vector>
 
 #include "base/auto_reset.h"
 #include "base/cancelable_callback.h"
+#include "base/debug/stack_trace.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
 #include "base/functional/callback_forward.h"
@@ -23,9 +26,12 @@
 #include "base/memory/scoped_refptr.h"
 #include "base/message_loop/message_pump_default.h"
 #include "base/message_loop/message_pump_type.h"
+#include "base/rand_util.h"
 #include "base/run_loop.h"
+#include "base/sequence_checker_impl.h"
 #include "base/strings/strcat.h"
 #include "base/strings/string_number_conversions.h"
+#include "base/strings/string_split.h"
 #include "base/strings/stringprintf.h"
 #include "base/synchronization/waitable_event.h"
 #include "base/task/current_thread.h"
@@ -41,8 +47,11 @@
 #include "base/task/sequence_manager/thread_controller_with_message_pump_impl.h"
 #include "base/task/sequence_manager/work_queue.h"
 #include "base/task/sequence_manager/work_queue_sets.h"
+#include "base/task/sequenced_task_runner.h"
 #include "base/task/single_thread_task_runner.h"
 #include "base/task/task_features.h"
+#include "base/task/thread_pool.h"
+#include "base/task/thread_pool/thread_pool_instance.h"
 #include "base/test/bind.h"
 #include "base/test/mock_callback.h"
 #include "base/test/null_task_runner.h"
@@ -51,6 +60,8 @@
 #include "base/test/task_environment.h"
 #include "base/test/test_mock_time_task_runner.h"
 #include "base/test/test_simple_task_runner.h"
+#include "base/test/test_timeouts.h"
+#include "base/threading/platform_thread.h"
 #include "base/threading/sequence_local_storage_slot.h"
 #include "base/threading/thread.h"
 #include "base/time/time.h"
@@ -60,8 +71,9 @@
 #include "testing/gmock/include/gmock/gmock.h"
 
 #if BUILDFLAG(ENABLE_BASE_TRACING)
+#include <optional>
+
 #include "base/test/trace_event_analyzer.h"
-#include "third_party/abseil-cpp/absl/types/optional.h"
 #endif  // BUILDFLAG(ENABLE_BASE_TRACING)
 
 using base::sequence_manager::EnqueueOrder;
@@ -91,6 +103,13 @@ enum class RunnerType {
 enum class WakeUpType {
   kDefault,
   kAlign,
+};
+
+// Expresses whether metrics subsampling in ThreadController should always or
+// never sample which affects the count of calls to Now().
+enum class MetricsSampling {
+  kMetricsOn,
+  kMetricsOff,
 };
 
 enum class TestQueuePriority : TaskQueue::QueuePriority {
@@ -126,14 +145,21 @@ std::string ToString(WakeUpType type) {
   }
 }
 
-std::string GetTestNameSuffix(
-    const testing::TestParamInfo<std::tuple<RunnerType, WakeUpType>>& info) {
-  return StrCat({"With", ToString(std::get<0>(info.param)).substr(1),
-                 ToString(std::get<1>(info.param))});
+std::string ToString(MetricsSampling sampling) {
+  switch (sampling) {
+    case MetricsSampling::kMetricsOn:
+      return "MetricsOn";
+    case MetricsSampling::kMetricsOff:
+      return "MetricsOff";
+  }
 }
 
-void PrintTo(const RunnerType type, std::ostream* os) {
-  *os << ToString(type);
+std::string GetTestNameSuffix(
+    const testing::TestParamInfo<
+        std::tuple<RunnerType, WakeUpType, MetricsSampling>>& info) {
+  return StrCat({"With", ToString(std::get<0>(info.param)).substr(1),
+                 ToString(std::get<1>(info.param)),
+                 ToString(std::get<2>(info.param))});
 }
 
 TaskQueueImpl* GetTaskQueueImpl(TaskQueue* task_queue) {
@@ -388,7 +414,8 @@ class FixtureWithMockMessagePump : public Fixture {
 // instead of templated ones. The latter would be more verbose as all method
 // calls to the fixture would need to be like this->method()
 class SequenceManagerTest
-    : public testing::TestWithParam<std::tuple<RunnerType, WakeUpType>>,
+    : public testing::TestWithParam<
+          std::tuple<RunnerType, WakeUpType, MetricsSampling>>,
       public Fixture {
  public:
   SequenceManagerTest() {
@@ -400,6 +427,33 @@ class SequenceManagerTest
         fixture_ =
             std::make_unique<FixtureWithMockMessagePump>(GetWakeUpType());
         break;
+    }
+
+    if (GetSampling() == MetricsSampling::kMetricsOn) {
+      always_sample_scoper_.emplace();
+    } else {
+      never_sample_scoper_.emplace();
+    }
+  }
+
+  // Accounts for the extra calls to Now() that come when sampling is enabled.
+  int GetExtraNowSampleCount() {
+    // When no extra metrics are sampled there are no extra Now() calls.
+    if (GetSampling() == MetricsSampling::kMetricsOff) {
+      return 0;
+    }
+
+    // In both cases when sampling metrics there is a new call to Now() when
+    // ThreadController goes idle and the LazyNow instance used
+    // has no value. There is an equivalent use of LazyNow upon becoming active.
+    // In the case of RunnerType::kMessagePump the LazyNow has no value but it
+    // does when using RunnerType::kMockTaskRunner since it was already
+    // populated on entering OnWorkStarted().
+    switch (GetUnderlyingRunnerType()) {
+      case RunnerType::kMockTaskRunner:
+        return 1;
+      case RunnerType::kMessagePump:
+        return 2;
     }
   }
 
@@ -468,23 +522,37 @@ class SequenceManagerTest
 
   RunnerType GetUnderlyingRunnerType() { return std::get<0>(GetParam()); }
   WakeUpType GetWakeUpType() { return std::get<1>(GetParam()); }
+  MetricsSampling GetSampling() { return std::get<2>(GetParam()); }
 
   TimeTicks FromStartAligned(TimeDelta delta) const override {
     return fixture_->FromStartAligned(delta);
   }
 
  private:
+  std::optional<base::MetricsSubSampler::ScopedAlwaysSampleForTesting>
+      always_sample_scoper_;
+  std::optional<base::MetricsSubSampler::ScopedNeverSampleForTesting>
+      never_sample_scoper_;
   debug::CrashKeyString dummy_key_{"dummy", debug::CrashKeySize::Size64};
   std::unique_ptr<Fixture> fixture_;
 };
 
 auto GetTestTypes() {
   return testing::Values(
-      std::make_tuple(RunnerType::kMessagePump, WakeUpType::kDefault),
+      std::make_tuple(RunnerType::kMessagePump, WakeUpType::kDefault,
+                      MetricsSampling::kMetricsOn),
+      std::make_tuple(RunnerType::kMessagePump, WakeUpType::kDefault,
+                      MetricsSampling::kMetricsOff),
 #if !BUILDFLAG(IS_WIN)
-      std::make_tuple(RunnerType::kMessagePump, WakeUpType::kAlign),
+      std::make_tuple(RunnerType::kMessagePump, WakeUpType::kAlign,
+                      MetricsSampling::kMetricsOn),
+      std::make_tuple(RunnerType::kMessagePump, WakeUpType::kAlign,
+                      MetricsSampling::kMetricsOff),
 #endif
-      std::make_tuple(RunnerType::kMockTaskRunner, WakeUpType::kDefault));
+      std::make_tuple(RunnerType::kMockTaskRunner, WakeUpType::kDefault,
+                      MetricsSampling::kMetricsOn),
+      std::make_tuple(RunnerType::kMockTaskRunner, WakeUpType::kDefault,
+                      MetricsSampling::kMetricsOff));
 }
 
 INSTANTIATE_TEST_SUITE_P(All,
@@ -566,7 +634,14 @@ TEST_P(SequenceManagerTest, NowNotCalledIfUnneeded) {
 
   RunLoop().RunUntilIdle();
 
-  EXPECT_EQ(0, GetNowTicksCallCount());
+  // In the absence of calls to Now() for TimeObserver the only calls will
+  // come from metrics. There will be one call when the ThreadController
+  // becomes active and one when it becomes idle.
+  int extra_call_count = 0;
+  if (GetSampling() == MetricsSampling::kMetricsOn) {
+    extra_call_count = 2;
+  }
+  EXPECT_EQ(0 + extra_call_count, GetNowTicksCallCount());
 }
 
 TEST_P(SequenceManagerTest,
@@ -587,7 +662,7 @@ TEST_P(SequenceManagerTest,
   RunLoop().RunUntilIdle();
   // Now is called when we start work and then for each task when it's
   // completed. 1 + 6  = 7 calls.
-  EXPECT_EQ(7, GetNowTicksCallCount());
+  EXPECT_EQ(7 + GetExtraNowSampleCount(), GetNowTicksCallCount());
 }
 
 TEST_P(SequenceManagerTest,
@@ -612,7 +687,7 @@ TEST_P(SequenceManagerTest,
   RunLoop().RunUntilIdle();
   // Now is called each time a task is queued, when first task is started
   // running, and when a task is completed. 1 + 6 * 2 = 13 calls.
-  EXPECT_EQ(13, GetNowTicksCallCount());
+  EXPECT_EQ(13 + GetExtraNowSampleCount(), GetNowTicksCallCount());
 }
 
 void NullTask() {}
@@ -2482,7 +2557,7 @@ TEST_P(SequenceManagerTest, TimeDomainDoesNotCauseWakeUp) {
   queue->task_runner()->PostDelayedTask(
       FROM_HERE, BindOnce(&TestTask, 1, &run_order), Milliseconds(10));
   LazyNow lazy_now1(domain.get());
-  EXPECT_EQ(absl::nullopt, sequence_manager()->GetPendingWakeUp(&lazy_now1));
+  EXPECT_EQ(std::nullopt, sequence_manager()->GetPendingWakeUp(&lazy_now1));
   EXPECT_EQ(TimeTicks::Max(), NextPendingTaskTime());
 
   domain->SetNowTicks(sequence_manager()->NowTicks() + Milliseconds(10));
@@ -2535,9 +2610,9 @@ class MockTaskQueueThrottler : public TaskQueue::Throttler {
   MOCK_METHOD0(OnHasImmediateTask, void());
   MOCK_METHOD1(GetNextAllowedWakeUp_DesiredWakeUpTime, void(TimeTicks));
 
-  absl::optional<WakeUp> GetNextAllowedWakeUp(
+  std::optional<WakeUp> GetNextAllowedWakeUp(
       LazyNow* lazy_now,
-      absl::optional<WakeUp> next_desired_wake_up,
+      std::optional<WakeUp> next_desired_wake_up,
       bool has_immediate_work) override {
     if (next_desired_wake_up)
       GetNextAllowedWakeUp_DesiredWakeUpTime(next_desired_wake_up->time);
@@ -2546,12 +2621,12 @@ class MockTaskQueueThrottler : public TaskQueue::Throttler {
     return next_desired_wake_up;
   }
 
-  void SetNextAllowedWakeUp(absl::optional<WakeUp> next_allowed_wake_up) {
+  void SetNextAllowedWakeUp(std::optional<WakeUp> next_allowed_wake_up) {
     next_allowed_wake_up_ = next_allowed_wake_up;
   }
 
  private:
-  absl::optional<WakeUp> next_allowed_wake_up_;
+  std::optional<WakeUp> next_allowed_wake_up_;
 };
 
 }  // namespace
@@ -3523,9 +3598,9 @@ TEST_P(SequenceManagerTest, DelayedTasksNotSelected) {
   auto queue = CreateTaskQueue();
   constexpr TimeDelta kDelay(Milliseconds(10));
   LazyNow lazy_now(mock_tick_clock());
-  EXPECT_EQ(absl::nullopt, sequence_manager()->GetPendingWakeUp(&lazy_now));
+  EXPECT_EQ(std::nullopt, sequence_manager()->GetPendingWakeUp(&lazy_now));
   EXPECT_EQ(
-      absl::nullopt,
+      std::nullopt,
       sequence_manager()->GetPendingWakeUp(
           &lazy_now, SequencedTaskSource::SelectTaskOption::kSkipDelayedTask));
 
@@ -3540,7 +3615,7 @@ TEST_P(SequenceManagerTest, DelayedTasksNotSelected) {
   EXPECT_EQ((WakeUp{lazy_now.Now() + kDelay, kLeeway}),
             sequence_manager()->GetPendingWakeUp(&lazy_now));
   EXPECT_EQ(
-      absl::nullopt,
+      std::nullopt,
       sequence_manager()->GetPendingWakeUp(
           &lazy_now, SequencedTaskSource::SelectTaskOption::kSkipDelayedTask));
 
@@ -3552,7 +3627,7 @@ TEST_P(SequenceManagerTest, DelayedTasksNotSelected) {
   EXPECT_FALSE(sequence_manager()->SelectNextTask(
       lazy_now2, SequencedTaskSource::SelectTaskOption::kSkipDelayedTask));
   EXPECT_EQ(
-      absl::nullopt,
+      std::nullopt,
       sequence_manager()->GetPendingWakeUp(
           &lazy_now2, SequencedTaskSource::SelectTaskOption::kSkipDelayedTask));
 
@@ -3560,7 +3635,7 @@ TEST_P(SequenceManagerTest, DelayedTasksNotSelected) {
   EXPECT_TRUE(sequence_manager()->SelectNextTask(
       lazy_now2, SequencedTaskSource::SelectTaskOption::kDefault));
   sequence_manager()->DidRunTask(lazy_now2);
-  EXPECT_EQ(absl::nullopt, sequence_manager()->GetPendingWakeUp(&lazy_now2));
+  EXPECT_EQ(std::nullopt, sequence_manager()->GetPendingWakeUp(&lazy_now2));
 }
 
 TEST_P(SequenceManagerTest, DelayedTasksNotSelectedWithImmediateTask) {
@@ -3568,9 +3643,9 @@ TEST_P(SequenceManagerTest, DelayedTasksNotSelectedWithImmediateTask) {
   constexpr TimeDelta kDelay(Milliseconds(10));
   LazyNow lazy_now(mock_tick_clock());
 
-  EXPECT_EQ(absl::nullopt, sequence_manager()->GetPendingWakeUp(&lazy_now));
+  EXPECT_EQ(std::nullopt, sequence_manager()->GetPendingWakeUp(&lazy_now));
   EXPECT_EQ(
-      absl::nullopt,
+      std::nullopt,
       sequence_manager()->GetPendingWakeUp(
           &lazy_now, SequencedTaskSource::SelectTaskOption::kSkipDelayedTask));
 
@@ -3606,7 +3681,7 @@ TEST_P(SequenceManagerTest, DelayedTasksNotSelectedWithImmediateTask) {
   EXPECT_FALSE(sequence_manager()->SelectNextTask(
       lazy_now2, SequencedTaskSource::SelectTaskOption::kSkipDelayedTask));
   EXPECT_EQ(
-      absl::nullopt,
+      std::nullopt,
       sequence_manager()->GetPendingWakeUp(
           &lazy_now2, SequencedTaskSource::SelectTaskOption::kSkipDelayedTask));
 
@@ -3614,7 +3689,7 @@ TEST_P(SequenceManagerTest, DelayedTasksNotSelectedWithImmediateTask) {
   EXPECT_TRUE(sequence_manager()->SelectNextTask(
       lazy_now2, SequencedTaskSource::SelectTaskOption::kDefault));
   EXPECT_EQ(
-      absl::nullopt,
+      std::nullopt,
       sequence_manager()->GetPendingWakeUp(
           &lazy_now2, SequencedTaskSource::SelectTaskOption::kSkipDelayedTask));
   sequence_manager()->DidRunTask(lazy_now2);
@@ -3666,7 +3741,7 @@ TEST_P(SequenceManagerTest,
   EXPECT_FALSE(sequence_manager()->SelectNextTask(
       lazy_now2, SequencedTaskSource::SelectTaskOption::kSkipDelayedTask));
   EXPECT_EQ(
-      absl::nullopt,
+      std::nullopt,
       sequence_manager()->GetPendingWakeUp(
           &lazy_now2, SequencedTaskSource::SelectTaskOption::kSkipDelayedTask));
 
@@ -3678,14 +3753,14 @@ TEST_P(SequenceManagerTest,
 
   // No delayed tasks can be executed anymore.
   EXPECT_FALSE(sequence_manager()->SelectNextTask(lazy_now2));
-  EXPECT_EQ(absl::nullopt, sequence_manager()->GetPendingWakeUp(&lazy_now2));
+  EXPECT_EQ(std::nullopt, sequence_manager()->GetPendingWakeUp(&lazy_now2));
 }
 
 TEST_P(SequenceManagerTest, GetPendingWakeUp) {
   auto queues = CreateTaskQueues(2u);
 
   LazyNow lazy_now(mock_tick_clock());
-  EXPECT_EQ(absl::nullopt, sequence_manager()->GetPendingWakeUp(&lazy_now));
+  EXPECT_EQ(std::nullopt, sequence_manager()->GetPendingWakeUp(&lazy_now));
 
   queues[0]->task_runner()->PostDelayedTask(FROM_HERE, BindOnce(&NopTask),
                                             Seconds(10));
@@ -3719,7 +3794,7 @@ TEST_P(SequenceManagerTest, GetPendingWakeUp_Disabled) {
   queue->task_runner()->PostTask(FROM_HERE, BindOnce(&NopTask));
 
   LazyNow lazy_now(mock_tick_clock());
-  EXPECT_EQ(absl::nullopt, sequence_manager()->GetPendingWakeUp(&lazy_now));
+  EXPECT_EQ(std::nullopt, sequence_manager()->GetPendingWakeUp(&lazy_now));
 }
 
 TEST_P(SequenceManagerTest, GetPendingWakeUp_Fence) {
@@ -3729,7 +3804,7 @@ TEST_P(SequenceManagerTest, GetPendingWakeUp_Fence) {
   queue->task_runner()->PostTask(FROM_HERE, BindOnce(&NopTask));
 
   LazyNow lazy_now(mock_tick_clock());
-  EXPECT_EQ(absl::nullopt, sequence_manager()->GetPendingWakeUp(&lazy_now));
+  EXPECT_EQ(std::nullopt, sequence_manager()->GetPendingWakeUp(&lazy_now));
 }
 
 TEST_P(SequenceManagerTest, GetPendingWakeUp_FenceUnblocking) {
@@ -3772,7 +3847,7 @@ TEST_P(SequenceManagerTest, RemoveAllCanceledDelayedTasksFromFront) {
   // Canceling the task is not sufficient to ensure it is not considered for the
   // next task time.
   cancelable_closure.Cancel();
-  EXPECT_EQ(absl::nullopt, sequence_manager()->GetPendingWakeUp(&lazy_now));
+  EXPECT_EQ(std::nullopt, sequence_manager()->GetPendingWakeUp(&lazy_now));
 }
 
 TEST_P(SequenceManagerTest,
@@ -3811,10 +3886,10 @@ TEST_P(SequenceManagerTest,
   cancelable_closure_2.Cancel();
 
   // No more valid tasks in any queues.
-  EXPECT_EQ(absl::nullopt, sequence_manager()->GetPendingWakeUp(&lazy_now));
+  EXPECT_EQ(std::nullopt, sequence_manager()->GetPendingWakeUp(&lazy_now));
 
   // Test that calling `GetPendingWakeUp()` works when no task is canceled.
-  EXPECT_EQ(absl::nullopt, sequence_manager()->GetPendingWakeUp(&lazy_now));
+  EXPECT_EQ(std::nullopt, sequence_manager()->GetPendingWakeUp(&lazy_now));
 }
 
 namespace {
@@ -3957,7 +4032,7 @@ TEST_P(SequenceManagerTest, DisablingQueuesChangesDelayTillNextDoWork) {
 TEST_P(SequenceManagerTest, GetNextDesiredWakeUp) {
   auto queue = CreateTaskQueue();
 
-  EXPECT_EQ(absl::nullopt, queue->GetNextDesiredWakeUp());
+  EXPECT_EQ(std::nullopt, queue->GetNextDesiredWakeUp());
 
   TimeTicks start_time = sequence_manager()->NowTicks();
   TimeDelta delay1 = Milliseconds(10);
@@ -3973,7 +4048,7 @@ TEST_P(SequenceManagerTest, GetNextDesiredWakeUp) {
   std::unique_ptr<TaskQueue::QueueEnabledVoter> voter =
       queue->CreateQueueEnabledVoter();
   voter->SetVoteToEnable(false);
-  EXPECT_EQ(absl::nullopt, queue->GetNextDesiredWakeUp());
+  EXPECT_EQ(std::nullopt, queue->GetNextDesiredWakeUp());
 
   voter->SetVoteToEnable(true);
   EXPECT_EQ(start_time + delay2, queue->GetNextDesiredWakeUp()->time);
@@ -4594,7 +4669,8 @@ class PostTaskWhenDeleted {
   }
 
   ~PostTaskWhenDeleted() {
-    DCHECK(tasks_alive_->find(full_name()) != tasks_alive_->end());
+    CHECK(tasks_alive_->find(full_name()) != tasks_alive_->end(),
+          base::NotFatalUntil::M125);
     tasks_alive_->erase(full_name());
     tasks_deleted_->push_back(full_name());
 
@@ -4756,7 +4832,7 @@ class MockTimeDomain : public TimeDomain {
   TimeTicks NowTicks() const override { return now_; }
 
   // TimeDomain:
-  bool MaybeFastForwardToWakeUp(absl::optional<WakeUp> wakeup,
+  bool MaybeFastForwardToWakeUp(std::optional<WakeUp> wakeup,
                                 bool quit_when_idle_requested) override {
     return MaybeFastForwardToWakeUp(quit_when_idle_requested);
   }
@@ -4771,20 +4847,20 @@ class MockTimeDomain : public TimeDomain {
 
 }  // namespace
 
-TEST_P(SequenceManagerTest, OnSystemIdleTimeDomainNotification) {
+TEST_P(SequenceManagerTest, OnIdleTimeDomainNotification) {
   if (GetUnderlyingRunnerType() != RunnerType::kMessagePump)
     return;
 
   auto queue = CreateTaskQueue();
 
-  // If we call OnSystemIdle, we expect registered TimeDomains to receive a call
-  // to MaybeFastForwardToWakeUp.  If no run loop has requested quit on idle,
-  // the parameter passed in should be false.
+  // If we call OnIdle, we expect registered TimeDomains to receive a call to
+  // MaybeFastForwardToWakeUp.  If no run loop has requested quit on idle, the
+  // parameter passed in should be false.
   StrictMock<MockTimeDomain> mock_time_domain;
   sequence_manager()->SetTimeDomain(&mock_time_domain);
   EXPECT_CALL(mock_time_domain, MaybeFastForwardToWakeUp(false))
       .WillOnce(Return(false));
-  sequence_manager()->OnSystemIdle();
+  sequence_manager()->OnIdle();
   sequence_manager()->ResetTimeDomain();
   Mock::VerifyAndClearExpectations(&mock_time_domain);
 
@@ -4795,7 +4871,7 @@ TEST_P(SequenceManagerTest, OnSystemIdleTimeDomainNotification) {
         EXPECT_CALL(mock_time_domain, MaybeFastForwardToWakeUp(true))
             .WillOnce(Return(false));
         sequence_manager()->SetTimeDomain(&mock_time_domain);
-        sequence_manager()->OnSystemIdle();
+        sequence_manager()->OnIdle();
         sequence_manager()->ResetTimeDomain();
       }));
 
@@ -5032,7 +5108,7 @@ class MockCrashKeyImplementation : public debug::CrashKeyImplementation {
  public:
   MOCK_METHOD2(Allocate,
                debug::CrashKeyString*(const char name[], debug::CrashKeySize));
-  MOCK_METHOD2(Set, void(debug::CrashKeyString*, StringPiece));
+  MOCK_METHOD2(Set, void(debug::CrashKeyString*, std::string_view));
   MOCK_METHOD1(Clear, void(debug::CrashKeyString*));
   MOCK_METHOD1(OutputCrashKeysToStream, void(std::ostream&));
 };
@@ -5391,6 +5467,531 @@ TEST_P(SequenceManagerTest, OnTaskPostedCallbacks) {
   queue->task_runner()->PostTask(FROM_HERE, BindOnce(NullTask));
   EXPECT_EQ(2, counter1);
   EXPECT_EQ(2, counter2);
+}
+
+// `RunOrPostTask` is tightly integrated with `ThreadControllerWithMessagePump`
+// and `RunLoop` so its tests can't use `SequenceManagerTest`.
+class SequenceManagerRunOrPostTaskTest : public testing::Test {
+ public:
+  SequenceManagerRunOrPostTaskTest() {
+    auto settings = SequenceManager::Settings::Builder().Build();
+    auto thread_controller =
+        std::make_unique<ThreadControllerWithMessagePumpImpl>(
+            std::make_unique<MessagePumpDefault>(), settings);
+    sequence_manager_ = SequenceManagerForTest::Create(
+        std::move(thread_controller), std::move(settings));
+    queue_ =
+        sequence_manager_->CreateTaskQueue(TaskQueue::Spec(QueueName::TEST_TQ));
+    other_queue_ =
+        sequence_manager_->CreateTaskQueue(TaskQueue::Spec(QueueName::TEST_TQ));
+    sequence_manager_->SetDefaultTaskRunner(queue_->task_runner());
+
+    thread_.Start();
+  }
+
+  SequenceManagerImpl* sequence_manager() { return sequence_manager_.get(); }
+  TaskQueue* queue() { return queue_.get(); }
+  TaskQueue* other_queue() { return other_queue_.get(); }
+  SingleThreadTaskRunner* task_runner() { return queue_->task_runner().get(); }
+  SingleThreadTaskRunner* other_task_runner() {
+    return other_queue_->task_runner().get();
+  }
+  SingleThreadTaskRunner* other_thread_task_runner() {
+    return thread_.task_runner().get();
+  }
+
+  void FlushOtherThread() { thread_.FlushForTesting(); }
+
+  // Allow tasks to run synchronously. This imitates being inside a `RunLoop`,
+  // but allows the test's body to keep running.
+  void SimulateInsideRunLoop() {
+    sequence_manager_->SetRunTaskSynchronouslyAllowed(true);
+  }
+
+ private:
+  std::unique_ptr<SequenceManagerForTest> sequence_manager_;
+  TaskQueue::Handle queue_;
+  TaskQueue::Handle other_queue_;
+  Thread thread_{"OtherThread"};
+};
+
+// Verify that `RunOrPostTask` from the bound thread does not run the task
+// synchronously if there is no active `RunLoop`.
+TEST_F(SequenceManagerRunOrPostTaskTest, FromBoundThreadOutsideRunLoop) {
+  bool did_run = false;
+  EXPECT_TRUE(task_runner()->RunOrPostTask(
+      subtle::RunOrPostTaskPassKeyForTesting(), FROM_HERE,
+      BindLambdaForTesting([&]() { did_run = true; })));
+  EXPECT_FALSE(did_run);
+  RunLoop().RunUntilIdle();
+  EXPECT_TRUE(did_run);
+}
+
+// Verify that `RunOrPostTask` from another thread does not run the task
+// synchronously if there is no active `RunLoop`.
+TEST_F(SequenceManagerRunOrPostTaskTest, FromOtherThreadOutsideRunLoop) {
+  bool did_run = false;
+  other_thread_task_runner()->PostTask(
+      FROM_HERE, BindLambdaForTesting([&]() {
+        EXPECT_TRUE(task_runner()->RunOrPostTask(
+            subtle::RunOrPostTaskPassKeyForTesting(), FROM_HERE,
+            BindLambdaForTesting([&]() { did_run = true; })));
+      }));
+
+  FlushOtherThread();
+  EXPECT_FALSE(did_run);
+  RunLoop().RunUntilIdle();
+  EXPECT_TRUE(did_run);
+}
+
+// Verify that `RunOrPostTask` from a task running on the bound thread does not
+// run the task synchronously.
+TEST_F(SequenceManagerRunOrPostTaskTest, FromInsideTask) {
+  bool did_run = false;
+  EXPECT_TRUE(task_runner()->PostTask(
+      FROM_HERE, BindLambdaForTesting([&]() {
+        EXPECT_TRUE(task_runner()->RunOrPostTask(
+            subtle::RunOrPostTaskPassKeyForTesting(), FROM_HERE,
+            BindLambdaForTesting([&]() { did_run = true; })));
+        EXPECT_FALSE(did_run);
+      })));
+  RunLoop().RunUntilIdle();
+  EXPECT_TRUE(did_run);
+}
+
+// Verify that `RunOrPostTask` from another thread does not run the task
+// synchronously if there is a queued task.
+TEST_F(SequenceManagerRunOrPostTaskTest, FromOtherThreadWithQueuedTask) {
+  SimulateInsideRunLoop();
+  EXPECT_TRUE(task_runner()->PostTask(FROM_HERE, DoNothing()));
+
+  bool did_run = false;
+  EXPECT_TRUE(other_thread_task_runner()->PostTask(
+      FROM_HERE, BindLambdaForTesting([&]() {
+        EXPECT_TRUE(task_runner()->RunOrPostTask(
+            subtle::RunOrPostTaskPassKeyForTesting(), FROM_HERE,
+            BindLambdaForTesting([&]() { did_run = true; })));
+        EXPECT_FALSE(did_run);
+      })));
+
+  FlushOtherThread();
+  EXPECT_FALSE(did_run);
+  RunLoop().RunUntilIdle();
+  EXPECT_TRUE(did_run);
+}
+
+// Verify that `RunOrPostTask` from another thread does not run the task
+// synchronously if there is a queued task in a different queue from the same
+// `SequenceManager`.
+TEST_F(SequenceManagerRunOrPostTaskTest,
+       FromOtherThreadWithQueuedTaskOtherQueue) {
+  SimulateInsideRunLoop();
+  EXPECT_TRUE(other_task_runner()->PostTask(FROM_HERE, DoNothing()));
+
+  bool did_run = false;
+  EXPECT_TRUE(other_thread_task_runner()->PostTask(
+      FROM_HERE, BindLambdaForTesting([&]() {
+        EXPECT_TRUE(task_runner()->RunOrPostTask(
+            subtle::RunOrPostTaskPassKeyForTesting(), FROM_HERE,
+            BindLambdaForTesting([&]() { did_run = true; })));
+        EXPECT_FALSE(did_run);
+      })));
+
+  FlushOtherThread();
+  EXPECT_FALSE(did_run);
+  RunLoop().RunUntilIdle();
+  EXPECT_TRUE(did_run);
+}
+
+// Verify that `RunOrPostTask` from another thread runs the task synchronously
+// if there is no queued or running task.
+TEST_F(SequenceManagerRunOrPostTaskTest, FromOtherThreadNoQueuedOrRunningTask) {
+  SimulateInsideRunLoop();
+
+  bool did_run = false;
+  EXPECT_TRUE(other_thread_task_runner()->PostTask(
+      FROM_HERE, BindLambdaForTesting([&]() {
+        EXPECT_TRUE(task_runner()->RunOrPostTask(
+            subtle::RunOrPostTaskPassKeyForTesting(), FROM_HERE,
+            BindLambdaForTesting([&]() { did_run = true; })));
+        EXPECT_TRUE(did_run);
+      })));
+
+  FlushOtherThread();
+  EXPECT_TRUE(did_run);
+}
+
+// Verify that `RunOrPostTask` from another thread does not run the task
+// synchronously when "internal work" is simulated.
+TEST_F(SequenceManagerRunOrPostTaskTest, FromOtherThreadInternalWork) {
+  SimulateInsideRunLoop();
+
+  // Simulate internal work execution in the message pump.
+  sequence_manager()->OnBeginWork();
+
+  bool did_run = false;
+  EXPECT_TRUE(other_thread_task_runner()->PostTask(
+      FROM_HERE, BindLambdaForTesting([&]() {
+        EXPECT_TRUE(task_runner()->RunOrPostTask(
+            subtle::RunOrPostTaskPassKeyForTesting(), FROM_HERE,
+            BindLambdaForTesting([&]() { did_run = true; })));
+        EXPECT_FALSE(did_run);
+      })));
+  FlushOtherThread();
+  EXPECT_FALSE(did_run);
+  RunLoop().RunUntilIdle();
+  EXPECT_TRUE(did_run);
+}
+
+// Verify that `RunOrPostTask` from another thread runs the task synchronously
+// if there is no running task and the only queued task is in a different queue
+// which is disabled.
+TEST_F(SequenceManagerRunOrPostTaskTest, FromOtherThreadDisabledQueue) {
+  auto voter = queue()->CreateQueueEnabledVoter();
+  voter->SetVoteToEnable(false);
+  // Reload empty work queues (tasks can't run synchronously when there are
+  // pending requests to reload empty work queues).
+  RunLoop().RunUntilIdle();
+  SimulateInsideRunLoop();
+
+  bool did_run = false;
+  EXPECT_TRUE(other_thread_task_runner()->PostTask(
+      FROM_HERE, BindLambdaForTesting([&]() {
+        EXPECT_TRUE(task_runner()->RunOrPostTask(
+            subtle::RunOrPostTaskPassKeyForTesting(), FROM_HERE,
+            BindLambdaForTesting([&]() { did_run = true; })));
+        EXPECT_FALSE(did_run);
+      })));
+
+  FlushOtherThread();
+  EXPECT_FALSE(did_run);
+  RunLoop().RunUntilIdle();
+  EXPECT_FALSE(did_run);
+  voter.reset();
+  RunLoop().RunUntilIdle();
+  EXPECT_TRUE(did_run);
+}
+
+// Verify that `RunOrPostTask` from another thread runs the task synchronously
+// if there is no running task and the only queued task is in a different queue
+// which is disabled.
+TEST_F(SequenceManagerRunOrPostTaskTest,
+       FromOtherThreadQueuedTaskInDisabledOtherQueue) {
+  bool did_run_other_task = false;
+  EXPECT_TRUE(other_task_runner()->PostTask(
+      FROM_HERE, BindLambdaForTesting([&]() { did_run_other_task = true; })));
+  auto voter = other_queue()->CreateQueueEnabledVoter();
+  voter->SetVoteToEnable(false);
+  // Reload empty work queues (tasks can't run synchronously when there are
+  // pending requests to reload empty work queues).
+  RunLoop().RunUntilIdle();
+  EXPECT_FALSE(did_run_other_task);
+  SimulateInsideRunLoop();
+
+  bool did_run = false;
+  EXPECT_TRUE(other_thread_task_runner()->PostTask(
+      FROM_HERE, BindLambdaForTesting([&]() {
+        EXPECT_TRUE(task_runner()->RunOrPostTask(
+            subtle::RunOrPostTaskPassKeyForTesting(), FROM_HERE,
+            BindLambdaForTesting([&]() { did_run = true; })));
+        EXPECT_TRUE(did_run);
+      })));
+
+  FlushOtherThread();
+  EXPECT_TRUE(did_run);
+}
+
+// Verify that `RunOrPostTask` from another thread does not run the task
+// synchronously if there is a running task.
+TEST_F(SequenceManagerRunOrPostTaskTest, FromOtherThreadWithRunningTask) {
+  WaitableEvent main_thread_task_running;
+  WaitableEvent run_or_post_task_done;
+  task_runner()->PostTask(FROM_HERE, BindLambdaForTesting([&]() {
+                            main_thread_task_running.Signal();
+                            run_or_post_task_done.Wait();
+                          }));
+
+  bool did_run = false;
+  EXPECT_TRUE(other_thread_task_runner()->PostTask(
+      FROM_HERE, BindLambdaForTesting([&]() {
+        main_thread_task_running.Wait();
+        EXPECT_TRUE(task_runner()->RunOrPostTask(
+            subtle::RunOrPostTaskPassKeyForTesting(), FROM_HERE,
+            BindLambdaForTesting([&]() { did_run = true; })));
+        EXPECT_FALSE(did_run);
+        run_or_post_task_done.Signal();
+      })));
+
+  RunLoop().RunUntilIdle();
+  EXPECT_TRUE(did_run);
+}
+
+// Verify that `RunOrPostTask` from another thread does not run the task
+// synchronously if there is a running task blocked in a nested loop.
+TEST_F(SequenceManagerRunOrPostTaskTest,
+       FromOtherThreadWithRunningTaskInNestedLoop) {
+  WaitableEvent main_thread_task_running;
+  RunLoop nested_run_loop(RunLoop::Type::kNestableTasksAllowed);
+  auto nested_run_loop_quit_closure = nested_run_loop.QuitClosure();
+  task_runner()->PostTask(FROM_HERE, BindLambdaForTesting([&]() {
+                            main_thread_task_running.Signal();
+                            nested_run_loop.Run();
+                          }));
+
+  thread_local bool is_main_thread = false;
+  is_main_thread = true;
+
+  EXPECT_TRUE(other_thread_task_runner()->PostTask(
+      FROM_HERE, BindLambdaForTesting([&]() {
+        EXPECT_FALSE(is_main_thread);
+        main_thread_task_running.Wait();
+        // Wait to increase chances of posting while the main thread task is in
+        // a nested `RunLoop`.
+        PlatformThread::Sleep(TestTimeouts::tiny_timeout());
+        EXPECT_TRUE(task_runner()->RunOrPostTask(
+            subtle::RunOrPostTaskPassKeyForTesting(), FROM_HERE,
+            BindLambdaForTesting([&]() {
+              // Should not run synchronously on the other thread.
+              EXPECT_TRUE(is_main_thread);
+              std::move(nested_run_loop_quit_closure).Run();
+            })));
+      })));
+
+  RunLoop().RunUntilIdle();
+  FlushOtherThread();
+}
+
+// Verify that `RunOrPostTask` from another thread does not run the task
+// synchronously if there is a running task in a different queue from the same
+// `SequenceManager`.
+TEST_F(SequenceManagerRunOrPostTaskTest,
+       FromOtherThreadWithRunningTaskOtherQueue) {
+  WaitableEvent main_thread_task_running;
+  WaitableEvent run_or_post_task_done;
+  other_task_runner()->PostTask(FROM_HERE, BindLambdaForTesting([&]() {
+                                  main_thread_task_running.Signal();
+                                  run_or_post_task_done.Wait();
+                                }));
+
+  bool did_run = false;
+  EXPECT_TRUE(other_thread_task_runner()->PostTask(
+      FROM_HERE, BindLambdaForTesting([&]() {
+        main_thread_task_running.Wait();
+        EXPECT_TRUE(task_runner()->RunOrPostTask(
+            subtle::RunOrPostTaskPassKeyForTesting(), FROM_HERE,
+            BindLambdaForTesting([&]() { did_run = true; })));
+        EXPECT_FALSE(did_run);
+        run_or_post_task_done.Signal();
+      })));
+
+  RunLoop().RunUntilIdle();
+  EXPECT_TRUE(did_run);
+}
+
+// Verify that a task run synchronously inside `RunOrPostTask` prevents another
+// task from starting on the bound thread.
+TEST_F(SequenceManagerRunOrPostTaskTest,
+       MainThreadCantStartTaskDuringRunOrPostTask) {
+  SimulateInsideRunLoop();
+  WaitableEvent sync_task_started;
+  bool sync_task_done = true;
+
+  EXPECT_TRUE(other_thread_task_runner()->PostTask(
+      FROM_HERE, BindLambdaForTesting([&]() {
+        EXPECT_TRUE(task_runner()->RunOrPostTask(
+            subtle::RunOrPostTaskPassKeyForTesting(), FROM_HERE,
+            BindLambdaForTesting([&]() {
+              sync_task_started.Signal();
+              // Wait to increase chances that the main thread will attempt to
+              // schedule its task.
+              PlatformThread::Sleep(TestTimeouts::tiny_timeout());
+              sync_task_done = true;
+            })));
+        EXPECT_TRUE(sync_task_done);
+      })));
+
+  sync_task_started.Wait();
+  RunLoop run_loop;
+  task_runner()->PostTask(FROM_HERE, BindLambdaForTesting([&]() {
+                            // Must deterministically run after the sync task.
+                            EXPECT_TRUE(sync_task_done);
+                            run_loop.Quit();
+                          }));
+  run_loop.Run();
+  FlushOtherThread();
+}
+
+// Verify that when `RunOrPostTask` is called concurrently from multiple
+// threads, only one can execute its task synchronously.
+TEST_F(SequenceManagerRunOrPostTaskTest, ConcurrentCalls) {
+  SimulateInsideRunLoop();
+
+  WaitableEvent did_start_task_1;
+  WaitableEvent did_post_task_2;
+
+  EXPECT_TRUE(other_thread_task_runner()->PostTask(
+      FROM_HERE, BindLambdaForTesting([&]() {
+        EXPECT_TRUE(task_runner()->RunOrPostTask(
+            subtle::RunOrPostTaskPassKeyForTesting(), FROM_HERE,
+            BindLambdaForTesting([&]() {
+              did_start_task_1.Signal();
+              did_post_task_2.Wait();
+            })));
+      })));
+
+  Thread other_thread_2{"OtherThread2"};
+  other_thread_2.Start();
+
+  bool did_complete_task_2 = false;
+  EXPECT_TRUE(other_thread_2.task_runner()->PostTask(
+      FROM_HERE, BindLambdaForTesting([&]() {
+        did_start_task_1.Wait();
+        EXPECT_TRUE(task_runner()->RunOrPostTask(
+            subtle::RunOrPostTaskPassKeyForTesting(), FROM_HERE,
+            BindLambdaForTesting([&]() { did_complete_task_2 = true; })));
+        EXPECT_FALSE(did_complete_task_2);
+        did_post_task_2.Signal();
+      })));
+
+  FlushOtherThread();
+  EXPECT_FALSE(did_complete_task_2);
+  RunLoop().RunUntilIdle();
+  EXPECT_TRUE(did_complete_task_2);
+}
+
+// Verify the behavior of `SequenceCheckerImpl` and `ThreadCheckerImpl` in a
+// callback that runs synchronously in `RunOrPostTask` on another thread.
+TEST_F(SequenceManagerRunOrPostTaskTest, SequenceAndThreadChecker) {
+  SimulateInsideRunLoop();
+
+  SequenceCheckerImpl sequence_checker;
+  ThreadCheckerImpl thread_checker;
+  std::optional<SequenceCheckerImpl> sequence_checker_bound_in_task;
+  std::optional<ThreadCheckerImpl> thread_checker_bound_in_task;
+
+  EXPECT_TRUE(other_thread_task_runner()->PostTask(
+      FROM_HERE, BindLambdaForTesting([&]() {
+        bool did_run = false;
+
+        task_runner()->RunOrPostTask(
+            subtle::RunOrPostTaskPassKeyForTesting(), FROM_HERE,
+            BindLambdaForTesting([&]() {
+              EXPECT_TRUE(sequence_checker.CalledOnValidSequence());
+              EXPECT_FALSE(thread_checker.CalledOnValidThread());
+              sequence_checker_bound_in_task.emplace();
+              thread_checker_bound_in_task.emplace();
+              EXPECT_TRUE(
+                  sequence_checker_bound_in_task->CalledOnValidSequence());
+              EXPECT_TRUE(thread_checker_bound_in_task->CalledOnValidThread());
+              did_run = true;
+            }));
+        EXPECT_TRUE(did_run);
+        EXPECT_FALSE(sequence_checker_bound_in_task->CalledOnValidSequence());
+        EXPECT_FALSE(thread_checker_bound_in_task->CalledOnValidThread());
+      })));
+
+  FlushOtherThread();
+  EXPECT_TRUE(sequence_checker_bound_in_task->CalledOnValidSequence());
+  EXPECT_FALSE(thread_checker_bound_in_task->CalledOnValidThread());
+}
+
+// Same as SequenceManagerRunOrPostTaskTest.SequenceAndThreadChecker, but
+// `RunOrPostTask()` is invoked from a `ThreadPool` task (i.e. within a
+// `TaskScope`).
+TEST_F(SequenceManagerRunOrPostTaskTest,
+       SequenceAndThreadCheckerFromThreadPool) {
+  SimulateInsideRunLoop();
+
+  SequenceCheckerImpl sequence_checker;
+  ThreadCheckerImpl thread_checker;
+  std::optional<SequenceCheckerImpl> sequence_checker_bound_in_task;
+  std::optional<ThreadCheckerImpl> thread_checker_bound_in_task;
+
+  ThreadPoolInstance::Create("TestPool");
+  ThreadPoolInstance::Get()->Start({/* max_num_foreground_threads_in=*/1});
+
+  EXPECT_TRUE(ThreadPool::PostTask(
+      FROM_HERE, BindLambdaForTesting([&]() {
+        bool did_run = false;
+        task_runner()->RunOrPostTask(
+            subtle::RunOrPostTaskPassKeyForTesting(), FROM_HERE,
+            BindLambdaForTesting([&]() {
+              EXPECT_TRUE(sequence_checker.CalledOnValidSequence());
+              EXPECT_FALSE(thread_checker.CalledOnValidThread());
+              sequence_checker_bound_in_task.emplace();
+              thread_checker_bound_in_task.emplace();
+              EXPECT_TRUE(
+                  sequence_checker_bound_in_task->CalledOnValidSequence());
+              EXPECT_TRUE(thread_checker_bound_in_task->CalledOnValidThread());
+              did_run = true;
+            }));
+        EXPECT_TRUE(did_run);
+        EXPECT_FALSE(sequence_checker_bound_in_task->CalledOnValidSequence());
+        EXPECT_FALSE(thread_checker_bound_in_task->CalledOnValidThread());
+      })));
+
+  ThreadPoolInstance::Get()->FlushForTesting();
+  ThreadPoolInstance::Get()->JoinForTesting();
+  ThreadPoolInstance::Set(nullptr);
+
+  EXPECT_TRUE(sequence_checker_bound_in_task->CalledOnValidSequence());
+  EXPECT_FALSE(thread_checker_bound_in_task->CalledOnValidThread());
+}
+
+TEST_F(SequenceManagerRunOrPostTaskTest, CurrentDefaultTaskRunner) {
+  SimulateInsideRunLoop();
+
+  EXPECT_TRUE(task_runner()->RunsTasksInCurrentSequence());
+  EXPECT_TRUE(task_runner()->BelongsToCurrentThread());
+  EXPECT_TRUE(other_task_runner()->RunsTasksInCurrentSequence());
+  EXPECT_TRUE(other_task_runner()->BelongsToCurrentThread());
+
+  EXPECT_TRUE(other_thread_task_runner()->PostTask(
+      FROM_HERE, BindLambdaForTesting([&]() {
+        EXPECT_TRUE(SingleThreadTaskRunner::HasCurrentDefault());
+        EXPECT_EQ(other_thread_task_runner(),
+                  SingleThreadTaskRunner::GetCurrentDefault());
+        EXPECT_TRUE(SequencedTaskRunner::HasCurrentDefault());
+        EXPECT_EQ(other_thread_task_runner(),
+                  SequencedTaskRunner::GetCurrentDefault());
+
+        EXPECT_FALSE(task_runner()->RunsTasksInCurrentSequence());
+        EXPECT_FALSE(task_runner()->BelongsToCurrentThread());
+        EXPECT_FALSE(other_task_runner()->RunsTasksInCurrentSequence());
+        EXPECT_FALSE(other_task_runner()->BelongsToCurrentThread());
+
+        for (auto* tested_task_runner : {task_runner(), other_task_runner()}) {
+          bool did_run = false;
+
+          // The "current default" `SequencedTaskRunner` is the
+          // `SequenceManager`'s default task runner, irrespective of the task
+          // runner on which `RunOrPostTask` is called.
+          tested_task_runner->RunOrPostTask(
+              subtle::RunOrPostTaskPassKeyForTesting(), FROM_HERE,
+              BindLambdaForTesting([&]() {
+                did_run = true;
+                EXPECT_FALSE(SingleThreadTaskRunner::HasCurrentDefault());
+                EXPECT_TRUE(SequencedTaskRunner::HasCurrentDefault());
+                EXPECT_EQ(task_runner(),
+                          SequencedTaskRunner::GetCurrentDefault());
+
+                EXPECT_TRUE(task_runner()->RunsTasksInCurrentSequence());
+                EXPECT_FALSE(task_runner()->BelongsToCurrentThread());
+                EXPECT_TRUE(other_task_runner()->RunsTasksInCurrentSequence());
+                EXPECT_FALSE(other_task_runner()->BelongsToCurrentThread());
+              }));
+          EXPECT_TRUE(did_run);
+        }
+
+        EXPECT_TRUE(SingleThreadTaskRunner::HasCurrentDefault());
+        EXPECT_EQ(other_thread_task_runner(),
+                  SingleThreadTaskRunner::GetCurrentDefault());
+        EXPECT_TRUE(SequencedTaskRunner::HasCurrentDefault());
+        EXPECT_EQ(other_thread_task_runner(),
+                  SequencedTaskRunner::GetCurrentDefault());
+      })));
+
+  FlushOtherThread();
 }
 
 TEST(

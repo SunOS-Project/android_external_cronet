@@ -35,7 +35,6 @@
 #include <openssl/base.h>
 #include <openssl/rsa.h>
 
-
 namespace anonymous_tokens {
 namespace {
 
@@ -80,7 +79,7 @@ absl::StatusOr<std::vector<PlaintextMessageWithPublicMetadata>> CreateInput(
 
   std::vector<PlaintextMessageWithPublicMetadata> anonymmous_tokens_input_proto;
   anonymmous_tokens_input_proto.reserve(messages.size());
-  for (int i = 0; i < messages.size(); ++i) {
+  for (size_t i = 0; i < messages.size(); ++i) {
     PlaintextMessageWithPublicMetadata input_message_and_metadata;
     input_message_and_metadata.set_plaintext_message(messages[i]);
     if (!public_metadata.empty()) {
@@ -273,7 +272,7 @@ TEST_F(AnonymousTokensRsaBssaClientTest, EnsureRandomTokens) {
   ANON_TOKENS_ASSERT_OK_AND_ASSIGN(
       std::vector<RSABlindSignatureTokenWithInput> tokens,
       client_->ProcessResponse(response));
-  ASSERT_EQ(tokens.size(), 2);
+  ASSERT_EQ(tokens.size(), 2u);
   for (const RSABlindSignatureTokenWithInput& token : tokens) {
     EXPECT_EQ(token.input().plaintext_message(), message);
   }
@@ -290,43 +289,6 @@ TEST_F(AnonymousTokensRsaBssaClientTest, EmptyInput) {
   EXPECT_EQ(request.status().code(), absl::StatusCode::kInvalidArgument);
   EXPECT_THAT(request.status().message(),
               testing::HasSubstr("Cannot create an empty request"));
-}
-
-TEST_F(AnonymousTokensRsaBssaClientTest, NotYetValidKey) {
-  RSABlindSignaturePublicKey not_valid_key = public_key_;
-  absl::Time start_time = absl::Now() + absl::Minutes(100);
-  ANON_TOKENS_ASSERT_OK_AND_ASSIGN(
-      *not_valid_key.mutable_key_validity_start_time(),
-      TimeToProto(start_time));
-  ANON_TOKENS_ASSERT_OK_AND_ASSIGN(
-      std::unique_ptr<AnonymousTokensRsaBssaClient> client,
-      AnonymousTokensRsaBssaClient::Create(not_valid_key));
-  ANON_TOKENS_ASSERT_OK_AND_ASSIGN(
-      std::vector<PlaintextMessageWithPublicMetadata> input_messages,
-      CreateInput({"message"}));
-  absl::StatusOr<AnonymousTokensSignRequest> request =
-      client->CreateRequest(input_messages);
-  EXPECT_EQ(request.status().code(), absl::StatusCode::kFailedPrecondition);
-  EXPECT_THAT(request.status().message(),
-              testing::HasSubstr("Key is not valid yet"));
-}
-
-TEST_F(AnonymousTokensRsaBssaClientTest, ExpiredKey) {
-  RSABlindSignaturePublicKey expired_key = public_key_;
-  absl::Time end_time = absl::Now() - absl::Seconds(1);
-  ANON_TOKENS_ASSERT_OK_AND_ASSIGN(*expired_key.mutable_expiration_time(),
-                                   TimeToProto(end_time));
-  ANON_TOKENS_ASSERT_OK_AND_ASSIGN(
-      std::unique_ptr<AnonymousTokensRsaBssaClient> client,
-      AnonymousTokensRsaBssaClient::Create(expired_key));
-  ANON_TOKENS_ASSERT_OK_AND_ASSIGN(
-      std::vector<PlaintextMessageWithPublicMetadata> input_messages,
-      CreateInput({"message"}));
-  absl::StatusOr<AnonymousTokensSignRequest> request =
-      client->CreateRequest(input_messages);
-  EXPECT_EQ(request.status().code(), absl::StatusCode::kFailedPrecondition);
-  EXPECT_THAT(request.status().message(),
-              testing::HasSubstr("Key is already expired"));
 }
 
 TEST_F(AnonymousTokensRsaBssaClientTest, CreateRequestTwice) {
@@ -606,4 +568,3 @@ TEST_F(AnonymousTokensRsaBssaClientWithPublicMetadataTest,
 
 }  // namespace
 }  // namespace anonymous_tokens
-

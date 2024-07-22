@@ -97,7 +97,7 @@ base::Value::Dict OverlayUserPrefStore::GetValues() const {
   // overwritten by the content of |persistent_user_pref_store_| (the persistent
   // store).
   for (const auto& key : persistent_names_set_) {
-    absl::optional<base::Value> out_value =
+    std::optional<base::Value> out_value =
         persistent_values.ExtractByDottedPath(key);
     if (out_value.has_value()) {
       values.SetByDottedPath(key, std::move(*out_value));
@@ -134,7 +134,7 @@ void OverlayUserPrefStore::SetValue(const std::string& key,
     return;
   }
 
-  // TODO(https://crbug.com/861722): If we always store in in-memory storage
+  // TODO(crbug.com/40584094): If we always store in in-memory storage
   // and conditionally also stored in persistent one, we wouldn't have to do a
   // complex merge in GetValues().
   ephemeral_user_pref_store_->SetValue(key, std::move(value), flags);

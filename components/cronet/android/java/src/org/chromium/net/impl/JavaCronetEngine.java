@@ -17,7 +17,6 @@ import org.chromium.net.NetworkQualityRttListener;
 import org.chromium.net.NetworkQualityThroughputListener;
 import org.chromium.net.RequestFinishedInfo;
 import org.chromium.net.UrlRequest;
-import org.chromium.net.impl.CronetLogger.CronetEngineBuilderInfo;
 import org.chromium.net.impl.CronetLogger.CronetSource;
 import org.chromium.net.impl.CronetLogger.CronetVersion;
 
@@ -96,11 +95,11 @@ public final class JavaCronetEngine extends CronetEngineBase {
                                                 });
                             }
                         });
-        mLogger = CronetLoggerFactory.createNoOpLogger();
+        mLogger = CronetLoggerFactory.createLogger(mContext, CronetSource.CRONET_SOURCE_FALLBACK);
         try {
             mLogger.logCronetEngineCreation(
                     mCronetEngineId,
-                    new CronetEngineBuilderInfo(builder),
+                    builder.toLoggerInfo(),
                     buildCronetVersion(),
                     CronetSource.CRONET_SOURCE_FALLBACK);
         } catch (RuntimeException e) {
@@ -259,7 +258,8 @@ public final class JavaCronetEngine extends CronetEngineBase {
     public void bindToNetwork(long networkHandle) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
             throw new UnsupportedOperationException(
-                    "This multi-network Java implementation is available starting from Android Pie");
+                    "This multi-network Java implementation is available starting from Android"
+                            + " Pie");
         }
         mNetworkHandle = networkHandle;
     }

@@ -5,6 +5,7 @@
 #include "net/http/http_basic_stream.h"
 
 #include <set>
+#include <string_view>
 #include <utility>
 
 #include "base/functional/bind.h"
@@ -20,8 +21,8 @@
 namespace net {
 
 HttpBasicStream::HttpBasicStream(std::unique_ptr<ClientSocketHandle> connection,
-                                 bool using_proxy)
-    : state_(std::move(connection), using_proxy) {}
+                                 bool is_for_get_to_http_proxy)
+    : state_(std::move(connection), is_for_get_to_http_proxy) {}
 
 HttpBasicStream::~HttpBasicStream() = default;
 
@@ -101,7 +102,7 @@ std::unique_ptr<HttpStream> HttpBasicStream::RenewStreamForAuth() {
   // than leaving it until the destructor is called.
   state_.DeleteParser();
   return std::make_unique<HttpBasicStream>(state_.ReleaseConnection(),
-                                           state_.using_proxy());
+                                           state_.is_for_get_to_http_proxy());
 }
 
 bool HttpBasicStream::IsResponseBodyComplete() const {
@@ -169,15 +170,6 @@ void HttpBasicStream::GetSSLInfo(SSLInfo* ssl_info) {
   }
 }
 
-void HttpBasicStream::GetSSLCertRequestInfo(
-    SSLCertRequestInfo* cert_request_info) {
-  if (!state_.connection()->socket()) {
-    cert_request_info->Reset();
-    return;
-  }
-  parser()->GetSSLCertRequestInfo(cert_request_info);
-}
-
 int HttpBasicStream::GetRemoteEndpoint(IPEndPoint* endpoint) {
   if (!state_.connection() || !state_.connection()->socket())
     return ERR_SOCKET_NOT_CONNECTED;
@@ -211,7 +203,7 @@ const std::set<std::string>& HttpBasicStream::GetDnsAliases() const {
   return state_.GetDnsAliases();
 }
 
-base::StringPiece HttpBasicStream::GetAcceptChViaAlps() const {
+std::string_view HttpBasicStream::GetAcceptChViaAlps() const {
   return {};
 }
 

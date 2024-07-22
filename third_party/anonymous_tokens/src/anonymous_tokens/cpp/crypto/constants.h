@@ -19,7 +19,6 @@
 
 #include "absl/strings/string_view.h"
 
-
 namespace anonymous_tokens {
 
 // Returned integer on successful execution of BoringSSL methods
@@ -55,7 +54,7 @@ constexpr int kSaltLengthInBytes48 = 48;
 // Length of message mask, 32 bytes.
 //
 // https://datatracker.ietf.org/doc/draft-irtf-cfrg-rsa-blind-signatures/
-constexpr int kRsaMessageMaskSizeInBytes32 = 32;
+constexpr size_t kRsaMessageMaskSizeInBytes32 = 32;
 
 // Info used in HKDF for Public Metadata Hash.
 constexpr absl::string_view kHkdfPublicMetadataInfo = "PBRSA";
@@ -77,6 +76,5 @@ constexpr char kSha384Oid[] = "2.16.840.1.101.3.4.2.2";
 constexpr char kRsaSsaPssMgf1Oid[] = "1.2.840.113549.1.1.8";
 
 }  // namespace anonymous_tokens
-
 
 #endif  // ANONYMOUS_TOKENS_CPP_CRYPTO_CONSTANTS_H_

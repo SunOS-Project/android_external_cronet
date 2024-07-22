@@ -7,6 +7,7 @@
 #include <stddef.h>
 
 #include <memory>
+#include <optional>
 #include <utility>
 #include <vector>
 
@@ -24,7 +25,6 @@
 #include "base/values.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
-#include "third_party/abseil-cpp/absl/types/optional.h"
 
 namespace {
 
@@ -364,7 +364,7 @@ TEST_P(StatisticsRecorderTest, ToJSON) {
   std::string json(StatisticsRecorder::ToJSON(JSON_VERBOSITY_LEVEL_FULL));
 
   // Check for valid JSON.
-  absl::optional<Value> root = JSONReader::Read(json);
+  std::optional<Value> root = JSONReader::Read(json);
   ASSERT_TRUE(root);
   Value::Dict* root_dict = root->GetIfDict();
   ASSERT_TRUE(root_dict);
@@ -403,7 +403,7 @@ TEST_P(StatisticsRecorderTest, ToJSONOmitBuckets) {
 
   std::string json =
       StatisticsRecorder::ToJSON(JSON_VERBOSITY_LEVEL_OMIT_BUCKETS);
-  absl::optional<Value> root = JSONReader::Read(json);
+  std::optional<Value> root = JSONReader::Read(json);
   ASSERT_TRUE(root);
   Value::Dict* root_dict = root->GetIfDict();
   ASSERT_TRUE(root_dict);
@@ -755,7 +755,7 @@ TEST_P(StatisticsRecorderTest, GlobalCallbackCalled) {
 
 TEST_P(StatisticsRecorderTest, LogOnShutdownNotInitialized) {
   ResetVLogInitialized();
-  logging::SetMinLogLevel(logging::LOG_WARNING);
+  logging::SetMinLogLevel(logging::LOGGING_WARNING);
   InitializeStatisticsRecorder();
   EXPECT_FALSE(VLOG_IS_ON(1));
   EXPECT_FALSE(IsVLogInitialized());
@@ -765,11 +765,11 @@ TEST_P(StatisticsRecorderTest, LogOnShutdownNotInitialized) {
 
 TEST_P(StatisticsRecorderTest, LogOnShutdownInitializedExplicitly) {
   ResetVLogInitialized();
-  logging::SetMinLogLevel(logging::LOG_WARNING);
+  logging::SetMinLogLevel(logging::LOGGING_WARNING);
   InitializeStatisticsRecorder();
   EXPECT_FALSE(VLOG_IS_ON(1));
   EXPECT_FALSE(IsVLogInitialized());
-  logging::SetMinLogLevel(logging::LOG_VERBOSE);
+  logging::SetMinLogLevel(logging::LOGGING_VERBOSE);
   EXPECT_TRUE(VLOG_IS_ON(1));
   InitLogOnShutdown();
   EXPECT_TRUE(IsVLogInitialized());
@@ -777,7 +777,7 @@ TEST_P(StatisticsRecorderTest, LogOnShutdownInitializedExplicitly) {
 
 TEST_P(StatisticsRecorderTest, LogOnShutdownInitialized) {
   ResetVLogInitialized();
-  logging::SetMinLogLevel(logging::LOG_VERBOSE);
+  logging::SetMinLogLevel(logging::LOGGING_VERBOSE);
   InitializeStatisticsRecorder();
   EXPECT_TRUE(VLOG_IS_ON(1));
   EXPECT_TRUE(IsVLogInitialized());

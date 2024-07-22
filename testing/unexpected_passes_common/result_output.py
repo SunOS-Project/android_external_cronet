@@ -12,11 +12,14 @@ import collections
 import logging
 import sys
 import tempfile
-from typing import Any, Dict, IO, List, Optional, OrderedDict, Set, Union
+from typing import Any, Dict, IO, List, Optional, OrderedDict, Set, Tuple, Union
 
 import six
 
 from unexpected_passes_common import data_types
+
+# Used for posting Buganizer comments.
+from blinkpy.w3c import buganizer
 
 FULL_PASS = 'Fully passed in the following'
 PARTIAL_PASS = 'Partially passed in the following'
@@ -164,6 +167,11 @@ SECTION_UNUSED = ('Unused Expectations (Indicative Of The Configuration No '
 
 MAX_BUGS_PER_LINE = 5
 MAX_CHARACTERS_PER_CL_LINE = 72
+
+BUGANIZER_COMMENT = ('The unexpected pass finder removed the last expectation '
+                     'associated with this bug. An associated CL should be '
+                     'landing shortly, after which this bug can be closed once '
+                     'a human confirms there is no more work to be done.')
 
 ElementType = Union[Dict[str, Any], List[str], str]
 # Sample:
@@ -566,7 +574,8 @@ def AddStatsToStr(s: str, stats: data_types.BuildStats) -> str:
 
 def OutputAffectedUrls(removed_urls: RemovedUrlsType,
                        orphaned_urls: Optional[RemovedUrlsType] = None,
-                       bug_file_handle: Optional[IO] = None) -> None:
+                       bug_file_handle: Optional[IO] = None,
+                       auto_close_bugs: bool = True) -> None:
   """Outputs URLs of affected expectations for easier consumption by the user.
 
   Outputs the following:
@@ -584,6 +593,9 @@ def OutputAffectedUrls(removed_urls: RemovedUrlsType,
         corresponding expectations.
     bug_file_handle: An optional open file-like object to write CL description
         bug information to. If not specified, will print to the terminal.
+    auto_close_bugs: A boolean specifying whether bugs in |orphaned_urls| should
+        be auto-closed on CL submission or not. If not closed, a comment will
+        be posted instead.
   """
   removed_urls = list(removed_urls)
   removed_urls.sort()
@@ -593,7 +605,8 @@ def OutputAffectedUrls(removed_urls: RemovedUrlsType,
   _OutputAffectedUrls(removed_urls, orphaned_urls)
   _OutputUrlsForClDescription(removed_urls,
                               orphaned_urls,
-                              file_handle=bug_file_handle)
+                              file_handle=bug_file_handle,
+                              auto_close_bugs=auto_close_bugs)
 
 
 def _OutputAffectedUrls(affected_urls: List[str],
@@ -637,7 +650,8 @@ def _OutputUrlsForCommandLine(urls: List[str],
 
 def _OutputUrlsForClDescription(affected_urls: List[str],
                                 orphaned_urls: List[str],
-                                file_handle: Optional[IO] = None) -> None:
+                                file_handle: Optional[IO] = None,
+                                auto_close_bugs: bool = True) -> None:
   """Outputs |urls| for use in a CL description.
 
   Output adheres to the line length recommendation and max number of bugs per
@@ -647,6 +661,9 @@ def _OutputUrlsForClDescription(affected_urls: List[str],
     affected_urls: A list of strings containing URLs to output.
     orphaned_urls: A list of strings containing URLs to output as closable.
     file_handle: A file handle to write the string to. Defaults to stdout.
+    auto_close_bugs: A boolean specifying whether bugs in |orphaned_urls| should
+        be auto-closed on CL submission or not. If not closed, a comment will
+        be posted instead.
   """
 
   def AddBugTypeToOutputString(urls, prefix):
@@ -690,6 +707,41 @@ def _OutputUrlsForClDescription(affected_urls: List[str],
   if affected_but_not_closable:
     output_str += AddBugTypeToOutputString(affected_but_not_closable, 'Bug:')
   if orphaned_urls:
-    output_str += AddBugTypeToOutputString(orphaned_urls, 'Fixed:')
+    if auto_close_bugs:
+      output_str += AddBugTypeToOutputString(orphaned_urls, 'Fixed:')
+    else:
+      output_str += AddBugTypeToOutputString(orphaned_urls, 'Bug:')
+      _PostCommentsToOrphanedBugs(orphaned_urls)
 
   file_handle.write('Affected bugs for CL description:\n%s' % output_str)
+
+
+def _PostCommentsToOrphanedBugs(orphaned_urls: List[str]) -> None:
+  """Posts comments to bugs in |orphaned_urls| saying they can likely be closed.
+
+  Does not post again if the comment has been posted before in the past.
+
+  Args:
+    orphaned_urls: A list of strings containing URLs to post comments to.
+  """
+
+  try:
+    buganizer_client = _GetBuganizerClient()
+  except buganizer.BuganizerError as e:
+    logging.error(
+        'Encountered error when authenticating, cannot post comments. %s', e)
+    return
+
+  for url in orphaned_urls:
+    try:
+      comment_list = buganizer_client.GetIssueComments(url)
+      existing_comments = [c['comment'] for c in comment_list]
+      if BUGANIZER_COMMENT not in existing_comments:
+        buganizer_client.NewComment(url, BUGANIZER_COMMENT)
+    except buganizer.BuganizerError:
+      logging.exception('Could not fetch or add comments for %s', url)
+
+
+def _GetBuganizerClient() -> buganizer.BuganizerClient:
+  """Helper function to get a usable Buganizer client."""
+  return buganizer.BuganizerClient()

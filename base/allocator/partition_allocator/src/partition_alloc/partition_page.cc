@@ -20,6 +20,7 @@
 #include "partition_alloc/partition_alloc_constants.h"
 #include "partition_alloc/partition_alloc_forward.h"
 #include "partition_alloc/partition_direct_map_extent.h"
+#include "partition_alloc/partition_freelist_entry.h"
 #include "partition_alloc/partition_root.h"
 #include "partition_alloc/reservation_offset_table.h"
 #include "partition_alloc/tagging.h"
@@ -33,9 +34,9 @@ void UnmapNow(uintptr_t reservation_start,
               pool_handle pool);
 
 PA_ALWAYS_INLINE void PartitionDirectUnmap(SlotSpanMetadata* slot_span) {
-  auto* root = PartitionRoot::FromSlotSpan(slot_span);
+  auto* root = PartitionRoot::FromSlotSpanMetadata(slot_span);
   PartitionRootLock(root).AssertAcquired();
-  auto* extent = PartitionDirectMapExtent::FromSlotSpan(slot_span);
+  auto* extent = PartitionDirectMapExtent::FromSlotSpanMetadata(slot_span);
 
   // Maintain the doubly-linked list of all direct mappings.
   if (extent->prev_extent) {
@@ -81,7 +82,7 @@ PA_ALWAYS_INLINE void PartitionDirectUnmap(SlotSpanMetadata* slot_span) {
 
 PA_ALWAYS_INLINE void SlotSpanMetadata::RegisterEmpty() {
   PA_DCHECK(is_empty());
-  auto* root = PartitionRoot::FromSlotSpan(this);
+  auto* root = PartitionRoot::FromSlotSpanMetadata(this);
   PartitionRootLock(root).AssertAcquired();
 
   root->empty_slot_spans_dirty_bytes +=
@@ -89,13 +90,15 @@ PA_ALWAYS_INLINE void SlotSpanMetadata::RegisterEmpty() {
 
   ToSuperPageExtent()->DecrementNumberOfNonemptySlotSpans();
 
-  // If the slot span is already registered as empty, give it another life.
+  // If the slot span is already registered as empty, don't do anything. This
+  // prevents continually reusing a slot span from decommitting a bunch of other
+  // slot spans.
   if (in_empty_cache_) {
-    PA_DCHECK(empty_cache_index_ < kMaxFreeableSpans);
-    PA_DCHECK(root->global_empty_slot_span_ring[empty_cache_index_] == this);
-    root->global_empty_slot_span_ring[empty_cache_index_] = nullptr;
+    return;
   }
 
+  PA_DCHECK(root->global_empty_slot_span_ring_index <
+            root->global_empty_slot_span_ring_size);
   int16_t current_index = root->global_empty_slot_span_ring_index;
   SlotSpanMetadata* slot_span_to_decommit =
       root->global_empty_slot_span_ring[current_index];
@@ -104,6 +107,10 @@ PA_ALWAYS_INLINE void SlotSpanMetadata::RegisterEmpty() {
   if (slot_span_to_decommit) {
     slot_span_to_decommit->DecommitIfPossible(root);
   }
+
+  // There should not be a slot span in the buffer at the position this is
+  // going into.
+  PA_DCHECK(!root->global_empty_slot_span_ring[current_index]);
 
   // We put the empty slot span on our global list of "slot spans that were once
   // empty", thus providing it a bit of breathing room to get re-used before we
@@ -149,7 +156,7 @@ SlotSpanMetadata::SlotSpanMetadata(PartitionBucket* bucket)
     : bucket(bucket), can_store_raw_size_(bucket->CanStoreRawSize()) {}
 
 void SlotSpanMetadata::FreeSlowPath(size_t number_of_freed) {
-  DCheckRootLockIsAcquired(PartitionRoot::FromSlotSpan(this));
+  DCheckRootLockIsAcquired(PartitionRoot::FromSlotSpanMetadata(this));
   PA_DCHECK(this != get_sentinel_slot_span());
 
   // The caller has already modified |num_allocated_slots|. It is a
@@ -185,9 +192,13 @@ void SlotSpanMetadata::FreeSlowPath(size_t number_of_freed) {
       PartitionDirectUnmap(this);
       return;
     }
+
 #if BUILDFLAG(PA_DCHECK_IS_ON)
-    freelist_head->CheckFreeList(bucket->slot_size);
-#endif
+    const PartitionFreelistDispatcher* freelist_dispatcher =
+        PartitionRoot::FromSlotSpanMetadata(this)->get_freelist_dispatcher();
+    freelist_dispatcher->CheckFreeList(freelist_head, bucket->slot_size);
+#endif  // BUILDFLAG(PA_DCHECK_IS_ON)
+
     // If it's the current active slot span, change it. We bounce the slot span
     // to the empty list as a force towards defragmentation.
     if (PA_LIKELY(this == bucket->active_slot_spans_head)) {
@@ -248,6 +259,7 @@ void SlotSpanMetadata::DecommitIfPossible(PartitionRoot* root) {
   if (is_empty()) {
     Decommit(root);
   }
+  root->global_empty_slot_span_ring[empty_cache_index_] = nullptr;
 }
 
 void SlotSpanMetadata::SortFreelist() {
@@ -260,8 +272,12 @@ void SlotSpanMetadata::SortFreelist() {
 
   size_t num_free_slots = 0;
   size_t slot_size = bucket->slot_size;
-  for (EncodedNextFreelistEntry* head = freelist_head; head;
-       head = head->GetNext(slot_size)) {
+
+  const PartitionFreelistDispatcher* freelist_dispatcher =
+      PartitionRoot::FromSlotSpanMetadata(this)->get_freelist_dispatcher();
+
+  for (PartitionFreelistEntry* head = freelist_head; head;
+       head = freelist_dispatcher->GetNext(head, slot_size)) {
     ++num_free_slots;
     size_t offset_in_slot_span = SlotStartPtr2Addr(head) - slot_span_start;
     size_t slot_number = bucket->GetSlotNumber(offset_in_slot_span);
@@ -272,19 +288,18 @@ void SlotSpanMetadata::SortFreelist() {
 
   // Empty or single-element list is always sorted.
   if (num_free_slots > 1) {
-    EncodedNextFreelistEntry* back = nullptr;
-    EncodedNextFreelistEntry* head = nullptr;
+    PartitionFreelistEntry* back = nullptr;
+    PartitionFreelistEntry* head = nullptr;
 
     for (size_t slot_number = 0; slot_number < num_provisioned_slots;
          slot_number++) {
       if (free_slots[slot_number]) {
         uintptr_t slot_start = slot_span_start + (slot_size * slot_number);
-        auto* entry = EncodedNextFreelistEntry::EmplaceAndInitNull(slot_start);
-
+        auto* entry = freelist_dispatcher->EmplaceAndInitNull(slot_start);
         if (!head) {
           head = entry;
         } else {
-          back->SetNext(entry);
+          freelist_dispatcher->SetNext(back, entry);
         }
 
         back = entry;
@@ -308,33 +323,38 @@ void UnmapNow(uintptr_t reservation_start,
   if (pool == kBRPPoolHandle) {
     // In 32-bit mode, the beginning of a reservation may be excluded from the
     // BRP pool, so shift the pointer. Other pools don't have this logic.
-    PA_DCHECK(IsManagedByPartitionAllocBRPPool(
 #if BUILDFLAG(HAS_64_BIT_POINTERS)
-        reservation_start
+    PA_DCHECK(IsManagedByPartitionAllocBRPPool(reservation_start));
 #else
+    PA_DCHECK(IsManagedByPartitionAllocBRPPool(
         reservation_start +
         AddressPoolManagerBitmap::kBytesPer1BitOfBRPPoolBitmap *
-            AddressPoolManagerBitmap::kGuardOffsetOfBRPPoolBitmap
+            AddressPoolManagerBitmap::kGuardOffsetOfBRPPoolBitmap));
 #endif  // BUILDFLAG(HAS_64_BIT_POINTERS)
-        ));
+
   } else
 #endif  // BUILDFLAG(ENABLE_BACKUP_REF_PTR_SUPPORT)
   {
-    PA_DCHECK(pool == kRegularPoolHandle
+    const bool received_expected_pool_handle =
+        pool == kRegularPoolHandle
 #if BUILDFLAG(ENABLE_THREAD_ISOLATION)
-              || pool == kThreadIsolatedPoolHandle
+        || pool == kThreadIsolatedPoolHandle
 #endif
 #if BUILDFLAG(HAS_64_BIT_POINTERS)
-              ||
-              (IsConfigurablePoolAvailable() && pool == kConfigurablePoolHandle)
+        || (pool == kConfigurablePoolHandle && IsConfigurablePoolAvailable())
 #endif
-    );
+        ;
+    PA_DCHECK(received_expected_pool_handle);
+
     // Non-BRP pools don't need adjustment that BRP needs in 32-bit mode.
-    PA_DCHECK(IsManagedByPartitionAllocRegularPool(reservation_start) ||
 #if BUILDFLAG(ENABLE_THREAD_ISOLATION)
-              IsManagedByPartitionAllocThreadIsolatedPool(reservation_start) ||
-#endif
+    PA_DCHECK(IsManagedByPartitionAllocThreadIsolatedPool(reservation_start) ||
+              IsManagedByPartitionAllocRegularPool(reservation_start) ||
               IsManagedByPartitionAllocConfigurablePool(reservation_start));
+#else
+    PA_DCHECK(IsManagedByPartitionAllocRegularPool(reservation_start) ||
+              IsManagedByPartitionAllocConfigurablePool(reservation_start));
+#endif
   }
 #endif  // BUILDFLAG(PA_DCHECK_IS_ON)
 

@@ -2,17 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef BASE_ALLOCATOR_PARTITION_ALLOCATOR_SRC_PARTITION_ALLOC_PARTITION_ALLOC_INL_H_
-#define BASE_ALLOCATOR_PARTITION_ALLOCATOR_SRC_PARTITION_ALLOC_PARTITION_ALLOC_INL_H_
+#ifndef PARTITION_ALLOC_PARTITION_ALLOC_INL_H_
+#define PARTITION_ALLOC_PARTITION_ALLOC_INL_H_
 
 #include <algorithm>
 #include <cstring>
 
 #include "build/build_config.h"
+#include "partition_alloc/in_slot_metadata.h"
 #include "partition_alloc/partition_alloc_base/compiler_specific.h"
 #include "partition_alloc/partition_alloc_base/debug/debugging_buildflags.h"
 #include "partition_alloc/partition_alloc_config.h"
-#include "partition_alloc/partition_ref_count.h"
 #include "partition_alloc/random.h"
 #include "partition_alloc/tagging.h"
 #include "partition_alloc/thread_isolation/thread_isolation.h"
@@ -101,4 +101,4 @@ PA_ALWAYS_INLINE uintptr_t SlotStartPtr2Addr(const void* slot_start) {
 
 }  // namespace partition_alloc::internal
 
-#endif  // BASE_ALLOCATOR_PARTITION_ALLOCATOR_SRC_PARTITION_ALLOC_PARTITION_ALLOC_INL_H_
+#endif  // PARTITION_ALLOC_PARTITION_ALLOC_INL_H_

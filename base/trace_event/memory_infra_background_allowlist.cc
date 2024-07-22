@@ -7,11 +7,12 @@
 #include <string.h>
 
 #include <string>
+#include <string_view>
 
-#include "base/allocator/partition_allocator/src/partition_alloc/partition_alloc_buildflags.h"
 #include "base/containers/fixed_flat_set.h"
 #include "base/strings/string_util.h"
 #include "build/build_config.h"
+#include "partition_alloc/partition_alloc_buildflags.h"
 #include "third_party/abseil-cpp/absl/strings/ascii.h"
 
 #if BUILDFLAG(IS_ANDROID)
@@ -28,7 +29,7 @@ namespace {
 // TODO(ssid): Some dump providers do not create ownership edges on background
 // dump. So, the effective size will not be correct.
 constexpr auto kDumpProviderAllowlist =
-    base::MakeFixedFlatSet<base::StringPiece>({
+    base::MakeFixedFlatSet<std::string_view>({
 // clang-format off
 #if BUILDFLAG(IS_ANDROID)
         base::android::MeminfoDumpProvider::kDumpProviderName,
@@ -44,6 +45,7 @@ constexpr auto kDumpProviderAllowlist =
 #if BUILDFLAG(IS_MAC)
         "CommandBuffer",
 #endif
+        "ContextProviderCommandBuffer",
         "DOMStorage",
         "DevTools",
         "DiscardableSharedMemoryManager",
@@ -86,17 +88,18 @@ constexpr auto kDumpProviderAllowlist =
         "Skia",
         "Sql",
         "TabRestoreServiceHelper",
+        "TextureOwner"
         "URLRequestContext",
         "V8Isolate",
         "WebMediaPlayer_MainThread",
         "WebMediaPlayer_MediaThread",
-      // clang-format on
+        // clang-format on
     });
 
 // A list of string names that are allowed for the memory allocator dumps in
 // background mode.
-constexpr auto kAllocatorDumpNameAllowlist = base::MakeFixedFlatSet<
-    base::StringPiece>({
+constexpr auto kAllocatorDumpNameAllowlist =
+    base::MakeFixedFlatSet<std::string_view>({
 // clang-format off
         // Some of the blink values vary based on compile time flags. The
         // compile time flags are not in base, so all are listed here.
@@ -151,13 +154,17 @@ constexpr auto kAllocatorDumpNameAllowlist = base::MakeFixedFlatSet<
         "font_caches/font_platform_data_cache",
         "font_caches/shape_caches",
         "frame_evictor",
+        "gpu/command_buffer_memory/buffer_0x?",
         "gpu/discardable_cache/cache_0x?",
         "gpu/discardable_cache/cache_0x?/avg_image_size",
         "gpu/gl/buffers/context_group_0x?",
         "gpu/gl/renderbuffers/context_group_0x?",
         "gpu/gl/textures/context_group_0x?",
         "gpu/gr_shader_cache/cache_0x?",
+        "gpu/mapped_memory/manager_0x?",
         "gpu/shared_images",
+        "gpu/media_texture_owner_?",
+        "gpu/transfer_buffer_memory/buffer_0x?",
         "gpu/transfer_cache/cache_0x?",
         "gpu/transfer_cache/cache_0x?/avg_image_size",
         "gpu/vulkan/vma_allocator_0x?",
@@ -183,6 +190,7 @@ constexpr auto kAllocatorDumpNameAllowlist = base::MakeFixedFlatSet<
 #if BUILDFLAG(USE_PARTITION_ALLOC_AS_MALLOC)
         "malloc/partitions",
         "malloc/partitions/allocator",
+        "malloc/partitions/allocator/scheduler_loop_quarantine",
         "malloc/partitions/allocator/thread_cache",
         "malloc/partitions/allocator/thread_cache/main_thread",
         "malloc/partitions/aligned",
@@ -307,8 +315,8 @@ constexpr auto kAllocatorDumpNameAllowlist = base::MakeFixedFlatSet<
         "tracing/heap_profiler_blink_gc/AllocationRegister",
         "tracing/heap_profiler_malloc/AllocationRegister",
         "tracing/heap_profiler_partition_alloc/AllocationRegister",
-  // clang-format on
-});
+        // clang-format on
+    });
 
 const char* const* g_dump_provider_allowlist_for_testing = nullptr;
 const char* const* g_allocator_dump_name_allowlist_for_testing = nullptr;

@@ -6,6 +6,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "base/debug/debugging_buildflags.h"
@@ -123,6 +124,17 @@ TEST(CommandLineTest, CommandLineConstructor) {
   EXPECT_EQ(FILE_PATH_LITERAL("unquoted arg-with-space"), *iter);
   ++iter;
   EXPECT_TRUE(iter == args.end());
+}
+
+TEST(CommandLineTest, CommandLineFromArgvWithoutProgram) {
+  CommandLine::StringVector argv = {FILE_PATH_LITERAL("--switch1"),
+                                    FILE_PATH_LITERAL("--switch2=value2")};
+
+  CommandLine cl = CommandLine::FromArgvWithoutProgram(argv);
+
+  EXPECT_EQ(base::FilePath(), cl.GetProgram());
+  EXPECT_TRUE(cl.HasSwitch("switch1"));
+  EXPECT_EQ("value2", cl.GetSwitchValueASCII("switch2"));
 }
 
 TEST(CommandLineTest, CommandLineFromString) {
@@ -501,7 +513,7 @@ TEST(CommandLineTest, Init) {
   EXPECT_EQ(initial, current);
 }
 
-// Test that copies of CommandLine have a valid StringPiece map.
+// Test that copies of CommandLine have a valid std::string_view map.
 TEST(CommandLineTest, Copy) {
   auto initial = std::make_unique<CommandLine>(CommandLine::NO_PROGRAM);
   initial->AppendSwitch("a");
@@ -538,6 +550,42 @@ TEST(CommandLineTest, CopySwitches) {
   EXPECT_THAT(cl.argv(), testing::ElementsAre(FILE_PATH_LITERAL(""),
                                               FILE_PATH_LITERAL("--a"),
                                               FILE_PATH_LITERAL("--c")));
+}
+
+TEST(CommandLineTest, Move) {
+  static constexpr std::string_view kSwitches[] = {
+      "a",
+      "bbbbbbbbb",
+      "c",
+  };
+  static constexpr CommandLine::StringPieceType kArgs[] = {
+      FILE_PATH_LITERAL("beebop"),
+      FILE_PATH_LITERAL("alouie"),
+  };
+  CommandLine initial(CommandLine::NO_PROGRAM);
+  for (auto a_switch : kSwitches) {
+    initial.AppendSwitch(a_switch);
+  }
+  for (auto an_arg : kArgs) {
+    initial.AppendArgNative(an_arg);
+  }
+
+  // Move construct and verify.
+  CommandLine move_constructed(std::move(initial));
+  initial = CommandLine(CommandLine::NO_PROGRAM);
+  for (auto a_switch : kSwitches) {
+    EXPECT_TRUE(move_constructed.HasSwitch(a_switch));
+  }
+  EXPECT_THAT(move_constructed.GetArgs(),
+              ::testing::ElementsAre(kArgs[0], kArgs[1]));
+
+  // Move assign and verify
+  initial = std::move(move_constructed);
+  move_constructed = CommandLine(CommandLine::NO_PROGRAM);
+  for (auto a_switch : kSwitches) {
+    EXPECT_TRUE(initial.HasSwitch(a_switch));
+  }
+  EXPECT_THAT(initial.GetArgs(), ::testing::ElementsAre(kArgs[0], kArgs[1]));
 }
 
 TEST(CommandLineTest, PrependSimpleWrapper) {
@@ -712,7 +760,7 @@ class MergeDuplicateFoosSemicolon : public DuplicateSwitchHandler {
  public:
   ~MergeDuplicateFoosSemicolon() override;
 
-  void ResolveDuplicate(base::StringPiece key,
+  void ResolveDuplicate(std::string_view key,
                         CommandLine::StringPieceType new_value,
                         CommandLine::StringType& out_value) override;
 };
@@ -720,7 +768,7 @@ class MergeDuplicateFoosSemicolon : public DuplicateSwitchHandler {
 MergeDuplicateFoosSemicolon::~MergeDuplicateFoosSemicolon() = default;
 
 void MergeDuplicateFoosSemicolon::ResolveDuplicate(
-    base::StringPiece key,
+    std::string_view key,
     CommandLine::StringPieceType new_value,
     CommandLine::StringType& out_value) {
   if (key != "mergeable-foo") {

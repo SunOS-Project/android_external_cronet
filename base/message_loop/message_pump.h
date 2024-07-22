@@ -33,6 +33,13 @@ class BASE_EXPORT MessagePump {
 
   static void InitializeFeatures();
 
+  // Manage the state of |kAlignWakeUps| and the leeway of the process.
+  static void OverrideAlignWakeUpsState(bool enabled, TimeDelta leeway);
+  static void ResetAlignWakeUpsState();
+  static bool GetAlignWakeUpsEnabled();
+  static TimeDelta GetLeewayIgnoringThreadOverride();
+  static TimeDelta GetLeewayForCurrentThread();
+
   // Creates the default MessagePump based on |type|. Caller owns return value.
   static std::unique_ptr<MessagePump> Create(MessagePumpType type);
 
@@ -269,6 +276,14 @@ class BASE_EXPORT MessagePump {
   virtual TimeTicks AdjustDelayedRunTime(TimeTicks earliest_time,
                                          TimeTicks run_time,
                                          TimeTicks latest_time);
+
+  // Requests the pump to handle either the likely imminent creation (`true`) or
+  // destruction (`false`) of a native nested loop in which application tasks
+  // are desired to be run. The pump should override and return `true` if it
+  // supports this call and has scheduled work in response. The default
+  // implementation returns `false` and does nothing.
+  virtual bool HandleNestedNativeLoopWithApplicationTasks(
+      bool application_tasks_desired);
 };
 
 }  // namespace base

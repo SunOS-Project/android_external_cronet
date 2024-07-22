@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef BASE_ALLOCATOR_PARTITION_ALLOCATOR_SRC_PARTITION_ALLOC_SHIM_ALLOCATOR_SHIM_OVERRIDE_CPP_SYMBOLS_H_
+#ifdef PARTITION_ALLOC_SHIM_ALLOCATOR_SHIM_OVERRIDE_CPP_SYMBOLS_H_
 #error This header is meant to be included only once by allocator_shim.cc
 #endif
 
-#ifndef BASE_ALLOCATOR_PARTITION_ALLOCATOR_SRC_PARTITION_ALLOC_SHIM_ALLOCATOR_SHIM_OVERRIDE_CPP_SYMBOLS_H_
-#define BASE_ALLOCATOR_PARTITION_ALLOCATOR_SRC_PARTITION_ALLOC_SHIM_ALLOCATOR_SHIM_OVERRIDE_CPP_SYMBOLS_H_
+#ifndef PARTITION_ALLOC_SHIM_ALLOCATOR_SHIM_OVERRIDE_CPP_SYMBOLS_H_
+#define PARTITION_ALLOC_SHIM_ALLOCATOR_SHIM_OVERRIDE_CPP_SYMBOLS_H_
 
 #include "partition_alloc/partition_alloc_buildflags.h"
 
@@ -35,105 +35,185 @@
 #endif
 
 SHIM_CPP_SYMBOLS_EXPORT void* operator new(size_t size) {
+#if BUILDFLAG(FORWARD_THROUGH_MALLOC)
+  return malloc(size);
+#else
   return ShimCppNew(size);
+#endif
 }
 
 SHIM_CPP_SYMBOLS_EXPORT void operator delete(void* p) __THROW {
+#if BUILDFLAG(FORWARD_THROUGH_MALLOC)
+  free(p);
+#else
   ShimCppDelete(p);
+#endif
 }
 
 SHIM_CPP_SYMBOLS_EXPORT void* operator new[](size_t size) {
+#if BUILDFLAG(FORWARD_THROUGH_MALLOC)
+  return malloc(size);
+#else
   return ShimCppNew(size);
+#endif
 }
 
 SHIM_CPP_SYMBOLS_EXPORT void operator delete[](void* p) __THROW {
+#if BUILDFLAG(FORWARD_THROUGH_MALLOC)
+  free(p);
+#else
   ShimCppDelete(p);
+#endif
 }
 
 SHIM_CPP_SYMBOLS_EXPORT void* operator new(size_t size,
                                            const std::nothrow_t&) __THROW {
+#if BUILDFLAG(FORWARD_THROUGH_MALLOC)
+  return malloc(size);
+#else
   return ShimCppNewNoThrow(size);
+#endif
 }
 
 SHIM_CPP_SYMBOLS_EXPORT void* operator new[](size_t size,
                                              const std::nothrow_t&) __THROW {
+#if BUILDFLAG(FORWARD_THROUGH_MALLOC)
+  return malloc(size);
+#else
   return ShimCppNewNoThrow(size);
+#endif
 }
 
 SHIM_CPP_SYMBOLS_EXPORT void operator delete(void* p,
                                              const std::nothrow_t&) __THROW {
+#if BUILDFLAG(FORWARD_THROUGH_MALLOC)
+  free(p);
+#else
   ShimCppDelete(p);
+#endif
 }
 
 SHIM_CPP_SYMBOLS_EXPORT void operator delete[](void* p,
                                                const std::nothrow_t&) __THROW {
+#if BUILDFLAG(FORWARD_THROUGH_MALLOC)
+  free(p);
+#else
   ShimCppDelete(p);
+#endif
 }
 
 SHIM_CPP_SYMBOLS_EXPORT void operator delete(void* p, size_t) __THROW {
+#if BUILDFLAG(FORWARD_THROUGH_MALLOC)
+  free(p);
+#else
   ShimCppDelete(p);
+#endif
 }
 
 SHIM_CPP_SYMBOLS_EXPORT void operator delete[](void* p, size_t) __THROW {
+#if BUILDFLAG(FORWARD_THROUGH_MALLOC)
+  free(p);
+#else
   ShimCppDelete(p);
+#endif
 }
 
 SHIM_CPP_SYMBOLS_EXPORT void* operator new(std::size_t size,
                                            std::align_val_t alignment) {
+#if BUILDFLAG(FORWARD_THROUGH_MALLOC)
+  return aligned_alloc(static_cast<size_t>(alignment), size);
+#else
   return ShimCppAlignedNew(size, static_cast<size_t>(alignment));
+#endif
 }
 
 SHIM_CPP_SYMBOLS_EXPORT void* operator new(std::size_t size,
                                            std::align_val_t alignment,
                                            const std::nothrow_t&) __THROW {
+#if BUILDFLAG(FORWARD_THROUGH_MALLOC)
+  return aligned_alloc(static_cast<size_t>(alignment), size);
+#else
   return ShimCppAlignedNew(size, static_cast<size_t>(alignment));
+#endif
 }
 
 SHIM_CPP_SYMBOLS_EXPORT void operator delete(void* p,
                                              std::align_val_t) __THROW {
+#if BUILDFLAG(FORWARD_THROUGH_MALLOC)
+  free(p);
+#else
   ShimCppDelete(p);
+#endif
 }
 
 SHIM_CPP_SYMBOLS_EXPORT void operator delete(void* p,
                                              std::size_t size,
                                              std::align_val_t) __THROW {
+#if BUILDFLAG(FORWARD_THROUGH_MALLOC)
+  free(p);
+#else
   ShimCppDelete(p);
+#endif
 }
 
 SHIM_CPP_SYMBOLS_EXPORT void operator delete(void* p,
                                              std::align_val_t,
                                              const std::nothrow_t&) __THROW {
+#if BUILDFLAG(FORWARD_THROUGH_MALLOC)
+  free(p);
+#else
   ShimCppDelete(p);
+#endif
 }
 
 SHIM_CPP_SYMBOLS_EXPORT void* operator new[](std::size_t size,
                                              std::align_val_t alignment) {
+#if BUILDFLAG(FORWARD_THROUGH_MALLOC)
+  return aligned_alloc(static_cast<size_t>(alignment), size);
+#else
   return ShimCppAlignedNew(size, static_cast<size_t>(alignment));
+#endif
 }
 
 SHIM_CPP_SYMBOLS_EXPORT void* operator new[](std::size_t size,
                                              std::align_val_t alignment,
                                              const std::nothrow_t&) __THROW {
+#if BUILDFLAG(FORWARD_THROUGH_MALLOC)
+  return aligned_alloc(static_cast<size_t>(alignment), size);
+#else
   return ShimCppAlignedNew(size, static_cast<size_t>(alignment));
+#endif
 }
 
 SHIM_CPP_SYMBOLS_EXPORT void operator delete[](void* p,
                                                std::align_val_t) __THROW {
+#if BUILDFLAG(FORWARD_THROUGH_MALLOC)
+  free(p);
+#else
   ShimCppDelete(p);
+#endif
 }
 
 SHIM_CPP_SYMBOLS_EXPORT void operator delete[](void* p,
                                                std::size_t size,
                                                std::align_val_t) __THROW {
+#if BUILDFLAG(FORWARD_THROUGH_MALLOC)
+  free(p);
+#else
   ShimCppDelete(p);
+#endif
 }
 
 SHIM_CPP_SYMBOLS_EXPORT void operator delete[](void* p,
                                                std::align_val_t,
                                                const std::nothrow_t&) __THROW {
+#if BUILDFLAG(FORWARD_THROUGH_MALLOC)
+  free(p);
+#else
   ShimCppDelete(p);
+#endif
 }
 
 #endif  // BUILDFLAG(USE_ALLOCATOR_SHIM)
 
-#endif  // BASE_ALLOCATOR_PARTITION_ALLOCATOR_SRC_PARTITION_ALLOC_SHIM_ALLOCATOR_SHIM_OVERRIDE_CPP_SYMBOLS_H_
+#endif  // PARTITION_ALLOC_SHIM_ALLOCATOR_SHIM_OVERRIDE_CPP_SYMBOLS_H_

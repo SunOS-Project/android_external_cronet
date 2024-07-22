@@ -4,6 +4,7 @@
 
 #include "net/server/web_socket.h"
 
+#include <string_view>
 #include <vector>
 
 #include "base/base64.h"
@@ -73,9 +74,8 @@ void WebSocket::Accept(const HttpServerRequestInfo& request,
         traffic_annotation);
     return;
   }
-  std::string encoded_hash;
-  base::Base64Encode(base::SHA1HashString(key + websockets::kWebSocketGuid),
-                     &encoded_hash);
+  std::string encoded_hash = base::Base64Encode(
+      base::SHA1HashString(key + websockets::kWebSocketGuid));
 
   std::vector<WebSocketExtension> response_extensions;
   auto i = request.headers.find("sec-websocket-extensions");
@@ -117,7 +117,7 @@ WebSocket::ParseResult WebSocket::Read(std::string* message) {
 
   ParseResult result = FRAME_OK_MIDDLE;
   HttpConnection::ReadIOBuffer* read_buf = connection_->read_buf();
-  base::StringPiece frame(read_buf->StartOfBuffer(), read_buf->GetSize());
+  std::string_view frame(read_buf->StartOfBuffer(), read_buf->GetSize());
   int bytes_consumed = 0;
   result = encoder_->DecodeFrame(frame, &bytes_consumed, message);
   read_buf->DidConsume(bytes_consumed);
@@ -150,7 +150,7 @@ WebSocket::ParseResult WebSocket::Read(std::string* message) {
   return result;
 }
 
-void WebSocket::Send(base::StringPiece message,
+void WebSocket::Send(std::string_view message,
                      WebSocketFrameHeader::OpCodeEnum op_code,
                      const NetworkTrafficAnnotationTag traffic_annotation) {
   if (closed_)

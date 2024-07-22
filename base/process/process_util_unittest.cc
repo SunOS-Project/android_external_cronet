@@ -8,6 +8,7 @@
 #include <stdint.h>
 
 #include <limits>
+#include <string_view>
 #include <tuple>
 
 #include "base/command_line.h"
@@ -27,7 +28,6 @@
 #include "base/process/process.h"
 #include "base/process/process_metrics.h"
 #include "base/strings/string_number_conversions.h"
-#include "base/strings/string_piece.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/synchronization/waitable_event.h"
 #include "base/test/multiprocess_test.h"
@@ -339,7 +339,7 @@ TEST_F(ProcessUtilTest, TransferHandleToPath) {
 // besides |expected_path| are in the namespace.
 // Since GetSignalFilePath() uses "/tmp", tests for paths other than this must
 // include two paths. "/tmp" must always be last.
-int CheckOnlyOnePathExists(StringPiece expected_path) {
+int CheckOnlyOnePathExists(std::string_view expected_path) {
   bool is_expected_path_tmp = expected_path == "/tmp";
   std::vector<FilePath> paths;
 
@@ -1294,6 +1294,17 @@ TEST_F(ProcessUtilTest, PreExecHook) {
 #endif  // !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_FUCHSIA)
 
 #endif  // BUILDFLAG(IS_POSIX) || BUILDFLAG(IS_FUCHSIA)
+
+// There's no such thing as a parent process id on Fuchsia.
+#if !BUILDFLAG(IS_FUCHSIA)
+TEST_F(ProcessUtilTest, GetParentProcessId2) {
+  ProcessId id1 = GetCurrentProcId();
+  Process process = SpawnChild("SimpleChildProcess");
+  ASSERT_TRUE(process.IsValid());
+  ProcessId ppid = GetParentProcessId(process.Handle());
+  EXPECT_EQ(ppid, id1);
+}
+#endif  // !BUILDFLAG(IS_FUCHSIA)
 
 namespace {
 

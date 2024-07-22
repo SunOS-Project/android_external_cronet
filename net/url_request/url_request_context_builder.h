@@ -18,6 +18,7 @@
 
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -44,14 +45,12 @@
 #include "net/ssl/ssl_config_service.h"
 #include "net/third_party/quiche/src/quiche/quic/core/quic_packets.h"
 #include "net/url_request/url_request_job_factory.h"
-#include "third_party/abseil-cpp/absl/types/optional.h"
 
 namespace net {
 
 class CertVerifier;
 class ClientSocketFactory;
 class CookieStore;
-class CTPolicyEnforcer;
 class HttpAuthHandlerFactory;
 class HttpTransactionFactory;
 class HttpUserAgentSettings;
@@ -65,6 +64,10 @@ class URLRequestContext;
 struct ReportingPolicy;
 class PersistentReportingAndNelStore;
 #endif  // BUILDFLAG(ENABLE_REPORTING)
+
+#if BUILDFLAG(ENABLE_DEVICE_BOUND_SESSIONS)
+class DeviceBoundSessionService;
+#endif  // BUILDFLAG(ENABLE_DEVICE_BOUND_SESSIONS)
 
 // A URLRequestContextBuilder creates a single URLRequestContext. It provides
 // methods to manage various URLRequestContext components which should be called
@@ -277,12 +280,6 @@ class NET_EXPORT URLRequestContextBuilder {
 
   void SetSpdyAndQuicEnabled(bool spdy_enabled, bool quic_enabled);
 
-  void set_throttling_enabled(bool throttling_enabled) {
-    throttling_enabled_ = throttling_enabled;
-  }
-
-  void set_ct_policy_enforcer(
-      std::unique_ptr<CTPolicyEnforcer> ct_policy_enforcer);
   void set_sct_auditing_delegate(
       std::unique_ptr<SCTAuditingDelegate> sct_auditing_delegate);
   void set_quic_context(std::unique_ptr<QuicContext> quic_context);
@@ -352,6 +349,11 @@ class NET_EXPORT URLRequestContextBuilder {
     cookie_deprecation_label_ = label;
   }
 
+#if BUILDFLAG(ENABLE_DEVICE_BOUND_SESSIONS)
+  void set_device_bound_session_service(
+      std::unique_ptr<DeviceBoundSessionService> device_bound_session_service);
+#endif  // BUILDFLAG(ENABLE_DEVICE_BOUND_SESSIONS)
+
   // Binds the context to `network`. All requests scheduled through the context
   // built by this builder will be sent using `network`. Requests will fail if
   // `network` disconnects. `options` allows to specify the ManagerOptions that
@@ -361,7 +363,7 @@ class NET_EXPORT URLRequestContextBuilder {
   // Only implemented for Android (API level > 23).
   void BindToNetwork(
       handles::NetworkHandle network,
-      absl::optional<HostResolver::ManagerOptions> options = absl::nullopt);
+      std::optional<HostResolver::ManagerOptions> options = std::nullopt);
 
   // Creates a mostly self-contained URLRequestContext. May only be called once
   // per URLRequestContextBuilder. After this is called, the Builder can be
@@ -413,10 +415,9 @@ class NET_EXPORT URLRequestContextBuilder {
   std::string user_agent_;
   std::unique_ptr<HttpUserAgentSettings> http_user_agent_settings_;
 
-  absl::optional<std::string> cookie_deprecation_label_;
+  std::optional<std::string> cookie_deprecation_label_;
 
   bool http_cache_enabled_ = true;
-  bool throttling_enabled_ = false;
   bool cookie_store_set_by_client_ = false;
   bool suppress_setting_socket_performance_watcher_factory_for_testing_ = false;
 
@@ -434,8 +435,7 @@ class NET_EXPORT URLRequestContextBuilder {
   raw_ptr<NetLog> net_log_ = nullptr;
   std::unique_ptr<HostResolver> host_resolver_;
   std::string host_mapping_rules_;
-  raw_ptr<HostResolverManager, DanglingUntriaged> host_resolver_manager_ =
-      nullptr;
+  raw_ptr<HostResolverManager> host_resolver_manager_ = nullptr;
   raw_ptr<HostResolver::Factory> host_resolver_factory_ = nullptr;
   std::unique_ptr<ProxyConfigService> proxy_config_service_;
   bool pac_quick_check_enabled_ = true;
@@ -446,7 +446,6 @@ class NET_EXPORT URLRequestContextBuilder {
   std::unique_ptr<CookieStore> cookie_store_;
   std::unique_ptr<HttpAuthHandlerFactory> http_auth_handler_factory_;
   std::unique_ptr<CertVerifier> cert_verifier_;
-  std::unique_ptr<CTPolicyEnforcer> ct_policy_enforcer_;
   std::unique_ptr<SCTAuditingDelegate> sct_auditing_delegate_;
   std::unique_ptr<QuicContext> quic_context_;
   std::unique_ptr<ClientSocketFactory> client_socket_factory_ = nullptr;
@@ -461,6 +460,9 @@ class NET_EXPORT URLRequestContextBuilder {
   std::unique_ptr<HttpServerProperties> http_server_properties_;
   std::map<std::string, std::unique_ptr<URLRequestJobFactory::ProtocolHandler>>
       protocol_handlers_;
+#if BUILDFLAG(ENABLE_DEVICE_BOUND_SESSIONS)
+  std::unique_ptr<DeviceBoundSessionService> device_bound_session_service_;
+#endif  // BUILDFLAG(ENABLE_DEVICE_BOUND_SESSIONS)
 
   raw_ptr<ClientSocketFactory> client_socket_factory_raw_ = nullptr;
 };

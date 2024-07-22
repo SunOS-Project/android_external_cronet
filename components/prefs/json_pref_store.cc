@@ -16,11 +16,13 @@
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
 #include "base/functional/callback_helpers.h"
+#include "base/hash/hash.h"
 #include "base/json/json_file_value_serializer.h"
 #include "base/json/json_writer.h"
 #include "base/logging.h"
 #include "base/memory/ref_counted.h"
 #include "base/metrics/histogram.h"
+#include "base/metrics/histogram_macros.h"
 #include "base/notreached.h"
 #include "base/observer_list.h"
 #include "base/ranges/algorithm.h"
@@ -53,6 +55,14 @@ namespace {
 
 // Some extensions we'll tack on to copies of the Preferences files.
 const base::FilePath::CharType kBadExtension[] = FILE_PATH_LITERAL("bad");
+
+// Report a key that triggers a write into the Preferences files.
+void ReportKeyChangedToUMA(const std::string& key) {
+  // Truncate the sign bit. Even if the type is unsigned, UMA displays 32-bit
+  // negative numbers.
+  const uint32_t hash = base::PersistentHash(key) & 0x7FFFFFFF;
+  UMA_HISTOGRAM_SPARSE("Prefs.JSonStore.SetValueKey", hash);
+}
 
 bool BackupPrefsFile(const base::FilePath& path) {
   const base::FilePath bad = path.ReplaceExtension(kBadExtension);
@@ -120,12 +130,12 @@ const char* GetHistogramSuffix(const base::FilePath& path) {
                      &spaceless_basename);
   static constexpr std::array<const char*, 3> kAllowList{
       "Secure_Preferences", "Preferences", "Local_State"};
-  const char* const* it = base::ranges::find(kAllowList, spaceless_basename);
+  auto it = base::ranges::find(kAllowList, spaceless_basename);
   return it != kAllowList.end() ? *it : "";
 }
 
-absl::optional<std::string> DoSerialize(base::ValueView value,
-                                        const base::FilePath& path) {
+std::optional<std::string> DoSerialize(base::ValueView value,
+                                       const base::FilePath& path) {
   std::string output;
   if (!base::JSONWriter::Write(value, &output)) {
     // Failed to serialize prefs file. Backup the existing prefs file and
@@ -222,6 +232,7 @@ void JsonPrefStore::SetValue(const std::string& key,
   if (!old_value || value != *old_value) {
     prefs_.SetByDottedPath(key, std::move(value));
     ReportValueChanged(key, flags);
+    ReportKeyChangedToUMA(key);
   }
 }
 
@@ -234,6 +245,7 @@ void JsonPrefStore::SetValueSilently(const std::string& key,
   if (!old_value || value != *old_value) {
     prefs_.SetByDottedPath(key, std::move(value));
     ScheduleWrite(flags);
+    ReportKeyChangedToUMA(key);
   }
 }
 
@@ -287,7 +299,8 @@ void JsonPrefStore::ReadPrefsAsync(ReadErrorDelegate* error_delegate) {
   // Weakly binds the read task so that it doesn't kick in during shutdown.
   file_task_runner_->PostTaskAndReplyWithResult(
       FROM_HERE, base::BindOnce(&ReadPrefsFromDisk, path_),
-      base::BindOnce(&JsonPrefStore::OnFileRead, AsWeakPtr()));
+      base::BindOnce(&JsonPrefStore::OnFileRead,
+                     weak_ptr_factory_.GetWeakPtr()));
 }
 
 void JsonPrefStore::CommitPendingWrite(
@@ -394,7 +407,7 @@ void JsonPrefStore::RegisterOnNextSuccessfulWriteReply(
             &PostWriteCallback, base::OnceCallback<void(bool success)>(),
             base::BindOnce(
                 &JsonPrefStore::RunOrScheduleNextSuccessfulWriteCallback,
-                AsWeakPtr()),
+                weak_ptr_factory_.GetWeakPtr()),
             base::SequencedTaskRunner::GetCurrentDefault()));
   }
 }
@@ -411,7 +424,7 @@ void JsonPrefStore::RegisterOnNextWriteSynchronousCallbacks(
           &PostWriteCallback, std::move(callbacks.second),
           base::BindOnce(
               &JsonPrefStore::RunOrScheduleNextSuccessfulWriteCallback,
-              AsWeakPtr()),
+              weak_ptr_factory_.GetWeakPtr()),
           base::SequencedTaskRunner::GetCurrentDefault()));
 }
 
@@ -465,7 +478,8 @@ void JsonPrefStore::OnFileRead(std::unique_ptr<ReadResult> read_result) {
   if (pref_filter_) {
     filtering_in_progress_ = true;
     PrefFilter::PostFilterOnLoadCallback post_filter_on_load_callback(
-        base::BindOnce(&JsonPrefStore::FinalizeFileRead, AsWeakPtr(),
+        base::BindOnce(&JsonPrefStore::FinalizeFileRead,
+                       weak_ptr_factory_.GetWeakPtr(),
                        initialization_successful));
     pref_filter_->FilterOnLoad(std::move(post_filter_on_load_callback),
                                std::move(unfiltered_prefs));
@@ -480,7 +494,7 @@ JsonPrefStore::~JsonPrefStore() {
   CommitPendingWrite();
 }
 
-absl::optional<std::string> JsonPrefStore::SerializeData() {
+std::optional<std::string> JsonPrefStore::SerializeData() {
   PerformPreserializationTasks();
   return DoSerialize(prefs_, path_);
 }

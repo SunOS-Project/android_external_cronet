@@ -10,40 +10,38 @@
 #include "base/dcheck_is_on.h"
 #include "base/logging_buildflags.h"
 
+// TODO(crbug.com/1520664): Remove once NOTIMPLEMENTED() call sites include
+// base/notimplemented.h.
+#include "base/notimplemented.h"
+
 namespace logging {
 
-// NOTREACHED() annotates should-be unreachable code. Under the
-// kNotReachedIsFatal experiment all NOTREACHED()s that happen after FeatureList
-// initialization are fatal. As of 2023-06-06 this experiment is disabled
-// everywhere.
+// NOTREACHED() annotates should-be unreachable code. When a base::NotFatalUntil
+// milestone is provided the instance is non-fatal (dumps without crashing)
+// until that milestone is hit. That is: `NOTREACHED(base::NotFatalUntil::M120)`
+// starts crashing in M120. See base/check.h.
 //
-// For paths that are intended to eventually be NOTREACHED() but are not yet
-// ready for migration (stability risk, known pre-existing failures), consider
-// the DUMP_WILL_BE_NOTREACHED_NORETURN() macro below.
+// Under the kNotReachedIsFatal experiment all NOTREACHED() without a milestone
+// argument are fatal. As of 2024-03-19 this experiment is 50/50 enabled on M124
+// Canary and Dev with intent to roll out to stable in M124 absent any blocking
+// issues that come up.
 //
-// Outside the kNotReachedIsFatal experiment behavior is as follows:
-//
-// On DCHECK builds NOTREACHED() match the fatality of DCHECKs. When DCHECKs are
-// non-FATAL a crash report will be generated for the first NOTREACHED() that
-// hits per process.
-//
-// Outside DCHECK builds NOTREACHED() will LOG(ERROR) and also upload a crash
-// report without crashing in order to weed out prevalent NOTREACHED()s in the
-// wild before always turning NOTREACHED()s FATAL.
-//
-// TODO(crbug.com/851128): Migrate NOTREACHED() callers to NOTREACHED_NORETURN()
-// which is [[noreturn]] and always FATAL. Once that's done, rename
-// NOTREACHED_NORETURN() back to NOTREACHED() and remove the non-FATAL version.
-// This migration will likely happen through the kNotReachedIsFatal experiment
-// for most code as we'll be able to avoid stability issues for pre-existing
-// failures.
+// TODO(crbug.com/851128): After kNotReachedIsFatal is universally rolled out
+// then move callers without a non-fatal milestone argument to
+// NOTREACHED_NORETURN(). Then rename the [[noreturn]] version back to
+// NOTREACHED().
 #if CHECK_WILL_STREAM() || BUILDFLAG(ENABLE_LOG_ERROR_NOT_REACHED)
-#define NOTREACHED() \
-  LOGGING_CHECK_FUNCTION_IMPL(::logging::NotReachedError::NotReached(), false)
+#define NOTREACHED(...)        \
+  LOGGING_CHECK_FUNCTION_IMPL( \
+      ::logging::NotReachedError::NotReached(__VA_ARGS__), false)
 #else
-#define NOTREACHED()                                       \
-  (true) ? ::logging::NotReachedError::TriggerNotReached() \
-         : EAT_CHECK_STREAM_PARAMS()
+#define BASE_HAS_VA_ARGS(...) 1
+#define NOTREACHED(...)                                            \
+  BASE_IF(BASE_IS_EMPTY(__VA_ARGS__),                              \
+          (true) ? ::logging::NotReachedError::TriggerNotReached() \
+                 : EAT_CHECK_STREAM_PARAMS(),                      \
+          LOGGING_CHECK_FUNCTION_IMPL(                             \
+              ::logging::NotReachedError::NotReached(__VA_ARGS__), false))
 #endif
 
 // NOTREACHED_NORETURN() annotates paths that are supposed to be unreachable.
@@ -69,29 +67,6 @@ namespace logging {
 // suggested usage.
 #define DUMP_WILL_BE_NOTREACHED_NORETURN() \
   ::logging::CheckError::DumpWillBeNotReachedNoreturn()
-
-// The NOTIMPLEMENTED() macro annotates codepaths which have not been
-// implemented yet. If output spam is a serious concern,
-// NOTIMPLEMENTED_LOG_ONCE() can be used.
-#if DCHECK_IS_ON()
-#define NOTIMPLEMENTED() \
-  ::logging::CheckError::NotImplemented(__PRETTY_FUNCTION__)
-
-// The lambda returns false the first time it is run, and true every other time.
-#define NOTIMPLEMENTED_LOG_ONCE()                                \
-  LOGGING_CHECK_FUNCTION_IMPL(NOTIMPLEMENTED(), []() {           \
-    bool old_value = true;                                       \
-    [[maybe_unused]] static const bool call_once = [](bool* b) { \
-      *b = false;                                                \
-      return true;                                               \
-    }(&old_value);                                               \
-    return old_value;                                            \
-  }())
-
-#else
-#define NOTIMPLEMENTED() EAT_CHECK_STREAM_PARAMS()
-#define NOTIMPLEMENTED_LOG_ONCE() EAT_CHECK_STREAM_PARAMS()
-#endif
 
 }  // namespace logging
 

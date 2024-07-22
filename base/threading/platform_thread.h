@@ -12,9 +12,11 @@
 #include <stddef.h>
 
 #include <iosfwd>
+#include <optional>
 #include <type_traits>
 
 #include "base/base_export.h"
+#include "base/feature_list.h"
 #include "base/message_loop/message_pump_type.h"
 #include "base/process/process_handle.h"
 #include "base/sequence_checker_impl.h"
@@ -23,7 +25,6 @@
 #include "base/types/strong_alias.h"
 #include "build/build_config.h"
 #include "build/chromeos_buildflags.h"
-#include "third_party/abseil-cpp/absl/types/optional.h"
 
 #if BUILDFLAG(IS_WIN)
 #include "base/win/windows_types.h"
@@ -42,7 +43,7 @@ namespace base {
 #if BUILDFLAG(IS_WIN)
 typedef DWORD PlatformThreadId;
 #elif BUILDFLAG(IS_FUCHSIA)
-typedef zx_handle_t PlatformThreadId;
+typedef zx_koid_t PlatformThreadId;
 #elif BUILDFLAG(IS_APPLE)
 typedef mach_port_t PlatformThreadId;
 #elif BUILDFLAG(IS_POSIX)
@@ -265,7 +266,7 @@ class BASE_EXPORT PlatformThreadBase {
   static TimeDelta GetRealtimePeriod(Delegate* delegate);
 
   // Returns the override of task leeway if any.
-  static absl::optional<TimeDelta> GetThreadLeewayOverride();
+  static std::optional<TimeDelta> GetThreadLeewayOverride();
 
   // Returns the default thread stack size set by chrome. If we do not
   // explicitly set default size then returns 0.
@@ -283,11 +284,10 @@ class BASE_EXPORT PlatformThreadApple : public PlatformThreadBase {
   // Stores the period value in TLS.
   static void SetCurrentThreadRealtimePeriodValue(TimeDelta realtime_period);
 
-  // Signals that the feature list has been initialized which allows to check
-  // the feature's value now and initialize state. This prevents race
-  // conditions where the feature is being checked while it is being
-  // initialized, which can cause a crash.
-  static void InitFeaturesPostFieldTrial();
+  static TimeDelta GetCurrentThreadRealtimePeriodForTest();
+
+  // Initializes features for this class. See `base::features::Init()`.
+  static void InitializeFeatures();
 };
 #endif  // BUILDFLAG(IS_APPLE)
 
@@ -318,6 +318,10 @@ class BASE_EXPORT PlatformThreadLinux : public PlatformThreadBase {
                             ThreadType thread_type,
                             IsViaIPC via_ipc);
 
+  // Toggles a specific thread's type at runtime. The thread must be of the
+  // current process.
+  static void SetThreadType(PlatformThreadId thread_id, ThreadType thread_type);
+
   // For a given thread id and thread type, setup the cpuset and schedtune
   // CGroups for the thread.
   static void SetThreadCgroupsForThreadType(PlatformThreadId thread_id,
@@ -326,16 +330,30 @@ class BASE_EXPORT PlatformThreadLinux : public PlatformThreadBase {
   // Determine if thread_id is a background thread by looking up whether
   // it is in the urgent or non-urgent cpuset
   static bool IsThreadBackgroundedForTest(PlatformThreadId thread_id);
+
+ protected:
+  static void SetThreadTypeInternal(PlatformThreadId process_id,
+                                    PlatformThreadId thread_id,
+                                    ThreadType thread_type,
+                                    IsViaIPC via_ipc);
 };
 #endif  // BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS)
 
 #if BUILDFLAG(IS_CHROMEOS)
+BASE_EXPORT BASE_DECLARE_FEATURE(kSetRtForDisplayThreads);
+
+class CrossProcessPlatformThreadDelegate;
 
 class BASE_EXPORT PlatformThreadChromeOS : public PlatformThreadLinux {
  public:
-  // Signals that the feature list has been initialized. Used for preventing
-  // race conditions and crashes, see comments in PlatformThreadApple.
-  static void InitFeaturesPostFieldTrial();
+  // Sets a delegate which handles thread type changes for threads of another
+  // process. This must be externally synchronized with any call to
+  // SetCurrentThreadType.
+  static void SetCrossProcessPlatformThreadDelegate(
+      CrossProcessPlatformThreadDelegate* delegate);
+
+  // Initializes features for this class. See `base::features::Init()`.
+  static void InitializeFeatures();
 
   // Toggles a specific thread's type at runtime. This is the ChromeOS-specific
   // version and includes Linux's functionality but does slightly more. See
@@ -359,13 +377,19 @@ class BASE_EXPORT PlatformThreadChromeOS : public PlatformThreadLinux {
                                     bool backgrounded);
 
   // Returns the thread type of a thread given its thread id.
-  static absl::optional<ThreadType> GetThreadTypeFromThreadId(
+  static std::optional<ThreadType> GetThreadTypeFromThreadId(
       ProcessId process_id,
       PlatformThreadId thread_id);
 
   // Returns a SequenceChecker which should be used to verify that all
   // cross-process priority changes are performed without races.
   static SequenceCheckerImpl& GetCrossProcessThreadPrioritySequenceChecker();
+
+ protected:
+  static void SetThreadTypeInternal(PlatformThreadId process_id,
+                                    PlatformThreadId thread_id,
+                                    ThreadType thread_type,
+                                    IsViaIPC via_ipc);
 };
 #endif  // BUILDFLAG(IS_CHROMEOS)
 

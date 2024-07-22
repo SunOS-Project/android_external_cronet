@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef BASE_ALLOCATOR_PARTITION_ALLOCATOR_SRC_PARTITION_ALLOC_PARTITION_ALLOC_BASE_RAND_UTIL_H_
-#define BASE_ALLOCATOR_PARTITION_ALLOCATOR_SRC_PARTITION_ALLOC_PARTITION_ALLOC_BASE_RAND_UTIL_H_
+#ifndef PARTITION_ALLOC_PARTITION_ALLOC_BASE_RAND_UTIL_H_
+#define PARTITION_ALLOC_PARTITION_ALLOC_BASE_RAND_UTIL_H_
 
-#include <stddef.h>
-#include <stdint.h>
+#include <cstddef>
+#include <cstdint>
 
 #include "build/build_config.h"
 #include "partition_alloc/partition_alloc_base/component_export.h"
@@ -15,7 +15,6 @@ namespace partition_alloc {
 class RandomGenerator;
 
 namespace internal {
-template <size_t>
 class LightweightQuarantineBranch;
 }
 }  // namespace partition_alloc
@@ -89,10 +88,9 @@ class PA_COMPONENT_EXPORT(PARTITION_ALLOC_BASE) InsecureRandomGenerator {
   // need a secure PRNG, as it's used for ASLR and zeroing some allocations at
   // free() time.
   friend class ::partition_alloc::RandomGenerator;
-  template <size_t>
   friend class ::partition_alloc::internal::LightweightQuarantineBranch;
 };
 
 }  // namespace partition_alloc::internal::base
 
-#endif  // BASE_ALLOCATOR_PARTITION_ALLOCATOR_SRC_PARTITION_ALLOC_PARTITION_ALLOC_BASE_RAND_UTIL_H_
+#endif  // PARTITION_ALLOC_PARTITION_ALLOC_BASE_RAND_UTIL_H_

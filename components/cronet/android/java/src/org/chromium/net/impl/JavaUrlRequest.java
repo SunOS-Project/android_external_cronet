@@ -966,6 +966,25 @@ final class JavaUrlRequest extends UrlRequestBase {
             final Duration headersLatency = Duration.ofSeconds(0);
             final Duration totalLatency = Duration.ofSeconds(0);
 
+            @State int state = mState.get();
+            CronetTrafficInfo.RequestTerminalState requestTerminalState;
+            switch (state) {
+                case State.COMPLETE:
+                    requestTerminalState = CronetTrafficInfo.RequestTerminalState.SUCCEEDED;
+                    break;
+                case State.ERROR:
+                    requestTerminalState = CronetTrafficInfo.RequestTerminalState.ERROR;
+                    break;
+                case State.CANCELLED:
+                    requestTerminalState = CronetTrafficInfo.RequestTerminalState.CANCELLED;
+                    break;
+                default:
+                    throw new IllegalStateException(
+                            "Internal Cronet error: attempted to report metrics but current state ("
+                                    + state
+                                    + ") is not a done state!");
+            }
+
             return new CronetTrafficInfo(
                     requestHeaderSizeInBytes,
                     requestBodySizeInBytes,
@@ -977,8 +996,8 @@ final class JavaUrlRequest extends UrlRequestBase {
                     negotiatedProtocol,
                     // There is no connection migration for the fallback implementation.
                     false, // wasConnectionMigrationAttempted
-                    false // didConnectionMigrationSucceed
-                    );
+                    false, // didConnectionMigrationSucceed
+                    requestTerminalState);
         }
 
         // Maybe report metrics. This method should only be called on Callback's executor thread and
@@ -990,7 +1009,7 @@ final class JavaUrlRequest extends UrlRequestBase {
                 } catch (RuntimeException e) {
                     // Handle any issue gracefully, we should never crash due failures while
                     // logging.
-                    Log.e(TAG, "Error while trying to log CronetTrafficInfo: ", e);
+                    Log.i(TAG, "Error while trying to log CronetTrafficInfo: ", e);
                 }
             }
         }
@@ -1001,10 +1020,10 @@ final class JavaUrlRequest extends UrlRequestBase {
                     () -> {
                         try {
                             mCallback.onCanceled(JavaUrlRequest.this, info);
-                            maybeReportMetrics();
                         } catch (Exception exception) {
                             Log.e(TAG, "Exception in onCanceled method", exception);
                         }
+                        maybeReportMetrics();
                         mEngine.decrementActiveRequestCount();
                     });
         }
@@ -1014,10 +1033,10 @@ final class JavaUrlRequest extends UrlRequestBase {
                     () -> {
                         try {
                             mCallback.onSucceeded(JavaUrlRequest.this, info);
-                            maybeReportMetrics();
                         } catch (Exception exception) {
                             Log.e(TAG, "Exception in onSucceeded method", exception);
                         }
+                        maybeReportMetrics();
                         mEngine.decrementActiveRequestCount();
                     });
         }
@@ -1028,10 +1047,10 @@ final class JavaUrlRequest extends UrlRequestBase {
                     () -> {
                         try {
                             mCallback.onFailed(JavaUrlRequest.this, urlResponseInfo, e);
-                            maybeReportMetrics();
                         } catch (Exception exception) {
                             Log.e(TAG, "Exception in onFailed method", exception);
                         }
+                        maybeReportMetrics();
                         mEngine.decrementActiveRequestCount();
                     };
             try {

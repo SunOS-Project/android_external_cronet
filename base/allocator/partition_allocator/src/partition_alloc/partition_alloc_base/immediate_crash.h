@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef BASE_ALLOCATOR_PARTITION_ALLOCATOR_SRC_PARTITION_ALLOC_PARTITION_ALLOC_BASE_IMMEDIATE_CRASH_H_
-#define BASE_ALLOCATOR_PARTITION_ALLOCATOR_SRC_PARTITION_ALLOC_PARTITION_ALLOC_BASE_IMMEDIATE_CRASH_H_
+#ifndef PARTITION_ALLOC_PARTITION_ALLOC_BASE_IMMEDIATE_CRASH_H_
+#define PARTITION_ALLOC_PARTITION_ALLOC_BASE_IMMEDIATE_CRASH_H_
 
 #include "build/build_config.h"
 
@@ -145,11 +145,12 @@
 
 // __builtin_unreachable() hints to the compiler that this is noreturn and can
 // be packed in the function epilogue.
-#define PA_IMMEDIATE_CRASH()     \
-  ({                             \
-    PA_WRAPPED_TRAP_SEQUENCE_(); \
-    __builtin_unreachable();     \
-  })
+#define PA_IMMEDIATE_CRASH() \
+  [] {                       \
+    PA_TRAP_SEQUENCE1_();    \
+    PA_TRAP_SEQUENCE2_();    \
+  }(),                       \
+      __builtin_unreachable()
 
 #else
 
@@ -159,4 +160,4 @@
 
 #endif  // defined(__clang__) || defined(COMPILER_GCC)
 
-#endif  // BASE_ALLOCATOR_PARTITION_ALLOCATOR_SRC_PARTITION_ALLOC_PARTITION_ALLOC_BASE_IMMEDIATE_CRASH_H_
+#endif  // PARTITION_ALLOC_PARTITION_ALLOC_BASE_IMMEDIATE_CRASH_H_

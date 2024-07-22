@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef BASE_ALLOCATOR_PARTITION_ALLOCATOR_SRC_PARTITION_ALLOC_PARTITION_PAGE_CONSTANTS_H_
-#define BASE_ALLOCATOR_PARTITION_ALLOCATOR_SRC_PARTITION_ALLOC_PARTITION_PAGE_CONSTANTS_H_
+#ifndef PARTITION_ALLOC_PARTITION_PAGE_CONSTANTS_H_
+#define PARTITION_ALLOC_PARTITION_PAGE_CONSTANTS_H_
 
 #include "build/build_config.h"
 #include "partition_alloc/partition_alloc_base/compiler_specific.h"
@@ -16,7 +16,7 @@ namespace partition_alloc::internal {
 // (1 << 12 or 1 << 14), as checked in PartitionRoot::Init(). And
 // PartitionPageSize() is 4 times the OS page size.
 static constexpr size_t kMaxSlotsPerSlotSpan = 4 * (1 << 14) / kSmallestBucket;
-#elif BUILDFLAG(IS_LINUX) && defined(ARCH_CPU_ARM64)
+#elif defined(PARTITION_ALLOCATOR_CONSTANTS_POSIX_NONCONST_PAGE_SIZE)
 // System page size can be 4, 16, or 64 kiB on Linux on arm64. 64 kiB is
 // currently (kMaxSlotsPerSlotSpanBits == 13) not supported by the code,
 // so we use the 16 kiB maximum (64 kiB will crash).
@@ -30,4 +30,4 @@ static constexpr size_t kMaxSlotsPerSlotSpan =
 
 }  // namespace partition_alloc::internal
 
-#endif  // BASE_ALLOCATOR_PARTITION_ALLOCATOR_SRC_PARTITION_ALLOC_PARTITION_PAGE_CONSTANTS_H_
+#endif  // PARTITION_ALLOC_PARTITION_PAGE_CONSTANTS_H_

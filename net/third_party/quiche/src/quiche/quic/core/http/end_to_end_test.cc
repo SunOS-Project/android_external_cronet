@@ -467,7 +467,9 @@ class EndToEndTest : public QuicTestWithParam<TestParams> {
       server_writer_ = new PacketDroppingTestWriter();
       StartServer();
 
-      client_config_.SetConnectionOptionsToSend(QuicTagVector{kSPAD});
+      if (!GetQuicFlag(quic_always_support_server_preferred_address)) {
+        client_config_.SetConnectionOptionsToSend(QuicTagVector{kSPAD});
+      }
     }
 
     if (!connect_to_server_on_initialize_) {
@@ -2845,7 +2847,7 @@ TEST_P(EndToEndTest, StreamCancelErrorTest) {
       client_connection->GetStats().packets_sent;
 
   if (version_.UsesHttp3()) {
-    if (GetQuicRestartFlag(quic_opport_bundle_qpack_decoder_data2)) {
+    if (GetQuicRestartFlag(quic_opport_bundle_qpack_decoder_data4)) {
       // QPACK decoder instructions and RESET_STREAM and STOP_SENDING frames are
       // sent in a single packet.
       EXPECT_EQ(packets_sent_before + 1, packets_sent_now);
@@ -3028,7 +3030,7 @@ TEST_P(EndToEndTest,
     return;
   }
   override_client_connection_id_length_ = kQuicDefaultConnectionIdLength;
-  SetQuicRestartFlag(quic_opport_bundle_qpack_decoder_data2, false);
+  SetQuicRestartFlag(quic_opport_bundle_qpack_decoder_data4, false);
   ASSERT_TRUE(Initialize());
   SendSynchronousFooRequestAndCheckResponse();
 
@@ -3929,7 +3931,8 @@ TEST_P(EndToEndTest, AckNotifierWithPacketLossAndBlockedSocket) {
     // Determine size of headers after QPACK compression.
     NoopDecoderStreamErrorDelegate decoder_stream_error_delegate;
     NoopQpackStreamSenderDelegate encoder_stream_sender_delegate;
-    QpackEncoder qpack_encoder(&decoder_stream_error_delegate);
+    QpackEncoder qpack_encoder(&decoder_stream_error_delegate,
+                               HuffmanEncoding::kEnabled);
     qpack_encoder.set_qpack_stream_sender_delegate(
         &encoder_stream_sender_delegate);
 
@@ -5006,10 +5009,8 @@ TEST_P(EndToEndTest, PreSharedKey) {
 
   if (version_.UsesTls()) {
     // TODO(b/154162689) add PSK support to QUIC+TLS.
-    bool ok = true;
-    EXPECT_QUIC_BUG(ok = Initialize(),
+    EXPECT_QUIC_BUG(EXPECT_FALSE(Initialize()),
                     "QUIC client pre-shared keys not yet supported with TLS");
-    EXPECT_FALSE(ok);
     return;
   }
 
@@ -5029,10 +5030,8 @@ TEST_P(EndToEndTest, QUIC_TEST_DISABLED_IN_CHROME(PreSharedKeyMismatch)) {
 
   if (version_.UsesTls()) {
     // TODO(b/154162689) add PSK support to QUIC+TLS.
-    bool ok = true;
-    EXPECT_QUIC_BUG(ok = Initialize(),
+    EXPECT_QUIC_BUG(EXPECT_FALSE(Initialize()),
                     "QUIC client pre-shared keys not yet supported with TLS");
-    EXPECT_FALSE(ok);
     return;
   }
 
@@ -5056,10 +5055,8 @@ TEST_P(EndToEndTest, QUIC_TEST_DISABLED_IN_CHROME(PreSharedKeyNoClient)) {
 
   if (version_.UsesTls()) {
     // TODO(b/154162689) add PSK support to QUIC+TLS.
-    bool ok = true;
-    EXPECT_QUIC_BUG(ok = Initialize(),
+    EXPECT_QUIC_BUG(EXPECT_FALSE(Initialize()),
                     "QUIC server pre-shared keys not yet supported with TLS");
-    EXPECT_FALSE(ok);
     return;
   }
 
@@ -5077,10 +5074,8 @@ TEST_P(EndToEndTest, QUIC_TEST_DISABLED_IN_CHROME(PreSharedKeyNoServer)) {
 
   if (version_.UsesTls()) {
     // TODO(b/154162689) add PSK support to QUIC+TLS.
-    bool ok = true;
-    EXPECT_QUIC_BUG(ok = Initialize(),
+    EXPECT_QUIC_BUG(EXPECT_FALSE(Initialize()),
                     "QUIC client pre-shared keys not yet supported with TLS");
-    EXPECT_FALSE(ok);
     return;
   }
 
@@ -5402,6 +5397,78 @@ TEST_P(EndToEndTest, ClientMultiPortConnection) {
   stream->Reset(QuicRstStreamErrorCode::QUIC_STREAM_NO_ERROR);
 }
 
+TEST_P(EndToEndTest, ClientPortMigrationOnPathDegrading) {
+  connect_to_server_on_initialize_ = false;
+  Initialize();
+  if (!version_.HasIetfQuicFrames()) {
+    CreateClientWithWriter();
+    return;
+  }
+
+  server_thread_->Pause();
+  QuicDispatcher* dispatcher =
+      QuicServerPeer::GetDispatcher(server_thread_->server());
+  if (dispatcher == nullptr) {
+    ADD_FAILURE() << "Missing dispatcher";
+    server_thread_->Resume();
+    return;
+  }
+  if (dispatcher->NumSessions() > 0) {
+    ADD_FAILURE() << "Dispatcher session map not empty";
+    server_thread_->Resume();
+    return;
+  }
+  auto* new_writer = new DroppingPacketsWithSpecificDestinationWriter();
+  // Note: this writer will only used by the server connection, not the time
+  // wait list.
+  QuicDispatcherPeer::UseWriter(dispatcher, new_writer);
+  server_thread_->Resume();
+
+  delete client_writer_;
+  client_.reset(EndToEndTest::CreateQuicClient(nullptr));
+  client_->client()->EnablePortMigrationUponPathDegrading(std::nullopt);
+  ASSERT_TRUE(client_->client()->WaitForHandshakeConfirmed());
+  QuicConnection* client_connection = GetClientConnection();
+  QuicSocketAddress original_self_addr = client_connection->self_address();
+  Http2HeaderBlock headers;
+  headers[":method"] = "POST";
+  headers[":path"] = "/bar";
+  headers[":scheme"] = "https";
+  headers[":authority"] = server_hostname_;
+  client_->SendMessage(headers, "aaaa", false);
+
+  // This causes the all server sent packets to the client's current address to
+  // be dropped.
+  new_writer->set_peer_address_to_drop(original_self_addr);
+  client_->SendData("bbbb", true);
+  // The response will be dropped till client migrates to a different port.
+  client_->WaitForResponse();
+  QuicSocketAddress new_self_addr1 = client_connection->self_address();
+  EXPECT_NE(original_self_addr, new_self_addr1);
+  EXPECT_EQ(1u, GetClientConnection()->GetStats().num_path_degrading);
+  EXPECT_EQ(1u, GetClientConnection()
+                    ->GetStats()
+                    .num_forward_progress_after_path_degrading);
+  EXPECT_EQ(1u, GetClientConnection()->GetStats().num_path_response_received);
+  size_t pto_count = GetClientConnection()->GetStats().pto_count;
+
+  // Wait for new connection id to be received.
+  WaitForNewConnectionIds();
+  // Use 1 PTO to detect path degrading more aggressively.
+  client_->client()->EnablePortMigrationUponPathDegrading({1});
+  new_writer->set_peer_address_to_drop(new_self_addr1);
+  client_->SendSynchronousRequest("/eep");
+  QuicSocketAddress new_self_addr2 = client_connection->self_address();
+  EXPECT_NE(new_self_addr1, new_self_addr2);
+  EXPECT_EQ(2u, GetClientConnection()->GetStats().num_path_degrading);
+  EXPECT_EQ(2u, GetClientConnection()
+                    ->GetStats()
+                    .num_forward_progress_after_path_degrading);
+  EXPECT_EQ(2u, GetClientConnection()->GetStats().num_path_response_received);
+  // It should take fewer PTOs to trigger port migration than the default(4).
+  EXPECT_GT(pto_count + 4, GetClientConnection()->GetStats().pto_count);
+}
+
 TEST_P(EndToEndTest, ClientMultiPortMigrationOnPathDegrading) {
   client_config_.SetClientConnectionOptions(QuicTagVector{kMPQC, kMPQM});
   ASSERT_TRUE(Initialize());
@@ -5447,6 +5514,35 @@ TEST_P(EndToEndTest, ClientMultiPortMigrationOnPathDegrading) {
 }
 
 TEST_P(EndToEndTest, SimpleServerPreferredAddressTest) {
+  use_preferred_address_ = true;
+  ASSERT_TRUE(Initialize());
+  if (!version_.HasIetfQuicFrames()) {
+    return;
+  }
+  client_.reset(CreateQuicClient(nullptr));
+  QuicConnection* client_connection = GetClientConnection();
+  EXPECT_TRUE(client_->client()->WaitForHandshakeConfirmed());
+  EXPECT_EQ(server_address_, client_connection->effective_peer_address());
+  EXPECT_EQ(server_address_, client_connection->peer_address());
+  EXPECT_TRUE(client_->client()->HasPendingPathValidation());
+  QuicConnectionId server_cid1 = client_connection->connection_id();
+
+  SendSynchronousFooRequestAndCheckResponse();
+  while (client_->client()->HasPendingPathValidation()) {
+    client_->client()->WaitForEvents();
+  }
+  EXPECT_EQ(server_preferred_address_,
+            client_connection->effective_peer_address());
+  EXPECT_EQ(server_preferred_address_, client_connection->peer_address());
+  EXPECT_NE(server_cid1, client_connection->connection_id());
+
+  const auto client_stats = GetClientConnection()->GetStats();
+  EXPECT_TRUE(client_stats.server_preferred_address_validated);
+  EXPECT_FALSE(client_stats.failed_to_validate_server_preferred_address);
+}
+
+TEST_P(EndToEndTest, SimpleServerPreferredAddressTestNoSPAD) {
+  SetQuicFlag(quic_always_support_server_preferred_address, true);
   use_preferred_address_ = true;
   ASSERT_TRUE(Initialize());
   if (!version_.HasIetfQuicFrames()) {
@@ -6051,10 +6147,9 @@ TEST_P(EndToEndTest, CustomTransportParameters) {
   EXPECT_CALL(visitor, OnTransportParametersSent(_))
       .WillOnce(Invoke([kCustomParameter](
                            const TransportParameters& transport_parameters) {
-        ASSERT_NE(transport_parameters.custom_parameters.find(kCustomParameter),
-                  transport_parameters.custom_parameters.end());
-        EXPECT_EQ(transport_parameters.custom_parameters.at(kCustomParameter),
-                  "test");
+        auto it = transport_parameters.custom_parameters.find(kCustomParameter);
+        ASSERT_NE(it, transport_parameters.custom_parameters.end());
+        EXPECT_EQ(it->second, "test");
       }));
   EXPECT_CALL(visitor, OnTransportParametersReceived(_)).Times(1);
   ASSERT_TRUE(Initialize());
@@ -6070,12 +6165,10 @@ TEST_P(EndToEndTest, CustomTransportParameters) {
     ADD_FAILURE() << "Missing server session";
   }
   if (server_config != nullptr) {
-    if (server_config->received_custom_transport_parameters().find(
-            kCustomParameter) !=
-        server_config->received_custom_transport_parameters().end()) {
-      EXPECT_EQ(server_config->received_custom_transport_parameters().at(
-                    kCustomParameter),
-                "test");
+    if (auto it = server_config->received_custom_transport_parameters().find(
+            kCustomParameter);
+        it != server_config->received_custom_transport_parameters().end()) {
+      EXPECT_EQ(it->second, "test");
     } else {
       ADD_FAILURE() << "Did not find custom parameter";
     }
@@ -7210,7 +7303,7 @@ TEST_P(EndToEndTest, OriginalConnectionIdClearedFromMap) {
 
 TEST_P(EndToEndTest, ServerReportsNotEct) {
   // Client connects using not-ECT.
-  SetQuicReloadableFlag(quic_send_ect1, true);
+  SetQuicRestartFlag(quic_support_ect1, true);
   ASSERT_TRUE(Initialize());
   QuicConnection* client_connection = GetClientConnection();
   QuicConnectionPeer::DisableEcnCodepointValidation(client_connection);
@@ -7230,7 +7323,7 @@ TEST_P(EndToEndTest, ServerReportsNotEct) {
 
 TEST_P(EndToEndTest, ServerReportsEct0) {
   // Client connects using not-ECT.
-  SetQuicReloadableFlag(quic_send_ect1, true);
+  SetQuicRestartFlag(quic_support_ect1, true);
   ASSERT_TRUE(Initialize());
   QuicConnection* client_connection = GetClientConnection();
   QuicConnectionPeer::DisableEcnCodepointValidation(client_connection);
@@ -7242,8 +7335,7 @@ TEST_P(EndToEndTest, ServerReportsEct0) {
   EXPECT_EQ(ecn->ce, 0);
   EXPECT_TRUE(client_connection->set_ecn_codepoint(ECN_ECT0));
   client_->SendSynchronousRequest("/foo");
-  if (!GetQuicRestartFlag(quic_receive_ecn3) ||
-      !VersionHasIetfQuicFrames(version_.transport_version)) {
+  if (!VersionHasIetfQuicFrames(version_.transport_version)) {
     EXPECT_EQ(ecn->ect0, 0);
   } else {
     EXPECT_GT(ecn->ect0, 0);
@@ -7255,7 +7347,7 @@ TEST_P(EndToEndTest, ServerReportsEct0) {
 
 TEST_P(EndToEndTest, ServerReportsEct1) {
   // Client connects using not-ECT.
-  SetQuicReloadableFlag(quic_send_ect1, true);
+  SetQuicRestartFlag(quic_support_ect1, true);
   ASSERT_TRUE(Initialize());
   QuicConnection* client_connection = GetClientConnection();
   QuicConnectionPeer::DisableEcnCodepointValidation(client_connection);
@@ -7267,8 +7359,7 @@ TEST_P(EndToEndTest, ServerReportsEct1) {
   EXPECT_EQ(ecn->ce, 0);
   EXPECT_TRUE(client_connection->set_ecn_codepoint(ECN_ECT1));
   client_->SendSynchronousRequest("/foo");
-  if (!GetQuicRestartFlag(quic_receive_ecn3) ||
-      !VersionHasIetfQuicFrames(version_.transport_version)) {
+  if (!VersionHasIetfQuicFrames(version_.transport_version)) {
     EXPECT_EQ(ecn->ect1, 0);
   } else {
     EXPECT_GT(ecn->ect1, 0);
@@ -7280,7 +7371,7 @@ TEST_P(EndToEndTest, ServerReportsEct1) {
 
 TEST_P(EndToEndTest, ServerReportsCe) {
   // Client connects using not-ECT.
-  SetQuicReloadableFlag(quic_send_ect1, true);
+  SetQuicRestartFlag(quic_support_ect1, true);
   ASSERT_TRUE(Initialize());
   QuicConnection* client_connection = GetClientConnection();
   QuicConnectionPeer::DisableEcnCodepointValidation(client_connection);
@@ -7292,8 +7383,7 @@ TEST_P(EndToEndTest, ServerReportsCe) {
   EXPECT_EQ(ecn->ce, 0);
   EXPECT_TRUE(client_connection->set_ecn_codepoint(ECN_CE));
   client_->SendSynchronousRequest("/foo");
-  if (!GetQuicRestartFlag(quic_receive_ecn3) ||
-      !VersionHasIetfQuicFrames(version_.transport_version)) {
+  if (!VersionHasIetfQuicFrames(version_.transport_version)) {
     EXPECT_EQ(ecn->ce, 0);
   } else {
     EXPECT_GT(ecn->ce, 0);
@@ -7304,7 +7394,7 @@ TEST_P(EndToEndTest, ServerReportsCe) {
 }
 
 TEST_P(EndToEndTest, ClientReportsEct1) {
-  SetQuicReloadableFlag(quic_send_ect1, true);
+  SetQuicRestartFlag(quic_support_ect1, true);
   ASSERT_TRUE(Initialize());
   // Wait for handshake to complete, so that we can manipulate the server
   // connection without race conditions.
@@ -7321,8 +7411,7 @@ TEST_P(EndToEndTest, ClientReportsEct1) {
   server_thread_->Pause();
   EXPECT_EQ(ecn->ect0, 0);
   EXPECT_EQ(ecn->ce, 0);
-  if (!GetQuicRestartFlag(quic_receive_ecn3) ||
-      !VersionHasIetfQuicFrames(version_.transport_version)) {
+  if (!VersionHasIetfQuicFrames(version_.transport_version)) {
     EXPECT_EQ(ecn->ect1, 0);
   } else {
     EXPECT_GT(ecn->ect1, 0);
@@ -7494,6 +7583,37 @@ TEST_P(EndToEndTest, MaxPacingRate) {
   QUIC_LOG(INFO) << "Response 2 duration: " << duration;
   EXPECT_GE(duration, QuicTime::Delta::FromSeconds(20));
   EXPECT_LE(duration, QuicTime::Delta::FromSeconds(25));
+}
+
+TEST_P(EndToEndTest, RequestsBurstMitigation) {
+  ASSERT_TRUE(Initialize());
+  if (!version_.HasIetfQuicFrames()) {
+    return;
+  }
+
+  // Send 50 requests simutanuously and wait for their responses. Hopefully at
+  // least more than 5 of these requests will arrive at the server in the same
+  // event loop and cause some of them to be pending till the next loop.
+  for (int i = 0; i < 50; ++i) {
+    EXPECT_LT(0, client_->SendRequest("/foo"));
+  }
+
+  while (50 > client_->num_responses()) {
+    client_->ClearPerRequestState();
+    client_->WaitForResponse();
+    CheckResponseHeaders(client_.get());
+  }
+  EXPECT_TRUE(client_->connected());
+
+  server_thread_->Pause();
+  QuicConnection* server_connection = GetServerConnection();
+  if (server_connection != nullptr) {
+    const QuicConnectionStats& server_stats = server_connection->GetStats();
+    EXPECT_LT(0u, server_stats.num_total_pending_streams);
+  } else {
+    ADD_FAILURE() << "Missing server connection";
+  }
+  server_thread_->Resume();
 }
 
 }  // namespace

@@ -11,6 +11,8 @@
 #include <memory>
 #include <string>
 
+#include "base/containers/heap_array.h"
+#include "base/containers/span.h"
 #include "base/memory/free_deleter.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/ref_counted.h"
@@ -89,13 +91,21 @@ class NET_EXPORT IOBuffer : public base::RefCountedThreadSafe<IOBuffer> {
     return reinterpret_cast<const uint8_t*>(data());
   }
 
+  base::span<char> span() {
+    return base::make_span(data(), static_cast<size_t>(size_));
+  }
+  base::span<const char> span() const {
+    return base::make_span(data(), static_cast<size_t>(size_));
+  }
+
  protected:
   friend class base::RefCountedThreadSafe<IOBuffer>;
 
   static void AssertValidBufferSize(size_t size);
 
   IOBuffer();
-  IOBuffer(char* data, size_t size);
+  explicit IOBuffer(base::span<char> data);
+  explicit IOBuffer(base::span<uint8_t> data);
 
   virtual ~IOBuffer();
 
@@ -112,6 +122,9 @@ class NET_EXPORT IOBufferWithSize : public IOBuffer {
 
  protected:
   ~IOBufferWithSize() override;
+
+ private:
+  base::HeapArray<char> storage_;
 };
 
 // This is a read only IOBuffer.  The data is stored in a string and
@@ -198,11 +211,24 @@ class NET_EXPORT GrowableIOBuffer : public IOBuffer {
   int offset() { return offset_; }
 
   int RemainingCapacity();
+
+  // TODO(crbug.com/329476354): Remove this method, use everything() to access
+  // the full buffer.
   char* StartOfBuffer();
+
+  // Returns the entire buffer, including the bytes before the `offset()`.
+  //
+  // The `span()` method in the base class only gives the part of the buffer
+  // after `offset()`.
+  base::span<uint8_t> everything();
+  base::span<const uint8_t> everything() const;
 
  private:
   ~GrowableIOBuffer() override;
 
+  // TODO(329476354): Convert to std::vector, use reserve()+resize() to make
+  // exact reallocs, and remove `capacity_`. Possibly with an allocator the
+  // default-initializes, if it's important to not initialize the new memory?
   std::unique_ptr<char, base::FreeDeleter> real_data_;
   int capacity_ = 0;
   int offset_ = 0;
@@ -231,9 +257,12 @@ class NET_EXPORT PickledIOBuffer : public IOBuffer {
 // A good example is the buffer for a synchronous operation, where we can be
 // sure that nobody is keeping an extra reference to this object so the lifetime
 // of the buffer can be completely managed by its intended owner.
+// This is now nearly the same as the base IOBuffer class, except that it
+// accepts const data as constructor arguments.
 class NET_EXPORT WrappedIOBuffer : public IOBuffer {
  public:
-  WrappedIOBuffer(const char* data, size_t size);
+  explicit WrappedIOBuffer(base::span<const char> data);
+  explicit WrappedIOBuffer(base::span<const uint8_t> data);
 
  protected:
   ~WrappedIOBuffer() override;

@@ -35,7 +35,7 @@ import (
 // inputFile represents a textual assembly file.
 type inputFile struct {
 	path string
-	// index is a unique identifer given to this file. It's used for
+	// index is a unique identifier given to this file. It's used for
 	// mapping local symbols.
 	index int
 	// isArchive indicates that the input should be processed as an ar
@@ -1162,6 +1162,22 @@ Args:
 			}
 
 			args = append(args, argStr)
+
+		case ruleGOTAddress:
+			if instructionName != "leaq" {
+				return nil, fmt.Errorf("_GLOBAL_OFFSET_TABLE_ used outside of lea")
+			}
+			if i != 0 || len(argNodes) != 2 {
+				return nil, fmt.Errorf("Load of _GLOBAL_OFFSET_TABLE_ address didn't have expected form")
+			}
+			d.gotDeltaNeeded = true
+			changed = true
+			targetReg := d.contents(argNodes[1])
+			args = append(args, ".Lboringssl_got_delta(%rip)")
+			wrappers = append(wrappers, func(k func()) {
+				k()
+				d.output.WriteString(fmt.Sprintf("\taddq .Lboringssl_got_delta(%%rip), %s\n", targetReg))
+			})
 
 		case ruleGOTLocation:
 			if instructionName != "movabsq" {

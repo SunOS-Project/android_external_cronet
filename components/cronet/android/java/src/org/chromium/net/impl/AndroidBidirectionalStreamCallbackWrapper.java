@@ -18,8 +18,8 @@ import java.util.Objects;
 
 @RequiresExtension(extension = EXT_API_LEVEL, version = EXT_VERSION)
 @SuppressWarnings("Override")
-class AndroidBidirectionalStreamCallbackWrapper implements
-    android.net.http.BidirectionalStream.Callback {
+class AndroidBidirectionalStreamCallbackWrapper
+        implements android.net.http.BidirectionalStream.Callback {
     private final org.chromium.net.BidirectionalStream.Callback mBackend;
 
     public AndroidBidirectionalStreamCallbackWrapper(

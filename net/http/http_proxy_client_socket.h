@@ -35,11 +35,14 @@ class ProxyDelegate;
 class StreamSocket;
 
 // Tunnels a stream socket over an HTTP/1.1 connection.
+//
+// This class handles only _tunneled_ proxy connections, using `CONNECT`.
+// Un-tunneled proxy requests are handled in the HTTP stream layer,
+// specifically in `HttpBasicStream`.
 class NET_EXPORT_PRIVATE HttpProxyClientSocket : public ProxyClientSocket {
  public:
   // Takes ownership of |socket|, which should already be connected by the time
-  // Connect() is called. |socket| is assumed to be a fresh socket. If tunnel
-  // is true then on Connect() this socket will establish an Http tunnel.
+  // Connect() is called. |socket| is assumed to be a fresh socket.
   HttpProxyClientSocket(std::unique_ptr<StreamSocket> socket,
                         const std::string& user_agent,
                         const HostPortPair& endpoint,
@@ -137,10 +140,9 @@ class NET_EXPORT_PRIVATE HttpProxyClientSocket : public ProxyClientSocket {
   HttpResponseInfo response_;
 
   scoped_refptr<GrowableIOBuffer> parser_buf_;
-  std::unique_ptr<HttpStreamParser> http_stream_parser_;
   scoped_refptr<IOBuffer> drain_buf_;
-
   std::unique_ptr<StreamSocket> socket_;
+  std::unique_ptr<HttpStreamParser> http_stream_parser_;
 
   // Whether or not |socket_| has been previously used. Once auth credentials
   // are sent, set to true.

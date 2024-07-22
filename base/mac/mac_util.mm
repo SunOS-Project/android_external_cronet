@@ -31,7 +31,7 @@
 #include "base/mac/scoped_ioobject.h"
 #include "base/posix/sysctl.h"
 #include "base/strings/string_number_conversions.h"
-#include "base/strings/string_piece.h"
+
 #include "base/strings/string_split.h"
 #include "base/strings/string_util.h"
 #include "base/strings/sys_string_conversions.h"
@@ -127,42 +127,12 @@ bool IsHiddenLoginItem(LSSharedFileListItemRef item) {
 
 }  // namespace
 
-CGColorSpaceRef GetGenericRGBColorSpace() {
-  // Leaked. That's OK, it's scoped to the lifetime of the application.
-  static CGColorSpaceRef g_color_space_generic_rgb(
-      CGColorSpaceCreateWithName(kCGColorSpaceGenericRGB));
-  DLOG_IF(ERROR, !g_color_space_generic_rgb) <<
-      "Couldn't get the generic RGB color space";
-  return g_color_space_generic_rgb;
-}
-
 CGColorSpaceRef GetSRGBColorSpace() {
   // Leaked.  That's OK, it's scoped to the lifetime of the application.
   static CGColorSpaceRef g_color_space_sRGB =
       CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
   DLOG_IF(ERROR, !g_color_space_sRGB) << "Couldn't get the sRGB color space";
   return g_color_space_sRGB;
-}
-
-CGColorSpaceRef GetSystemColorSpace() {
-  // Leaked.  That's OK, it's scoped to the lifetime of the application.
-  // Try to get the main display's color space.
-  static CGColorSpaceRef g_system_color_space =
-      CGDisplayCopyColorSpace(CGMainDisplayID());
-
-  if (!g_system_color_space) {
-    // Use a generic RGB color space.  This is better than nothing.
-    g_system_color_space = CGColorSpaceCreateDeviceRGB();
-
-    if (g_system_color_space) {
-      DLOG(WARNING) <<
-          "Couldn't get the main display's color space, using generic";
-    } else {
-      DLOG(ERROR) << "Couldn't get any color space";
-    }
-  }
-
-  return g_system_color_space;
 }
 
 void AddToLoginItems(const FilePath& app_bundle_file_path,
@@ -303,6 +273,21 @@ bool RemoveQuarantineAttribute(const FilePath& file_path) {
   return status == 0 || errno == ENOATTR;
 }
 
+void SetFileTags(const FilePath& file_path,
+                 const std::vector<std::string>& file_tags) {
+  if (file_tags.empty()) {
+    return;
+  }
+
+  NSMutableArray* tag_array = [NSMutableArray array];
+  for (const auto& tag : file_tags) {
+    [tag_array addObject:SysUTF8ToNSString(tag)];
+  }
+
+  NSURL* file_url = apple::FilePathToNSURL(file_path);
+  [file_url setResourceValue:tag_array forKey:NSURLTagNamesKey error:nil];
+}
+
 namespace {
 
 int ParseOSProductVersion(const std::string_view& version) {
@@ -315,7 +300,7 @@ int ParseOSProductVersion(const std::string_view& version) {
   // When a Rapid Security Response is applied to a system, the UI will display
   // an additional letter (e.g. "13.4.1 (a)"). That extra letter should not be
   // present in `version_string`; in fact, the version string should not contain
-  // any spaces. However, take the first string-delimited "word" for parsing.
+  // any spaces. However, take the first space-delimited "word" for parsing.
   std::vector<std::string_view> words = base::SplitStringPiece(
       version, " ", base::KEEP_WHITESPACE, base::SPLIT_WANT_ALL);
   CHECK_GE(words.size(), 1u);
@@ -423,20 +408,27 @@ std::string GetPlatformSerialNumber() {
   return base::SysCFStringRefToUTF8(serial_number_cfstring);
 }
 
-void OpenSystemSettingsPane(SystemSettingsPane pane) {
+void OpenSystemSettingsPane(SystemSettingsPane pane,
+                            const std::string& id_param) {
   NSString* url = nil;
   NSString* pane_file = nil;
   NSData* subpane_data = nil;
-  // Note: On macOS 13 and later, System Settings are implemented with app
-  // extensions found at /System/Library/ExtensionKit/Extensions/. URLs to open
-  // them are constructed with a scheme of "x-apple.systempreferences" and a
-  // body of the the bundle ID of the app extension. (In the Info.plist there is
-  // an EXAppExtensionAttributes dictionary with legacy identifiers, but given
-  // that those are explicitly named "legacy", this code prefers to use the
-  // bundle IDs for the URLs it uses.) It is not yet known how to definitively
-  // identify the query string used to open sub-panes; the ones used below were
+  // On macOS 13 and later, System Settings are implemented with app extensions
+  // found at /System/Library/ExtensionKit/Extensions/. URLs to open them are
+  // constructed with a scheme of "x-apple.systempreferences" and a body of the
+  // the bundle ID of the app extension. (In the Info.plist there is an
+  // EXAppExtensionAttributes dictionary with legacy identifiers, but given that
+  // those are explicitly named "legacy", this code prefers to use the bundle
+  // IDs for the URLs it uses.) It is not yet known how to definitively identify
+  // the query string used to open sub-panes; the ones used below were
   // determined from historical usage, disassembly of related code, and
-  // guessing. Clarity was requested from Apple in FB11753405.
+  // guessing. Clarity was requested from Apple in FB11753405. The current best
+  // guess is to analyze the method named -revealElementForKey:, but because
+  // the extensions are all written in Swift it's hard to confirm this is
+  // correct or to use this knowledge.
+  //
+  // For macOS 12 and earlier, to determine the `subpane_data`, find a method
+  // named -handleOpenParameter: which takes an AEDesc as a parameter.
   switch (pane) {
     case SystemSettingsPane::kAccessibility_Captions:
       if (MacOSMajorVersion() >= 13) {
@@ -462,6 +454,26 @@ void OpenSystemSettingsPane(SystemSettingsPane pane) {
       } else {
         pane_file = @"/System/Library/PreferencePanes/Network.prefPane";
         subpane_data = [@"Proxies" dataUsingEncoding:NSASCIIStringEncoding];
+      }
+      break;
+    case SystemSettingsPane::kNotifications:
+      if (MacOSMajorVersion() >= 13) {
+        url = @"x-apple.systempreferences:com.apple.Notifications-Settings."
+              @"extension";
+        if (!id_param.empty()) {
+          url = [url stringByAppendingFormat:@"?id=%s", id_param.c_str()];
+        }
+      } else {
+        pane_file = @"/System/Library/PreferencePanes/Notifications.prefPane";
+        NSDictionary* subpane_dict = @{
+          @"command" : @"show",
+          @"identifier" : SysUTF8ToNSString(id_param)
+        };
+        subpane_data = [NSPropertyListSerialization
+            dataWithPropertyList:subpane_dict
+                          format:NSPropertyListXMLFormat_v1_0
+                         options:0
+                           error:nil];
       }
       break;
     case SystemSettingsPane::kPrintersScanners:

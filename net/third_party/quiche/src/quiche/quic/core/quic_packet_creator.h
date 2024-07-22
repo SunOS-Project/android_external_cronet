@@ -61,8 +61,10 @@ class QUICHE_EXPORT QuicPacketCreator {
     virtual bool ShouldGeneratePacket(HasRetransmittableData retransmittable,
                                       IsHandshake handshake) = 0;
     // Called when there is data to be sent. Gives delegate a chance to bundle
-    // anything with to-be-sent data.
-    virtual void MaybeBundleOpportunistically() = 0;
+    // anything with to-be-sent data. |transmission_type| is the transmission
+    // type of the data being sent.
+    virtual void MaybeBundleOpportunistically(
+        TransmissionType transmission_type) = 0;
 
     // When sending flow controlled data, this will be called after
     // MaybeBundleOpportunistically(). If the returned flow control send window
@@ -611,6 +613,10 @@ class QUICHE_EXPORT QuicPacketCreator {
   // fail to add.
   bool AddPaddedFrameWithRetry(const QuicFrame& frame);
 
+  // Saves next_transmission_type_ before calling the delegate and restore it
+  // after.
+  void MaybeBundleOpportunistically();
+
   // Does not own these delegates or the framer.
   DelegateInterface* delegate_;
   DebugDelegate* debug_delegate_;
@@ -623,6 +629,9 @@ class QUICHE_EXPORT QuicPacketCreator {
   DiversificationNonce diversification_nonce_;
   // Maximum length including headers and encryption (UDP payload length.)
   QuicByteCount max_packet_length_;
+  // Value of max_packet_length_ to be applied for the next packet, if not 0.
+  QuicByteCount next_max_packet_length_;
+
   size_t max_plaintext_size_;
   // Whether the server_connection_id is sent over the wire.
   QuicConnectionIdIncluded server_connection_id_included_;

@@ -19,6 +19,7 @@
 #include <stdlib.h>
 
 #include <memory>
+#include <string_view>
 #include <utility>
 
 #include "base/check.h"
@@ -46,8 +47,6 @@
 #include "net/base/ip_endpoint.h"
 #include "net/base/net_errors.h"
 #include "net/cert/cert_status_flags.h"
-#include "net/cert/ct_policy_enforcer.h"
-#include "net/cert/ct_policy_status.h"
 #include "net/cert/mock_cert_verifier.h"
 #include "net/cert/mock_client_cert_verifier.h"
 #include "net/cert/signed_certificate_timestamp_and_status.h"
@@ -58,6 +57,7 @@
 #include "net/socket/socket_test_util.h"
 #include "net/socket/ssl_client_socket.h"
 #include "net/socket/stream_socket.h"
+#include "net/ssl/openssl_private_key.h"
 #include "net/ssl/ssl_cert_request_info.h"
 #include "net/ssl/ssl_cipher_suite_names.h"
 #include "net/ssl/ssl_client_session_cache.h"
@@ -66,7 +66,6 @@
 #include "net/ssl/ssl_private_key.h"
 #include "net/ssl/ssl_server_config.h"
 #include "net/ssl/test_ssl_config_service.h"
-#include "net/ssl/test_ssl_private_key.h"
 #include "net/test/cert_test_util.h"
 #include "net/test/gtest_util.h"
 #include "net/test/test_data_directory.h"
@@ -106,18 +105,6 @@ const uint16_t kEcdheCiphers[] = {
     0xc030,  // ECDHE_RSA_WITH_AES_256_GCM_SHA384
     0xcca8,  // ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256
     0xcca9,  // ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256
-};
-
-class MockCTPolicyEnforcer : public CTPolicyEnforcer {
- public:
-  MockCTPolicyEnforcer() = default;
-  ~MockCTPolicyEnforcer() override = default;
-  ct::CTPolicyCompliance CheckCompliance(
-      X509Certificate* cert,
-      const ct::SCTList& verified_scts,
-      const NetLogWithSource& net_log) override {
-    return ct::CTPolicyCompliance::CT_POLICY_COMPLIES_VIA_SCTS;
-  }
 };
 
 class FakeDataChannel {
@@ -366,7 +353,6 @@ class SSLServerSocketTest : public PlatformTest, public WithTaskEnvironment {
         cert_verifier_(std::make_unique<MockCertVerifier>()),
         client_cert_verifier_(std::make_unique<MockClientCertVerifier>()),
         transport_security_state_(std::make_unique<TransportSecurityState>()),
-        ct_policy_enforcer_(std::make_unique<MockCTPolicyEnforcer>()),
         ssl_client_session_cache_(std::make_unique<SSLClientSessionCache>(
             SSLClientSessionCache::Config())) {}
 
@@ -393,8 +379,8 @@ class SSLServerSocketTest : public PlatformTest, public WithTaskEnvironment {
 
     client_context_ = std::make_unique<SSLClientContext>(
         ssl_config_service_.get(), cert_verifier_.get(),
-        transport_security_state_.get(), ct_policy_enforcer_.get(),
-        ssl_client_session_cache_.get(), nullptr);
+        transport_security_state_.get(), ssl_client_session_cache_.get(),
+        nullptr);
   }
 
  protected:
@@ -476,7 +462,7 @@ class SSLServerSocketTest : public PlatformTest, public WithTaskEnvironment {
   }
 #endif  // BUILDFLAG(ENABLE_CLIENT_CERTIFICATES)
 
-  std::unique_ptr<crypto::RSAPrivateKey> ReadTestKey(base::StringPiece name) {
+  std::unique_ptr<crypto::RSAPrivateKey> ReadTestKey(std::string_view name) {
     base::FilePath certs_dir(GetTestCertsDirectory());
     base::FilePath key_path = certs_dir.AppendASCII(name);
     std::string key_string;
@@ -516,13 +502,14 @@ class SSLServerSocketTest : public PlatformTest, public WithTaskEnvironment {
 
   std::unique_ptr<FakeDataChannel> channel_1_;
   std::unique_ptr<FakeDataChannel> channel_2_;
-  SSLConfig client_ssl_config_;
-  SSLServerConfig server_ssl_config_;
   std::unique_ptr<TestSSLConfigService> ssl_config_service_;
   std::unique_ptr<MockCertVerifier> cert_verifier_;
   std::unique_ptr<MockClientCertVerifier> client_cert_verifier_;
+  SSLConfig client_ssl_config_;
+  // Note that this has a pointer to the `cert_verifier_`, so must be destroyed
+  // before that is.
+  SSLServerConfig server_ssl_config_;
   std::unique_ptr<TransportSecurityState> transport_security_state_;
-  std::unique_ptr<MockCTPolicyEnforcer> ct_policy_enforcer_;
   std::unique_ptr<SSLClientSessionCache> ssl_client_session_cache_;
   std::unique_ptr<SSLClientContext> client_context_;
   std::unique_ptr<SSLServerContext> server_context_;

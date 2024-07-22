@@ -24,6 +24,7 @@
 #include "base/containers/span.h"
 #include "base/strings/string_piece.h"  // For implicit conversions.
 #include "base/strings/string_util_internal.h"
+#include "base/types/to_address.h"
 #include "build/build_config.h"
 
 namespace base {
@@ -91,9 +92,10 @@ BASE_EXPORT bool IsWprintfFormatPortable(const wchar_t* format);
 // Simplified implementation of C++20's std::basic_string_view(It, End).
 // Reference: https://wg21.link/string.view.cons
 template <typename CharT, typename Iter>
-constexpr BasicStringPiece<CharT> MakeBasicStringPiece(Iter begin, Iter end) {
+constexpr std::basic_string_view<CharT> MakeBasicStringPiece(Iter begin,
+                                                             Iter end) {
   DCHECK_GE(end - begin, 0);
-  return {std::to_address(begin), static_cast<size_t>(end - begin)};
+  return {base::to_address(begin), static_cast<size_t>(end - begin)};
 }
 
 // Explicit instantiations of MakeBasicStringPiece for the BasicStringPiece

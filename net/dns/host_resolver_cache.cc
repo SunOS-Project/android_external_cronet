@@ -6,20 +6,20 @@
 
 #include <cstddef>
 #include <memory>
+#include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
 #include "base/check_op.h"
 #include "base/numerics/safe_conversions.h"
-#include "base/strings/string_piece.h"
 #include "base/time/clock.h"
 #include "base/time/time.h"
 #include "net/base/network_anonymization_key.h"
 #include "net/dns/host_resolver_internal_result.h"
 #include "net/dns/public/dns_query_type.h"
 #include "net/dns/public/host_resolver_source.h"
-#include "third_party/abseil-cpp/absl/types/optional.h"
 #include "url/third_party/mozilla/url_parse.h"
 #include "url/url_canon.h"
 #include "url/url_canon_stdstring.h"
@@ -28,13 +28,13 @@ namespace net {
 
 namespace {
 
-constexpr base::StringPiece kNikKey = "network_anonymization_key";
-constexpr base::StringPiece kSourceKey = "source";
-constexpr base::StringPiece kSecureKey = "secure";
-constexpr base::StringPiece kResultKey = "result";
-constexpr base::StringPiece kStalenessGenerationKey = "staleness_generation";
-constexpr base::StringPiece kMaxEntriesKey = "max_entries";
-constexpr base::StringPiece kEntriesKey = "entries";
+constexpr std::string_view kNakKey = "network_anonymization_key";
+constexpr std::string_view kSourceKey = "source";
+constexpr std::string_view kSecureKey = "secure";
+constexpr std::string_view kResultKey = "result";
+constexpr std::string_view kStalenessGenerationKey = "staleness_generation";
+constexpr std::string_view kMaxEntriesKey = "max_entries";
+constexpr std::string_view kEntriesKey = "entries";
 
 }  // namespace
 
@@ -42,7 +42,7 @@ HostResolverCache::Key::~Key() = default;
 
 HostResolverCache::StaleLookupResult::StaleLookupResult(
     const HostResolverInternalResult& result,
-    absl::optional<base::TimeDelta> expired_by,
+    std::optional<base::TimeDelta> expired_by,
     bool stale_by_generation)
     : result(result),
       expired_by(expired_by),
@@ -62,11 +62,11 @@ HostResolverCache::HostResolverCache(HostResolverCache&&) = default;
 HostResolverCache& HostResolverCache::operator=(HostResolverCache&&) = default;
 
 const HostResolverInternalResult* HostResolverCache::Lookup(
-    base::StringPiece domain_name,
+    std::string_view domain_name,
     const NetworkAnonymizationKey& network_anonymization_key,
     DnsQueryType query_type,
     HostResolverSource source,
-    absl::optional<bool> secure) const {
+    std::optional<bool> secure) const {
   std::vector<EntryMap::const_iterator> candidates = LookupInternal(
       domain_name, network_anonymization_key, query_type, source, secure);
 
@@ -94,13 +94,13 @@ const HostResolverInternalResult* HostResolverCache::Lookup(
   return most_secure_result;
 }
 
-absl::optional<HostResolverCache::StaleLookupResult>
+std::optional<HostResolverCache::StaleLookupResult>
 HostResolverCache::LookupStale(
-    base::StringPiece domain_name,
+    std::string_view domain_name,
     const NetworkAnonymizationKey& network_anonymization_key,
     DnsQueryType query_type,
     HostResolverSource source,
-    absl::optional<bool> secure) const {
+    std::optional<bool> secure) const {
   std::vector<EntryMap::const_iterator> candidates = LookupInternal(
       domain_name, network_anonymization_key, query_type, source, secure);
 
@@ -143,9 +143,9 @@ HostResolverCache::LookupStale(
   }
 
   if (best_match == nullptr) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
-    absl::optional<base::TimeDelta> expired_by;
+    std::optional<base::TimeDelta> expired_by;
     if (best_match_time_until_expiration.is_negative()) {
       expired_by = best_match_time_until_expiration.magnitude();
     }
@@ -196,7 +196,7 @@ bool HostResolverCache::RestoreFromValue(const base::Value& value) {
       return false;
     }
 
-    const base::Value* anonymization_key_value = dict->Find(kNikKey);
+    const base::Value* anonymization_key_value = dict->Find(kNakKey);
     NetworkAnonymizationKey anonymization_key;
     if (!anonymization_key_value ||
         !NetworkAnonymizationKey::FromValue(*anonymization_key_value,
@@ -205,14 +205,14 @@ bool HostResolverCache::RestoreFromValue(const base::Value& value) {
     }
 
     const base::Value* source_value = dict->Find(kSourceKey);
-    absl::optional<HostResolverSource> source =
-        source_value == nullptr ? absl::nullopt
+    std::optional<HostResolverSource> source =
+        source_value == nullptr ? std::nullopt
                                 : HostResolverSourceFromValue(*source_value);
     if (!source.has_value()) {
       return false;
     }
 
-    absl::optional<bool> secure = dict->FindBool(kSecureKey);
+    std::optional<bool> secure = dict->FindBool(kSecureKey);
     if (!secure.has_value()) {
       return false;
     }
@@ -287,11 +287,11 @@ base::TimeDelta HostResolverCache::Entry::TimeUntilExpiration(
 
 std::vector<HostResolverCache::EntryMap::const_iterator>
 HostResolverCache::LookupInternal(
-    base::StringPiece domain_name,
+    std::string_view domain_name,
     const NetworkAnonymizationKey& network_anonymization_key,
     DnsQueryType query_type,
     HostResolverSource source,
-    absl::optional<bool> secure) const {
+    std::optional<bool> secure) const {
   auto matches = std::vector<EntryMap::const_iterator>();
 
   if (entries_.empty()) {
@@ -309,7 +309,7 @@ HostResolverCache::LookupInternal(
   // For performance, when canonicalization can't canonicalize, minimize string
   // copies and just reuse the input StringPiece. This optimization prevents
   // easily reusing a MaybeCanoncalize util with similar code.
-  base::StringPiece lookup_name = domain_name;
+  std::string_view lookup_name = domain_name;
   if (host_info.family == url::CanonHostInfo::Family::NEUTRAL) {
     output.Complete();
     lookup_name = canonicalized;
@@ -384,7 +384,7 @@ void HostResolverCache::EvictEntries() {
 
   bool stale_found = false;
   base::TimeDelta soonest_time_till_expriation = base::TimeDelta::Max();
-  absl::optional<EntryMap::const_iterator> best_for_removal;
+  std::optional<EntryMap::const_iterator> best_for_removal;
 
   auto it = entries_.cbegin();
   while (it != entries_.cend()) {
@@ -441,7 +441,7 @@ base::Value HostResolverCache::SerializeEntries(
       }
     }
 
-    dict.Set(kNikKey, std::move(anonymization_key_value));
+    dict.Set(kNakKey, std::move(anonymization_key_value));
     dict.Set(kSourceKey, ToValue(entry.source));
     dict.Set(kSecureKey, entry.secure);
     dict.Set(kResultKey, entry.result->ToValue());

@@ -28,7 +28,6 @@
 #include <openssl/digest.h>
 #include <openssl/rsa.h>
 
-
 namespace anonymous_tokens {
 
 namespace {
@@ -121,7 +120,8 @@ PrivacyPassRsaBssaPublicMetadataClient::CreateTokenRequest(
   // token_key_id and the blinded_message.
   TokenRequest token_request = {
       /*token_type=*/kTokenType,
-      /*truncated_token_key_id=*/token_key_id[token_key_id.size() - 1],
+      /*truncated_token_key_id=*/
+      static_cast<uint8_t>(token_key_id[token_key_id.size() - 1]),
       /*blinded_token_request=*/blinded_message};
 
   // ExtendedTokenRequest carries the public metadata / encoded extensions list.
@@ -175,4 +175,3 @@ absl::Status PrivacyPassRsaBssaPublicMetadataClient::Verify(
 }
 
 }  // namespace anonymous_tokens
-

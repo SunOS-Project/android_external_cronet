@@ -16,7 +16,9 @@
 #include "base/base_export.h"
 #include "base/compiler_specific.h"
 #include "base/dcheck_is_on.h"
+#include "base/files/file_path.h"
 #include "base/functional/callback_forward.h"
+#include "base/memory/raw_ptr.h"
 #include "base/scoped_clear_last_error.h"
 #include "base/strings/string_piece.h"
 #include "base/strings/utf_ostream_operators.h"
@@ -25,6 +27,10 @@
 
 #if BUILDFLAG(IS_CHROMEOS)
 #include <cstdio>
+#endif
+
+#if BUILDFLAG(IS_WIN)
+#include "base/win/windows_types.h"
 #endif
 
 //
@@ -174,19 +180,13 @@
 
 namespace logging {
 
-// TODO(avi): do we want to do a unification of character types here?
-#if BUILDFLAG(IS_WIN)
-typedef wchar_t PathChar;
-#elif BUILDFLAG(IS_POSIX) || BUILDFLAG(IS_FUCHSIA)
-typedef char PathChar;
-#endif
-
 // A bitmask of potential logging destinations.
 using LoggingDestination = uint32_t;
 // Specifies where logs will be written. Multiple destinations can be specified
 // with bitwise OR.
 // Unless destination is LOG_NONE, all logs with severity ERROR and above will
 // be written to stderr in addition to the specified destination.
+// LOG_TO_FILE includes logging to externally-provided file handles.
 enum : uint32_t {
   LOG_NONE = 0,
   LOG_TO_FILE = 1 << 0,
@@ -235,7 +235,7 @@ struct BASE_EXPORT LoggingSettings {
 
   // The four settings below have an effect only when LOG_TO_FILE is
   // set in |logging_dest|.
-  const PathChar* log_file_path = nullptr;
+  base::FilePath::StringType log_file_path;
   LogLockingState lock_log = LOCK_LOG_FILE;
   OldFileDeletionState delete_old = APPEND_TO_OLD_LOG_FILE;
 #if BUILDFLAG(IS_CHROMEOS)
@@ -243,9 +243,16 @@ struct BASE_EXPORT LoggingSettings {
   // |log_file_path| will be ignored, and the logging system will take ownership
   // of the FILE. If there's an error writing to this file, no fallback paths
   // will be opened.
-  FILE* log_file = nullptr;
+  raw_ptr<FILE> log_file = nullptr;
   // ChromeOS uses the syslog log format by default.
   LogFormat log_format = LogFormat::LOG_FORMAT_SYSLOG;
+#endif
+#if BUILDFLAG(IS_WIN)
+  // Contains an optional file that logs should be written to. If present,
+  // `log_file_path` will be ignored, and the logging system will take ownership
+  // of the HANDLE. If there's an error writing to this file, no fallback paths
+  // will be opened.
+  HANDLE log_file = nullptr;
 #endif
 };
 
@@ -374,16 +381,6 @@ constexpr LogSeverity LOGGING_DFATAL = LOGGING_FATAL;
 constexpr LogSeverity LOGGING_DFATAL = LOGGING_ERROR;
 #endif
 
-// This block duplicates the above entries to facilitate incremental conversion
-// from LOG_FOO to LOGGING_FOO.
-// TODO(thestig): Convert existing users to LOGGING_FOO and remove this block.
-constexpr LogSeverity LOG_VERBOSE = LOGGING_VERBOSE;
-constexpr LogSeverity LOG_INFO = LOGGING_INFO;
-constexpr LogSeverity LOG_WARNING = LOGGING_WARNING;
-constexpr LogSeverity LOG_ERROR = LOGGING_ERROR;
-constexpr LogSeverity LOG_FATAL = LOGGING_FATAL;
-constexpr LogSeverity LOG_DFATAL = LOGGING_DFATAL;
-
 // A few definitions of macros that don't generate much code. These are used
 // by LOG() and LOG_IF, etc. Since these are used all over our code, it's
 // better to have compact code for these operations.
@@ -396,14 +393,11 @@ constexpr LogSeverity LOG_DFATAL = LOGGING_DFATAL;
 #define COMPACT_GOOGLE_LOG_EX_ERROR(ClassName, ...)                  \
   ::logging::ClassName(__FILE__, __LINE__, ::logging::LOGGING_ERROR, \
                        ##__VA_ARGS__)
-#define COMPACT_GOOGLE_LOG_EX_FATAL(ClassName, ...)                  \
-  ::logging::ClassName(__FILE__, __LINE__, ::logging::LOGGING_FATAL, \
-                       ##__VA_ARGS__)
+#define COMPACT_GOOGLE_LOG_EX_FATAL(ClassName, ...)                         \
+  ::logging::ClassName##Fatal(__FILE__, __LINE__, ::logging::LOGGING_FATAL, \
+                              ##__VA_ARGS__)
 #define COMPACT_GOOGLE_LOG_EX_DFATAL(ClassName, ...)                  \
   ::logging::ClassName(__FILE__, __LINE__, ::logging::LOGGING_DFATAL, \
-                       ##__VA_ARGS__)
-#define COMPACT_GOOGLE_LOG_EX_DCHECK(ClassName, ...)                  \
-  ::logging::ClassName(__FILE__, __LINE__, ::logging::LOGGING_DCHECK, \
                        ##__VA_ARGS__)
 
 #define COMPACT_GOOGLE_LOG_INFO COMPACT_GOOGLE_LOG_EX_INFO(LogMessage)
@@ -411,7 +405,6 @@ constexpr LogSeverity LOG_DFATAL = LOGGING_DFATAL;
 #define COMPACT_GOOGLE_LOG_ERROR COMPACT_GOOGLE_LOG_EX_ERROR(LogMessage)
 #define COMPACT_GOOGLE_LOG_FATAL COMPACT_GOOGLE_LOG_EX_FATAL(LogMessage)
 #define COMPACT_GOOGLE_LOG_DFATAL COMPACT_GOOGLE_LOG_EX_DFATAL(LogMessage)
-#define COMPACT_GOOGLE_LOG_DCHECK COMPACT_GOOGLE_LOG_EX_DCHECK(LogMessage)
 
 #if BUILDFLAG(IS_WIN)
 // wingdi.h defines ERROR to be 0. When we call LOG(ERROR), it gets
@@ -430,8 +423,11 @@ constexpr LogSeverity LOGGING_0 = LOGGING_ERROR;
 // As special cases, we can assume that LOG_IS_ON(FATAL) always holds. Also,
 // LOG_IS_ON(DFATAL) always holds in debug mode. In particular, CHECK()s will
 // always fire if they fail.
-#define LOG_IS_ON(severity) \
-  (::logging::ShouldCreateLogMessage(::logging::LOGGING_##severity))
+// FATAL is always enabled and required to be resolved in compile time for
+// LOG(FATAL) to be properly understood as [[noreturn]].
+#define LOG_IS_ON(severity)                                     \
+  (::logging::LOGGING_##severity == ::logging::LOGGING_FATAL || \
+   ::logging::ShouldCreateLogMessage(::logging::LOGGING_##severity))
 
 // Define a default ENABLED_VLOG_LEVEL if it is not defined. The macros allows
 // code to enable vlog level at build time without the need of --vmodule
@@ -541,12 +537,22 @@ BASE_EXPORT extern std::ostream* g_swallow_stream;
 
 #if DCHECK_IS_ON()
 
-#define DLOG_IS_ON(severity) LOG_IS_ON(severity)
-#define DLOG_IF(severity, condition) LOG_IF(severity, condition)
-#define DLOG_ASSERT(condition) LOG_ASSERT(condition)
-#define DPLOG_IF(severity, condition) PLOG_IF(severity, condition)
+// All of these definitions use DLOG_IS_ON() rather than define to their LOG()
+// equivalents, as DLOG(FATAL) and friends can't be understood as [[noreturn]]
+// but LOG(FATAL) is.
+#define DLOG_IS_ON(severity) \
+  (::logging::ShouldCreateLogMessage(::logging::LOGGING_##severity))
+
+#define DLOG(severity) LAZY_STREAM(LOG_STREAM(severity), DLOG_IS_ON(severity))
+#define DLOG_IF(severity, condition) \
+  LAZY_STREAM(LOG_STREAM(severity), DLOG_IS_ON(severity) && (condition))
+#define DPLOG(severity) LAZY_STREAM(PLOG_STREAM(severity), DLOG_IS_ON(severity))
+#define DPLOG_IF(severity, condition) \
+  LAZY_STREAM(PLOG_STREAM(severity), DLOG_IS_ON(severity) && (condition))
 #define DVLOG_IF(verboselevel, condition) VLOG_IF(verboselevel, condition)
 #define DVPLOG_IF(verboselevel, condition) VPLOG_IF(verboselevel, condition)
+#define DLOG_ASSERT(condition) \
+  DLOG_IF(FATAL, !(condition)) << "Assert failed: " #condition ". "
 
 #else  // DCHECK_IS_ON()
 
@@ -555,26 +561,24 @@ BASE_EXPORT extern std::ostream* g_swallow_stream;
 // Contrast this with DCHECK et al., which has different behavior.
 
 #define DLOG_IS_ON(severity) false
+#define DLOG(severity) EAT_STREAM_PARAMETERS
 #define DLOG_IF(severity, condition) EAT_STREAM_PARAMETERS
-#define DLOG_ASSERT(condition) EAT_STREAM_PARAMETERS
+#define DPLOG(severity) EAT_STREAM_PARAMETERS
 #define DPLOG_IF(severity, condition) EAT_STREAM_PARAMETERS
 #define DVLOG_IF(verboselevel, condition) EAT_STREAM_PARAMETERS
 #define DVPLOG_IF(verboselevel, condition) EAT_STREAM_PARAMETERS
+#define DLOG_ASSERT(condition) EAT_STREAM_PARAMETERS
 
 #endif  // DCHECK_IS_ON()
 
-#define DLOG(severity)                                          \
-  LAZY_STREAM(LOG_STREAM(severity), DLOG_IS_ON(severity))
-
-#define DPLOG(severity)                                         \
-  LAZY_STREAM(PLOG_STREAM(severity), DLOG_IS_ON(severity))
-
 #define DVLOG(verboselevel) DVLOG_IF(verboselevel, true)
-
 #define DVPLOG(verboselevel) DVPLOG_IF(verboselevel, true)
 
 // Definitions for DCHECK et al.
 
+// TODO(pbos): Move this to check.h. Probably find a better name. Maybe this
+// means that we want LogSeverity in a separate file, but maybe we can just have
+// this as a bool DCHECK_IS_FATAL.
 #if BUILDFLAG(DCHECK_IS_CONFIGURABLE)
 BASE_EXPORT extern LogSeverity LOGGING_DCHECK;
 #else
@@ -614,8 +618,13 @@ class BASE_EXPORT LogMessage {
   // Gets file:line: message in a format suitable for crash reporting.
   std::string BuildCrashString() const;
 
+ protected:
+  void Flush();
+
  private:
   void Init(const char* file, int line);
+
+  void HandleFatal(size_t stack_start, const std::string& str_newline) const;
 
   const LogSeverity severity_;
   std::ostringstream stream_;
@@ -641,6 +650,12 @@ class BASE_EXPORT LogMessage {
                             bool enable_timestamp,
                             bool enable_tickcount);
 #endif
+};
+
+class BASE_EXPORT LogMessageFatal final : public LogMessage {
+ public:
+  using LogMessage::LogMessage;
+  [[noreturn]] ~LogMessageFatal() override;
 };
 
 // This class is used to explicitly ignore values in the conditional
@@ -678,9 +693,20 @@ class BASE_EXPORT Win32ErrorLogMessage : public LogMessage {
   // Appends the error message before destructing the encapsulated class.
   ~Win32ErrorLogMessage() override;
 
+ protected:
+  void AppendError();
+
  private:
   SystemErrorCode err_;
 };
+
+class BASE_EXPORT Win32ErrorLogMessageFatal final
+    : public Win32ErrorLogMessage {
+ public:
+  using Win32ErrorLogMessage::Win32ErrorLogMessage;
+  [[noreturn]] ~Win32ErrorLogMessageFatal() override;
+};
+
 #elif BUILDFLAG(IS_POSIX) || BUILDFLAG(IS_FUCHSIA)
 // Appends a formatted system message of the errno type
 class BASE_EXPORT ErrnoLogMessage : public LogMessage {
@@ -694,9 +720,19 @@ class BASE_EXPORT ErrnoLogMessage : public LogMessage {
   // Appends the error message before destructing the encapsulated class.
   ~ErrnoLogMessage() override;
 
+ protected:
+  void AppendError();
+
  private:
   SystemErrorCode err_;
 };
+
+class BASE_EXPORT ErrnoLogMessageFatal final : public ErrnoLogMessage {
+ public:
+  using ErrnoLogMessage::ErrnoLogMessage;
+  [[noreturn]] ~ErrnoLogMessageFatal() override;
+};
+
 #endif  // BUILDFLAG(IS_WIN)
 
 // Closes the log file explicitly if open.
@@ -725,6 +761,9 @@ BASE_EXPORT bool IsLoggingToFileEnabled();
 
 // Returns the default log file path.
 BASE_EXPORT std::wstring GetLogFileFullPath();
+
+// Duplicates the log file handle to send into a child process.
+BASE_EXPORT HANDLE DuplicateLogFileHandle();
 #endif
 
 }  // namespace logging

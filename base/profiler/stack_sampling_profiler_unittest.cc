@@ -19,6 +19,7 @@
 #include "base/memory/ptr_util.h"
 #include "base/memory/raw_ptr.h"
 #include "base/metrics/metrics_hashes.h"
+#include "base/notimplemented.h"
 #include "base/profiler/profiler_buildflags.h"
 #include "base/profiler/sample_metadata.h"
 #include "base/profiler/stack_sampler.h"
@@ -38,9 +39,10 @@
 #include "testing/gtest/include/gtest/gtest.h"
 
 #if BUILDFLAG(IS_WIN)
+#include <windows.h>
+
 #include <intrin.h>
 #include <malloc.h>
-#include <windows.h>
 #else
 #include <alloca.h>
 #endif
@@ -54,7 +56,8 @@
     (BUILDFLAG(IS_MAC) && defined(ARCH_CPU_X86_64)) ||            \
     (BUILDFLAG(IS_IOS) && defined(ARCH_CPU_64_BITS)) ||           \
     (BUILDFLAG(IS_ANDROID) && BUILDFLAG(ENABLE_ARM_CFI_TABLE)) || \
-    (BUILDFLAG(IS_CHROMEOS) && defined(ARCH_CPU_X86_64) &&        \
+    (BUILDFLAG(IS_CHROMEOS) &&                                    \
+     (defined(ARCH_CPU_X86_64) || defined(ARCH_CPU_ARM64)) &&     \
      !defined(MEMORY_SANITIZER))
 #define STACK_SAMPLING_PROFILER_SUPPORTED 1
 #endif
@@ -321,8 +324,9 @@ void TestLibraryUnload(bool wait_until_unloaded, ModuleCache* module_cache) {
 
   NativeLibrary other_library = LoadOtherLibrary();
 
-  UnwindScenario scenario(
-      BindRepeating(&CallThroughOtherLibrary, Unretained(other_library)));
+  // TODO(https://crbug.com/1380714): Remove `UnsafeDanglingUntriaged`
+  UnwindScenario scenario(BindRepeating(
+      &CallThroughOtherLibrary, UnsafeDanglingUntriaged(other_library)));
 
   UnwindScenario::SampleEvents events;
   TargetThread target_thread(

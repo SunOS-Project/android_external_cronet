@@ -8,6 +8,7 @@
 #include <list>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include "base/check_op.h"
@@ -309,7 +310,8 @@ void SpdyHttpStream::OnHeadersReceived(
   response_info_->response_time = stream_->response_time();
   // Don't store the SSLInfo in the response here, HttpNetworkTransaction
   // will take care of that part.
-  response_info_->was_alpn_negotiated = was_alpn_negotiated_;
+  CHECK_EQ(stream_->GetNegotiatedProtocol(), kProtoHTTP2);
+  response_info_->was_alpn_negotiated = true;
   response_info_->request_time = stream_->GetRequestTime();
   response_info_->connection_info = HttpConnectionInfo::kHTTP2;
   response_info_->alpn_negotiated_protocol =
@@ -451,7 +453,6 @@ void SpdyHttpStream::SendEmptyBody() {
 
 void SpdyHttpStream::InitializeStreamHelper() {
   stream_->SetDelegate(this);
-  was_alpn_negotiated_ = stream_->GetNegotiatedProtocol() != kProtoUnknown;
 }
 
 void SpdyHttpStream::ResetStream(int error) {
@@ -591,7 +592,7 @@ const std::set<std::string>& SpdyHttpStream::GetDnsAliases() const {
   return dns_aliases_;
 }
 
-base::StringPiece SpdyHttpStream::GetAcceptChViaAlps() const {
+std::string_view SpdyHttpStream::GetAcceptChViaAlps() const {
   if (!request_info_) {
     return {};
   }

@@ -56,8 +56,15 @@ def __step_config(ctx, step_config):
     cfg = "buildtools/reclient_cfgs/chromium-browser-clang/rewrapper_windows.cfg"
     if ctx.fs.exists(cfg):
         reproxy_config = rewrapper_cfg.parse(ctx, cfg)
+        largePlatform = {}
+        for k, v in reproxy_config["platform"].items():
+            if k.startswith("label:action"):
+                continue
+            largePlatform[k] = v
+        largePlatform["label:action_large"] = "1"
         step_config["platforms"].update({
             "clang-cl": reproxy_config["platform"],
+            "clang-cl_large": largePlatform,
         })
         step_config["input_deps"].update(clang_all.input_deps)
 
@@ -222,26 +229,38 @@ def __step_config(ctx, step_config):
                         path.join(win_toolchain_dir, "Windows Kits/10/Include/10.0.22621.0/shared/Devpropdef.h"),
                         # third_party/dawn/third_party/dxc/include/dxc/Support/WinIncludes.h "ObjIdl.h"
                         path.join(win_toolchain_dir, "Windows Kits/10/Include/10.0.22621.0/um/ObjIdl.h"),
+                        # third_party/dawn/third_party/dxc/lib/Support includes "D3Dcommon.h"
+                        # https://github.com/microsoft/DirectXShaderCompiler/pull/6380
+                        path.join(win_toolchain_dir, "Windows Kits/10/Include/10.0.22621.0/um/D3Dcommon.h"),
                     ],
                 })
                 remote = True
+        remote_wrapper = reproxy_config.get("remote_wrapper")
         step_config["rules"].extend([
             {
                 "name": "clang-cl/cxx",
                 "action": "(.*_)?cxx",
                 "command_prefix": "..\\..\\third_party\\llvm-build\\Release+Asserts\\bin\\clang-cl.exe",
+                "inputs": [
+                    "third_party/llvm-build/Release+Asserts/bin/clang-cl.exe",
+                ],
+                "exclude_input_patterns": ["*.stamp"],
                 "platform_ref": "clang-cl",
                 "remote": remote,
-                "remote_wrapper": reproxy_config["remote_wrapper"],
+                "remote_wrapper": remote_wrapper,
                 "timeout": "2m",
             },
             {
                 "name": "clang-cl/cc",
                 "action": "(.*_)?cc",
                 "command_prefix": "..\\..\\third_party\\llvm-build\\Release+Asserts\\bin\\clang-cl.exe",
+                "inputs": [
+                    "third_party/llvm-build/Release+Asserts/bin/clang-cl.exe",
+                ],
+                "exclude_input_patterns": ["*.stamp"],
                 "platform_ref": "clang-cl",
                 "remote": remote,
-                "remote_wrapper": reproxy_config["remote_wrapper"],
+                "remote_wrapper": remote_wrapper,
                 "timeout": "2m",
             },
             {
@@ -251,10 +270,11 @@ def __step_config(ctx, step_config):
                 "inputs": [
                     "third_party/llvm-build/Release+Asserts/bin/clang++",
                 ],
+                "exclude_input_patterns": ["*.stamp"],
                 "handler": "clang_compile_coverage",
                 "platform_ref": "clang-cl",
                 "remote": remote,
-                "remote_wrapper": reproxy_config["remote_wrapper"],
+                "remote_wrapper": remote_wrapper,
                 "timeout": "2m",
             },
             {
@@ -264,10 +284,11 @@ def __step_config(ctx, step_config):
                 "inputs": [
                     "third_party/llvm-build/Release+Asserts/bin/clang",
                 ],
+                "exclude_input_patterns": ["*.stamp"],
                 "handler": "clang_compile_coverage",
                 "platform_ref": "clang-cl",
                 "remote": remote,
-                "remote_wrapper": reproxy_config["remote_wrapper"],
+                "remote_wrapper": remote_wrapper,
                 "timeout": "2m",
             },
         ])

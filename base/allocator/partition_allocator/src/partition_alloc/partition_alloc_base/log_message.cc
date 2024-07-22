@@ -25,18 +25,18 @@
 #include "partition_alloc/partition_alloc_base/strings/stringprintf.h"
 
 #if BUILDFLAG(IS_WIN)
-
-#include <io.h>
 #include <windows.h>
 
+#include <io.h>
 #endif
 
 #if BUILDFLAG(IS_POSIX) || BUILDFLAG(IS_FUCHSIA)
-#include <errno.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <unistd.h>
+
+#include <cerrno>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #endif
 
 #if BUILDFLAG(IS_POSIX) || BUILDFLAG(IS_FUCHSIA)
@@ -65,10 +65,10 @@ LogMessageHandlerFunction g_log_message_handler = nullptr;
 
 #if BUILDFLAG(PA_DCHECK_IS_CONFIGURABLE)
 // In DCHECK-enabled Chrome builds, allow the meaning of LOGGING_DCHECK to be
-// determined at run-time. We default it to INFO, to avoid it triggering
+// determined at run-time. We default it to ERROR, to avoid it triggering
 // crashes before the run-time has explicitly chosen the behaviour.
 PA_COMPONENT_EXPORT(PARTITION_ALLOC_BASE)
-logging::LogSeverity LOGGING_DCHECK = LOGGING_INFO;
+logging::LogSeverity LOGGING_DCHECK = LOGGING_ERROR;
 #endif  // BUILDFLAG(PA_DCHECK_IS_CONFIGURABLE)
 
 // This is never instantiated, it's just used for EAT_STREAM_PARAMETERS to have

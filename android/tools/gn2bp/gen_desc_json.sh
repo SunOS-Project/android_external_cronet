@@ -73,21 +73,6 @@ function setup_chromium_src_repo() (
 #######################################
 function cherry_pick_chromium_cls() (
   cd "${chromium_dir}"
-  # Remove once 122.0.6168.0 is imported
-  git fetch https://chromium.googlesource.com/chromium/src refs/changes/32/5083632/4 && git cherry-pick FETCH_HEAD
-  git fetch https://chromium.googlesource.com/chromium/src refs/changes/14/5094514/5 && git cherry-pick FETCH_HEAD
-  # Remove once 122.0.6183.0 is imported
-  git fetch https://chromium.googlesource.com/chromium/src refs/changes/87/5088887/9 && git cherry-pick FETCH_HEAD
-  # Remove once 122.0.6240.0 is imported
-  git fetch https://chromium.googlesource.com/chromium/src refs/changes/35/5184435/4 && git cherry-pick FETCH_HEAD
-  # Remove once 123.0.6272.0 is imported
-  git fetch https://chromium.googlesource.com/chromium/src refs/changes/93/5164293/3 && git cherry-pick FETCH_HEAD
-  # Remove once 123.0.6286.0 is imported
-  git fetch https://chromium.googlesource.com/chromium/src refs/changes/42/5259242/5 && git cherry-pick FETCH_HEAD
-  # Remove once 124.0.6317.0 is imported
-  git fetch https://chromium.googlesource.com/chromium/src refs/changes/51/5317651/2 && git cherry-pick FETCH_HEAD
-  # Remove once 124.0.6340.0 is imported
-  git fetch https://chromium.googlesource.com/chromium/src refs/changes/79/5340179/4 && git cherry-pick FETCH_HEAD
 )
 #######################################
 # Generate desc.json for a specified architecture.

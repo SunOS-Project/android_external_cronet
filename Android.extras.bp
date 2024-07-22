@@ -63,7 +63,7 @@ java_library {
     // Don't change the name of the module.
     name: "cronet_aml_java",
     static_libs: [
-        "cronet_aml_components_cronet_android_cronet_impl_native_base_java",
+        "cronet_aml_components_cronet_android_cronet_impl_native_java",
         "cronet_aml_components_cronet_android_cronet_jni_registration_java"
     ],
     sdk_version: "module_current",
@@ -81,7 +81,7 @@ java_library {
     // Don't change the name of the module.
     name: "cronet_aml_java__testing",
     static_libs: [
-        "cronet_aml_components_cronet_android_cronet_impl_native_base_java__testing",
+        "cronet_aml_components_cronet_android_cronet_impl_native_java__testing",
         "cronet_aml_components_cronet_android_cronet_jni_registration_java__testing",
         "cronet_aml_components_cronet_android_cronet_tests_jni_registration_java__testing"
     ],
@@ -129,7 +129,6 @@ filegroup {
     name: "net_unittests_data",
     srcs: [
         "net/data/**/*",
-        "net/third_party/nist-pkits/**/*",
         "net/third_party/quiche/src/quiche/common/platform/api/testdir/**/*",
         "third_party/anonymous_tokens/src/anonymous_tokens/testdata/**/*",
     ],

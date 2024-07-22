@@ -44,9 +44,7 @@ std::string GetProxy(const net::HttpResponseInfo& info) {
     return net::HostPortPair().ToString();
   }
   CHECK(info.proxy_chain.is_single_proxy());
-  return info.proxy_chain.GetProxyServer(/*chain_index=*/0)
-      .host_port_pair()
-      .ToString();
+  return info.proxy_chain.First().host_port_pair().ToString();
 }
 
 int CalculateLoadFlags(int load_flags,
@@ -148,7 +146,7 @@ void CronetURLRequest::FollowDeferredRedirect() {
 }
 
 bool CronetURLRequest::ReadData(net::IOBuffer* raw_read_buffer, int max_size) {
-  // TODO(https://crbug.com/1335423): Change to DCHECK() or remove after bug
+  // TODO(crbug.com/40847077): Change to DCHECK() or remove after bug
   // is fixed.
   CHECK(max_size == 0 || (raw_read_buffer && raw_read_buffer->data()));
 
@@ -337,8 +335,8 @@ void CronetURLRequest::NetworkTasks::GetStatus(
 void CronetURLRequest::NetworkTasks::FollowDeferredRedirect() {
   DCHECK_CALLED_ON_VALID_THREAD(network_thread_checker_);
   url_request_->FollowDeferredRedirect(
-      absl::nullopt /* removed_request_headers */,
-      absl::nullopt /* modified_request_headers */);
+      std::nullopt /* removed_request_headers */,
+      std::nullopt /* modified_request_headers */);
 }
 
 void CronetURLRequest::NetworkTasks::ReadData(

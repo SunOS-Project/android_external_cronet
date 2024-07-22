@@ -33,7 +33,6 @@ DefaultSupportedQuicVersions() {
 // should only use versions at least as recent as the oldest default version.
 inline NET_EXPORT_PRIVATE quic::ParsedQuicVersionVector ObsoleteQuicVersions() {
   return quic::ParsedQuicVersionVector{quic::ParsedQuicVersion::Q046(),
-                                       quic::ParsedQuicVersion::Q050(),
                                        quic::ParsedQuicVersion::Draft29()};
 }
 
@@ -145,6 +144,9 @@ struct NET_EXPORT QuicParams {
   // If true, connection migration v2 will be used to migrate existing
   // sessions to network when the platform indicates that the default network
   // is changing.
+  // Use the value of the flag as the default value. This is needed because unit
+  // tests does not go through network_session_configuration which causes
+  // discrepancy.
   bool migrate_sessions_on_network_change_v2 =
       base::FeatureList::IsEnabled(features::kMigrateSessionsOnNetworkChangeV2);
   // If true, connection migration v2 may be used to migrate active QUIC
@@ -197,14 +199,17 @@ struct NET_EXPORT QuicParams {
   // (best effort).
   int ios_network_service_type = 0;
   // Delay for the 1st time the alternative service is marked broken.
-  absl::optional<base::TimeDelta> initial_delay_for_broken_alternative_service;
+  std::optional<base::TimeDelta> initial_delay_for_broken_alternative_service;
   // If true, the delay for broke alternative service would be initial_delay *
   // (1 << broken_count). Otherwise, the delay would be initial_delay, 5min,
   // 10min and so on.
-  absl::optional<bool> exponential_backoff_on_initial_delay;
+  std::optional<bool> exponential_backoff_on_initial_delay;
   // If true, delay main job even the request can be sent immediately on an
   // available SPDY session.
   bool delay_main_job_with_available_spdy_session = false;
+
+  // If true, ALPS uses new codepoint to negotiates application settings.
+  bool use_new_alps_codepoint = false;
 };
 
 // QuicContext contains QUIC-related variables that are shared across all of the
@@ -214,7 +219,7 @@ class NET_EXPORT_PRIVATE QuicContext {
   QuicContext();
   explicit QuicContext(
       std::unique_ptr<quic::QuicConnectionHelperInterface> helper);
-  ~QuicContext();
+  virtual ~QuicContext();
 
   quic::QuicConnectionHelperInterface* helper() { return helper_.get(); }
   const quic::QuicClock* clock() { return helper_->GetClock(); }

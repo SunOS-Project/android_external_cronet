@@ -5,6 +5,7 @@
 #include "quiche/quic/core/quic_packets.h"
 
 #include <algorithm>
+#include <memory>
 #include <utility>
 
 #include "absl/strings/escaping.h"
@@ -14,7 +15,6 @@
 #include "quiche/quic/core/quic_types.h"
 #include "quiche/quic/core/quic_utils.h"
 #include "quiche/quic/core/quic_versions.h"
-#include "quiche/quic/platform/api/quic_flag_utils.h"
 #include "quiche/quic/platform/api/quic_flags.h"
 
 namespace quic {
@@ -375,11 +375,12 @@ std::unique_ptr<QuicReceivedPacket> QuicReceivedPacket::Clone() const {
     memcpy(headers_buffer, this->packet_headers(), this->headers_length());
     return std::make_unique<QuicReceivedPacket>(
         buffer, this->length(), receipt_time(), true, ttl(), ttl() >= 0,
-        headers_buffer, this->headers_length(), true);
+        headers_buffer, this->headers_length(), true, this->ecn_codepoint());
   }
 
   return std::make_unique<QuicReceivedPacket>(
-      buffer, this->length(), receipt_time(), true, ttl(), ttl() >= 0);
+      buffer, this->length(), receipt_time(), true, ttl(), ttl() >= 0, nullptr,
+      0, false, this->ecn_codepoint());
 }
 
 std::ostream& operator<<(std::ostream& os, const QuicReceivedPacket& s) {

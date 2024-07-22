@@ -34,7 +34,6 @@
     <!-- Push the testing data to the specified directory before running tests -->
     <target_preparer class="com.android.tradefed.targetprep.PushFilePreparer">
         <option name="push-file" key="testdir" value="/storage/emulated/0/chromium_tests_root/net/third_party/quiche/src/quiche/common/platform/api/testdir/" />
-        <option name="push-file" key="nist-pkits" value="/storage/emulated/0/chromium_tests_root/net/third_party/nist-pkits/" />
         <option name="push-file" key="data" value="/storage/emulated/0/chromium_tests_root/net/data/" />
         <option name="push-file" key="anonymous_tokens" value="/storage/emulated/0/chromium_tests_root/third_party/anonymous_tokens/" />
     </target_preparer>

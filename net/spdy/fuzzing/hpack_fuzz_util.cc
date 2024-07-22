@@ -8,9 +8,11 @@
 #include <cmath>
 #include <memory>
 
-#include "base/big_endian.h"
+#include "base/containers/span.h"
+#include "base/numerics/byte_conversions.h"
 #include "base/rand_util.h"
 #include "net/third_party/quiche/src/quiche/spdy/core/hpack/hpack_constants.h"
+#include "net/third_party/quiche/src/quiche/spdy/core/recording_headers_handler.h"
 
 namespace spdy {
 
@@ -111,35 +113,38 @@ size_t HpackFuzzUtil::SampleExponential(size_t mean, size_t sanity_bound) {
 bool HpackFuzzUtil::NextHeaderBlock(Input* input, std::string_view* out) {
   // ClusterFuzz may truncate input files if the fuzzer ran out of allocated
   // disk space. Be tolerant of these.
-  CHECK_LE(input->offset, input->input.size());
-  if (input->remaining() < sizeof(uint32_t)) {
+  if (input->RemainingBytes().size() < sizeof(uint32_t)) {
     return false;
   }
+  uint32_t length = base::U32FromBigEndian(input->ReadSpan<sizeof(uint32_t)>());
 
-  uint32_t length;
-  base::ReadBigEndian(reinterpret_cast<const uint8_t*>(input->ptr()), &length);
-  input->offset += sizeof(uint32_t);
-
-  if (input->remaining() < length) {
+  if (input->RemainingBytes().size() < length) {
     return false;
   }
-  *out = std::string_view(input->ptr(), length);
-  input->offset += length;
+  auto block = base::as_chars(input->ReadSpan(length));
+  *out = std::string_view(block.begin(), block.end());
+
   return true;
 }
 
 // static
 std::string HpackFuzzUtil::HeaderBlockPrefix(size_t block_size) {
-  char buf[4];
-  base::WriteBigEndian(buf, static_cast<uint32_t>(block_size));
-  return std::string(buf, sizeof(buf));
+  std::array<uint8_t, 4u> buf =
+      base::U32ToBigEndian(base::checked_cast<uint32_t>(block_size));
+  return std::string(buf.begin(), buf.end());
 }
 
 // static
 void HpackFuzzUtil::InitializeFuzzerContext(FuzzerContext* context) {
   context->first_stage = std::make_unique<HpackDecoderAdapter>();
+  context->first_stage_handler = std::make_unique<RecordingHeadersHandler>();
+  context->first_stage->HandleControlFrameHeadersStart(
+      context->first_stage_handler.get());
   context->second_stage = std::make_unique<HpackEncoder>();
   context->third_stage = std::make_unique<HpackDecoderAdapter>();
+  context->third_stage_handler = std::make_unique<RecordingHeadersHandler>();
+  context->third_stage->HandleControlFrameHeadersStart(
+      context->third_stage_handler.get());
 }
 
 // static
@@ -156,7 +161,7 @@ bool HpackFuzzUtil::RunHeaderBlockThroughFuzzerStages(
   }
   // Second stage: Re-encode the decoded header block. This must succeed.
   std::string second_stage_out = context->second_stage->EncodeHeaderBlock(
-      context->first_stage->decoded_block());
+      context->first_stage_handler->decoded_block());
 
   // Third stage: Expect a decoding of the re-encoded block to succeed, but
   // don't require it. It's possible for the stage-two encoder to produce an

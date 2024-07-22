@@ -5,13 +5,13 @@
 
 #include <algorithm>
 #include <memory>
+#include <string_view>
 #include <utility>
 #include <vector>
 
 #include "base/metrics/histogram_macros.h"
 #include "base/strings/strcat.h"
 #include "base/strings/string_number_conversions.h"
-#include "base/strings/string_piece.h"
 #include "net/http/http_log_util.h"
 #include "net/log/net_log_capture_mode.h"
 #include "net/log/net_log_event_type.h"
@@ -41,20 +41,20 @@ base::Value::Dict NetLogPriorityUpdateParams(
       .Set("priority_field_value", frame.priority_field_value);
 }
 
-base::Value::Dict NetLogTwoIntParams(base::StringPiece name1,
+base::Value::Dict NetLogTwoIntParams(std::string_view name1,
                                      uint64_t value1,
-                                     base::StringPiece name2,
+                                     std::string_view name2,
                                      uint64_t value2) {
   return base::Value::Dict()
       .Set(name1, NetLogNumberValue(value1))
       .Set(name2, NetLogNumberValue(value2));
 }
 
-base::Value::Dict NetLogThreeIntParams(base::StringPiece name1,
+base::Value::Dict NetLogThreeIntParams(std::string_view name1,
                                        uint64_t value1,
-                                       base::StringPiece name2,
+                                       std::string_view name2,
                                        uint64_t value2,
-                                       base::StringPiece name3,
+                                       std::string_view name3,
                                        uint64_t value3) {
   return base::Value::Dict()
       .Set(name1, NetLogNumberValue(value1))
@@ -67,8 +67,8 @@ base::Value::List ElideQuicHeaderListForNetLog(
     NetLogCaptureMode capture_mode) {
   base::Value::List headers_list;
   for (const auto& header : headers) {
-    base::StringPiece key = header.first;
-    base::StringPiece value = header.second;
+    std::string_view key = header.first;
+    std::string_view value = header.second;
     headers_list.Append(NetLogStringValue(
         base::StrCat({key, ": ",
                       ElideHeaderValueForNetLog(capture_mode, std::string(key),
@@ -147,7 +147,6 @@ void QuicHttp3Logger::OnSettingsFrameReceived(
                               frame.values.size() + 1, /* min = */ 1,
                               /* max = */ 10, /* buckets = */ 10);
   int reserved_identifier_count = 0;
-  bool settings_extended_connect_enabled = false;
   for (const auto& value : frame.values) {
     if (value.first == quic::SETTINGS_QPACK_MAX_TABLE_CAPACITY) {
       UMA_HISTOGRAM_COUNTS_1M(
@@ -158,8 +157,6 @@ void QuicHttp3Logger::OnSettingsFrameReceived(
     } else if (value.first == quic::SETTINGS_QPACK_BLOCKED_STREAMS) {
       UMA_HISTOGRAM_COUNTS_1000(
           "Net.QuicSession.ReceivedSettings.BlockedStreams", value.second);
-    } else if (value.first == quic::SETTINGS_ENABLE_CONNECT_PROTOCOL) {
-      settings_extended_connect_enabled = value.second == 1;
     } else if (value.first >= 0x21 && value.first % 0x1f == 2) {
       // Reserved setting identifiers are defined at
       // https://quicwg.org/base-drafts/draft-ietf-quic-http.html#name-defined-settings-parameters.
@@ -174,9 +171,6 @@ void QuicHttp3Logger::OnSettingsFrameReceived(
       "Net.QuicSession.ReceivedSettings.ReservedCountPlusOne",
       reserved_identifier_count + 1, /* min = */ 1,
       /* max = */ 5, /* buckets = */ 5);
-  UMA_HISTOGRAM_BOOLEAN(
-      "Net.QuicSession.ReceivedSettings.EnableExtendedConnect",
-      settings_extended_connect_enabled);
 
   if (!net_log_.IsCapturing())
     return;

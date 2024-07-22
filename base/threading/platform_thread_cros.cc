@@ -4,18 +4,18 @@
 // Description: ChromeOS specific Linux code layered on top of
 // base/threading/platform_thread_linux{,_base}.cc.
 
-#include "base/feature_list.h"
-#include "base/no_destructor.h"
-#include "base/threading/platform_thread.h"
-#include "base/threading/platform_thread_internal_posix.h"
-
 #include "base/base_switches.h"
 #include "base/command_line.h"
+#include "base/feature_list.h"
 #include "base/files/file_util.h"
 #include "base/metrics/field_trial_params.h"
+#include "base/no_destructor.h"
 #include "base/process/internal_linux.h"
 #include "base/process/process.h"
 #include "base/strings/stringprintf.h"
+#include "base/threading/cross_process_platform_thread_delegate.h"
+#include "base/threading/platform_thread.h"
+#include "base/threading/platform_thread_internal_posix.h"
 
 #include <sys/resource.h>
 
@@ -33,6 +33,9 @@ BASE_FEATURE(kSetRtForDisplayThreads,
              "SetRtForDisplayThreads",
              FEATURE_DISABLED_BY_DEFAULT);
 namespace {
+
+CrossProcessPlatformThreadDelegate* g_cross_process_platform_thread_delegate =
+    nullptr;
 
 std::atomic<bool> g_use_sched_util(true);
 std::atomic<bool> g_scheduler_hints_adjusted(false);
@@ -213,16 +216,16 @@ void SetThreadLatencySensitivity(ProcessId process_id,
 }
 
 // Get the type by reading through kThreadTypeToNiceValueMap
-absl::optional<ThreadType> GetThreadTypeForNiceValue(int nice_value) {
+std::optional<ThreadType> GetThreadTypeForNiceValue(int nice_value) {
   for (auto i : internal::kThreadTypeToNiceValueMap) {
     if (nice_value == i.nice_value) {
       return i.thread_type;
     }
   }
-  return absl::nullopt;
+  return std::nullopt;
 }
 
-absl::optional<int> GetNiceValueForThreadId(PlatformThreadId thread_id) {
+std::optional<int> GetNiceValueForThreadId(PlatformThreadId thread_id) {
   // Get the current nice value of the thread_id
   errno = 0;
   int nice_value = getpriority(PRIO_PROCESS, static_cast<id_t>(thread_id));
@@ -231,7 +234,7 @@ absl::optional<int> GetNiceValueForThreadId(PlatformThreadId thread_id) {
     DVPLOG_IF(1, errno != ESRCH)
         << "Failed to call getpriority for thread id " << thread_id
         << ", performance may be effected.";
-    return absl::nullopt;
+    return std::nullopt;
   }
   return nice_value;
 }
@@ -303,7 +306,7 @@ void SetThreadNiceFromType(ProcessId process_id,
   }
 }
 
-void PlatformThreadChromeOS::InitFeaturesPostFieldTrial() {
+void PlatformThreadChromeOS::InitializeFeatures() {
   DCHECK(FeatureList::GetInstance());
   g_threads_bg_enabled.store(FeatureList::IsEnabled(kSetThreadBgForBgProcess));
   g_display_threads_rt.store(FeatureList::IsEnabled(kSetRtForDisplayThreads));
@@ -340,22 +343,33 @@ void PlatformThreadChromeOS::InitFeaturesPostFieldTrial() {
 }
 
 // static
+void PlatformThreadChromeOS::SetCrossProcessPlatformThreadDelegate(
+    CrossProcessPlatformThreadDelegate* delegate) {
+  // A component cannot override a delegate set by another component, thus
+  // disallow setting a delegate when one already exists.
+  DCHECK_NE(!!g_cross_process_platform_thread_delegate, !!delegate);
+
+  g_cross_process_platform_thread_delegate = delegate;
+}
+
+// static
 bool PlatformThreadChromeOS::IsThreadsBgFeatureEnabled() {
   return g_threads_bg_enabled.load();
 }
 
+// static
 bool PlatformThreadChromeOS::IsDisplayThreadsRtFeatureEnabled() {
   return g_display_threads_rt.load();
 }
 
 // static
-absl::optional<ThreadType> PlatformThreadChromeOS::GetThreadTypeFromThreadId(
+std::optional<ThreadType> PlatformThreadChromeOS::GetThreadTypeFromThreadId(
     ProcessId process_id,
     PlatformThreadId thread_id) {
   // Get the current nice_value of the thread_id
-  absl::optional<int> nice_value = GetNiceValueForThreadId(thread_id);
+  std::optional<int> nice_value = GetNiceValueForThreadId(thread_id);
   if (!nice_value.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   return GetThreadTypeForNiceValue(nice_value.value());
 }
@@ -365,6 +379,19 @@ void PlatformThreadChromeOS::SetThreadType(ProcessId process_id,
                                            PlatformThreadId thread_id,
                                            ThreadType thread_type,
                                            IsViaIPC via_ipc) {
+  if (g_cross_process_platform_thread_delegate &&
+      g_cross_process_platform_thread_delegate->HandleThreadTypeChange(
+          process_id, thread_id, thread_type)) {
+    return;
+  }
+  SetThreadTypeInternal(process_id, thread_id, thread_type, via_ipc);
+}
+
+// static
+void PlatformThreadChromeOS::SetThreadTypeInternal(ProcessId process_id,
+                                                   PlatformThreadId thread_id,
+                                                   ThreadType thread_type,
+                                                   IsViaIPC via_ipc) {
   // TODO(b/262267726): Re-use common code with PlatformThreadLinux::SetThreadType
   // Should not be called concurrently with other functions
   // like SetThreadBackgrounded.
@@ -392,13 +419,12 @@ void PlatformThreadChromeOS::SetThreadBackgrounded(ProcessId process_id,
                                                    PlatformThreadId thread_id,
                                                    bool backgrounded) {
   // Get the current nice value of the thread_id
-  absl::optional<int> nice_value =
-      GetNiceValueForThreadId(thread_id);
+  std::optional<int> nice_value = GetNiceValueForThreadId(thread_id);
   if (!nice_value.has_value()) {
     return;
   }
 
-  absl::optional<ThreadType> type =
+  std::optional<ThreadType> type =
       GetThreadTypeForNiceValue(nice_value.value());
   if (!type.has_value()) {
     return;

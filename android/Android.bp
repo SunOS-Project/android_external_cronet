@@ -41,7 +41,7 @@ java_library {
     name: "httpclient_api",
     srcs: [
         ":httpclient_api_sources",
-        ":cronet_aml_components_cronet_android_interface_api_version",
+        ":cronet_aml_components_cronet_android_api_version",
     ],
     libs: [
         "androidx.annotation_annotation",

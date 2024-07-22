@@ -12,6 +12,7 @@
 //    limit for PDBs (https://crbug.com/1327710#c5). To fix this, we set
 //    _LIBCPP_ABI_NAMESPACE to a shorter value.
 #define _LIBCPP_ABI_NAMESPACE __Cr
+
 #define _LIBCPP_ABI_VERSION 2
 
 /* #undef _LIBCPP_ABI_FORCE_ITANIUM */
@@ -32,6 +33,14 @@
 /* #undef _LIBCPP_HAS_NO_RANDOM_DEVICE */
 /* #undef _LIBCPP_HAS_NO_LOCALIZATION */
 /* #undef _LIBCPP_HAS_NO_WIDE_CHARACTERS */
+
+// TODO(thakis): Is this right?
+/* #undef _LIBCPP_HAS_NO_STD_MODULES */
+
+// TODO(thakis): Is this right?
+/* #undef _LIBCPP_HAS_NO_TIME_ZONE_DATABASE */
+
+#define _LIBCPP_INSTRUMENTED_WITH_ASAN
 
 // PSTL backends
 /* #undef _LIBCPP_PSTL_CPU_BACKEND_SERIAL */

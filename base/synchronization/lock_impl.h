@@ -8,6 +8,8 @@
 #include "base/base_export.h"
 #include "base/check.h"
 #include "base/dcheck_is_on.h"
+#include "base/memory/raw_ptr_exclusion.h"
+#include "base/memory/stack_allocated.h"
 #include "base/thread_annotations.h"
 #include "build/build_config.h"
 
@@ -152,12 +154,15 @@ class SCOPED_LOCKABLE BasicAutoLock {
   }
 
  private:
-  LockType& lock_;
+  // RAW_PTR_EXCLUSION: crbug.com/1521343 crbug.com/1520734 crbug.com/1519816
+  RAW_PTR_EXCLUSION LockType& lock_;
 };
 
 // This is an implementation used for AutoTryLock templated on the lock type.
 template <class LockType>
 class SCOPED_LOCKABLE BasicAutoTryLock {
+  STACK_ALLOCATED();
+
  public:
   explicit BasicAutoTryLock(LockType& lock) EXCLUSIVE_LOCK_FUNCTION(lock)
       : lock_(lock), is_acquired_(lock_.Try()) {}
@@ -182,6 +187,8 @@ class SCOPED_LOCKABLE BasicAutoTryLock {
 // This is an implementation used for AutoUnlock templated on the lock type.
 template <class LockType>
 class BasicAutoUnlock {
+  STACK_ALLOCATED();
+
  public:
   explicit BasicAutoUnlock(LockType& lock) : lock_(lock) {
     // We require our caller to have the lock.
@@ -201,6 +208,8 @@ class BasicAutoUnlock {
 // This is an implementation used for AutoLockMaybe templated on the lock type.
 template <class LockType>
 class SCOPED_LOCKABLE BasicAutoLockMaybe {
+  STACK_ALLOCATED();
+
  public:
   explicit BasicAutoLockMaybe(LockType* lock) EXCLUSIVE_LOCK_FUNCTION(lock)
       : lock_(lock) {
@@ -226,6 +235,8 @@ class SCOPED_LOCKABLE BasicAutoLockMaybe {
 // type.
 template <class LockType>
 class SCOPED_LOCKABLE BasicReleasableAutoLock {
+  STACK_ALLOCATED();
+
  public:
   explicit BasicReleasableAutoLock(LockType* lock) EXCLUSIVE_LOCK_FUNCTION(lock)
       : lock_(lock) {

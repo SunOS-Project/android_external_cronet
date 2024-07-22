@@ -5,8 +5,10 @@
 #include "net/cert/x509_util.h"
 
 #include <string.h>
+
 #include <map>
 #include <memory>
+#include <string_view>
 
 #include "base/lazy_instance.h"
 #include "base/logging.h"
@@ -25,6 +27,8 @@
 #include "net/cert/x509_certificate.h"
 #include "third_party/boringssl/src/include/openssl/bytestring.h"
 #include "third_party/boringssl/src/include/openssl/digest.h"
+#include "third_party/boringssl/src/include/openssl/ec.h"
+#include "third_party/boringssl/src/include/openssl/ec_key.h"
 #include "third_party/boringssl/src/include/openssl/evp.h"
 #include "third_party/boringssl/src/include/openssl/mem.h"
 #include "third_party/boringssl/src/include/openssl/pkcs7.h"
@@ -42,32 +46,43 @@ namespace net::x509_util {
 
 namespace {
 
-bool AddRSASignatureAlgorithm(CBB* cbb, DigestAlgorithm algorithm) {
-  // See RFC 4055.
-  static const uint8_t kSHA256WithRSAEncryption[] = {
-      0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x0b};
-
+bool AddSignatureAlgorithm(CBB* cbb,
+                           base::span<const uint8_t> oid_bytes,
+                           bool null_param) {
   // An AlgorithmIdentifier is described in RFC 5280, 4.1.1.2.
   CBB sequence, oid, params;
   if (!CBB_add_asn1(cbb, &sequence, CBS_ASN1_SEQUENCE) ||
-      !CBB_add_asn1(&sequence, &oid, CBS_ASN1_OBJECT)) {
+      !CBB_add_asn1(&sequence, &oid, CBS_ASN1_OBJECT) ||
+      !CBB_add_bytes(&oid, oid_bytes.data(), oid_bytes.size()) ||
+      (null_param && !CBB_add_asn1(&sequence, &params, CBS_ASN1_NULL)) ||
+      !CBB_flush(cbb)) {
     return false;
   }
-
-  switch (algorithm) {
-    case DIGEST_SHA256:
-      if (!CBB_add_bytes(&oid, kSHA256WithRSAEncryption,
-                         sizeof(kSHA256WithRSAEncryption)))
-        return false;
-      break;
-  }
-
-  // All supported algorithms use null parameters.
-  if (!CBB_add_asn1(&sequence, &params, CBS_ASN1_NULL) || !CBB_flush(cbb)) {
-    return false;
-  }
-
   return true;
+}
+
+bool AddSignatureAlgorithm(CBB* cbb,
+                           const EVP_PKEY* pkey,
+                           DigestAlgorithm digest_alg) {
+  if (digest_alg != DIGEST_SHA256) {
+    return false;
+  }
+
+  if (EVP_PKEY_id(pkey) == EVP_PKEY_RSA) {
+    // See RFC 4055.
+    static const uint8_t kSHA256WithRSAEncryption[] = {
+        0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x0b};
+    // RSA always has null parameters.
+    return AddSignatureAlgorithm(cbb, kSHA256WithRSAEncryption,
+                                 /*null_param=*/true);
+  } else if (EVP_PKEY_id(pkey) == EVP_PKEY_EC) {
+    // 1.2.840.10045.4.3.2
+    static const uint8_t kECDSAWithSHA256[] = {0x2a, 0x86, 0x48, 0xce,
+                                               0x3d, 0x04, 0x03, 0x02};
+    return AddSignatureAlgorithm(cbb, kECDSAWithSHA256,
+                                 /*null_param=*/false);
+  }
+  return false;
 }
 
 const EVP_MD* ToEVP(DigestAlgorithm alg) {
@@ -99,7 +114,7 @@ base::LazyInstance<BufferPoolSingleton>::Leaky g_buffer_pool_singleton =
 }  // namespace
 
 // Adds an X.509 Name with the specified distinguished name to |cbb|.
-bool AddName(CBB* cbb, base::StringPiece name) {
+bool AddName(CBB* cbb, std::string_view name) {
   // See RFC 4519.
   static const uint8_t kCommonName[] = {0x55, 0x04, 0x03};
   static const uint8_t kCountryName[] = {0x55, 0x04, 0x06};
@@ -167,6 +182,35 @@ bool AddName(CBB* cbb, base::StringPiece name) {
   return true;
 }
 
+NET_EXPORT net::CertificateList ConvertToX509CertificatesIgnoreErrors(
+    const std::vector<std::vector<uint8_t>>& certs_bytes) {
+  net::CertificateList x509_certs;
+  for (const auto& cert_uint8 : certs_bytes) {
+    scoped_refptr<net::X509Certificate> x509_cert =
+        net::X509Certificate::CreateFromBytes(base::as_byte_span(cert_uint8));
+    if (x509_cert) {
+      x509_certs.push_back(std::move(x509_cert));
+    }
+  }
+  return x509_certs;
+}
+
+bssl::ParsedCertificateList ParseAllValidCerts(
+    const CertificateList& x509_certs) {
+  bssl::ParsedCertificateList parsed_certs;
+  for (const auto& x509_cert : x509_certs) {
+    std::shared_ptr<const bssl::ParsedCertificate> cert =
+        bssl::ParsedCertificate::Create(
+            bssl::UpRef(x509_cert->cert_buffer()),
+            net::x509_util::DefaultParseCertificateOptions(), NULL);
+    if (cert) {
+      parsed_certs.push_back(std::move(cert));
+    }
+  }
+
+  return parsed_certs;
+}
+
 bool CBBAddTime(CBB* cbb, base::Time time) {
   bssl::der::GeneralizedTime generalized_time;
   if (!EncodeTimeAsGeneralizedTime(time, &generalized_time)) {
@@ -193,7 +237,7 @@ bool GetTLSServerEndPointChannelBinding(const X509Certificate& certificate,
                                         std::string* token) {
   static const char kChannelBindingPrefix[] = "tls-server-end-point:";
 
-  base::StringPiece der_encoded_certificate =
+  std::string_view der_encoded_certificate =
       x509_util::CryptoBufferAsStringPiece(certificate.cert_buffer());
 
   bssl::der::Input tbs_certificate_tlv;
@@ -261,7 +305,7 @@ static const uint16_t kRSAKeyLength = 1024;
 // digest algorithm.
 static const DigestAlgorithm kSignatureDigestAlgorithm = DIGEST_SHA256;
 
-bool CreateKeyAndSelfSignedCert(const std::string& subject,
+bool CreateKeyAndSelfSignedCert(std::string_view subject,
                                 uint32_t serial_number,
                                 base::Time not_valid_before,
                                 base::Time not_valid_after,
@@ -288,14 +332,16 @@ Extension::Extension(base::span<const uint8_t> in_oid,
 Extension::~Extension() = default;
 Extension::Extension(const Extension&) = default;
 
-bool CreateSelfSignedCert(EVP_PKEY* key,
-                          DigestAlgorithm alg,
-                          const std::string& subject,
-                          uint32_t serial_number,
-                          base::Time not_valid_before,
-                          base::Time not_valid_after,
-                          const std::vector<Extension>& extension_specs,
-                          std::string* der_encoded) {
+bool CreateCert(EVP_PKEY* subject_key,
+                DigestAlgorithm digest_alg,
+                std::string_view subject,
+                uint32_t serial_number,
+                base::Time not_valid_before,
+                base::Time not_valid_after,
+                const std::vector<Extension>& extension_specs,
+                std::string_view issuer,
+                EVP_PKEY* issuer_key,
+                std::string* der_encoded) {
   crypto::EnsureOpenSSLInit();
   crypto::OpenSSLErrStackTracer err_tracer(FROM_HERE);
 
@@ -310,13 +356,14 @@ bool CreateSelfSignedCert(EVP_PKEY* key,
                     CBS_ASN1_CONTEXT_SPECIFIC | CBS_ASN1_CONSTRUCTED | 0) ||
       !CBB_add_asn1_uint64(&version, 2) ||
       !CBB_add_asn1_uint64(&tbs_cert, serial_number) ||
-      !AddRSASignatureAlgorithm(&tbs_cert, alg) ||  // signature
-      !AddName(&tbs_cert, subject) ||               // issuer
+      !AddSignatureAlgorithm(&tbs_cert, issuer_key, digest_alg) ||  // signature
+      !AddName(&tbs_cert, issuer) ||
       !CBB_add_asn1(&tbs_cert, &validity, CBS_ASN1_SEQUENCE) ||
       !CBBAddTime(&validity, not_valid_before) ||
       !CBBAddTime(&validity, not_valid_after) ||
-      !AddName(&tbs_cert, subject) ||             // subject
-      !EVP_marshal_public_key(&tbs_cert, key)) {  // subjectPublicKeyInfo
+      !AddName(&tbs_cert, subject) ||  // subject
+      !EVP_marshal_public_key(&tbs_cert,
+                              subject_key)) {  // subjectPublicKeyInfo
     return false;
   }
 
@@ -362,10 +409,11 @@ bool CreateSelfSignedCert(EVP_PKEY* key,
   if (!CBB_init(cbb.get(), tbs_cert_len) ||
       !CBB_add_asn1(cbb.get(), &cert, CBS_ASN1_SEQUENCE) ||
       !CBB_add_bytes(&cert, tbs_cert_bytes, tbs_cert_len) ||
-      !AddRSASignatureAlgorithm(&cert, alg) ||
+      !AddSignatureAlgorithm(&cert, issuer_key, digest_alg) ||
       !CBB_add_asn1(&cert, &signature, CBS_ASN1_BITSTRING) ||
       !CBB_add_u8(&signature, 0 /* no unused bits */) ||
-      !EVP_DigestSignInit(ctx.get(), nullptr, ToEVP(alg), nullptr, key) ||
+      !EVP_DigestSignInit(ctx.get(), nullptr, ToEVP(digest_alg), nullptr,
+                          issuer_key) ||
       // Compute the maximum signature length.
       !EVP_DigestSign(ctx.get(), nullptr, &sig_len, tbs_cert_bytes,
                       tbs_cert_len) ||
@@ -382,6 +430,19 @@ bool CreateSelfSignedCert(EVP_PKEY* key,
   return true;
 }
 
+bool CreateSelfSignedCert(EVP_PKEY* key,
+                          DigestAlgorithm digest_alg,
+                          std::string_view subject,
+                          uint32_t serial_number,
+                          base::Time not_valid_before,
+                          base::Time not_valid_after,
+                          const std::vector<Extension>& extension_specs,
+                          std::string* der_encoded) {
+  return CreateCert(/*subject_key=*/key, digest_alg, subject, serial_number,
+                    not_valid_before, not_valid_after, extension_specs,
+                    /*issuer=*/subject, /*issuer_key=*/key, der_encoded);
+}
+
 CRYPTO_BUFFER_POOL* GetBufferPool() {
   return g_buffer_pool_singleton.Get().pool();
 }
@@ -392,7 +453,7 @@ bssl::UniquePtr<CRYPTO_BUFFER> CreateCryptoBuffer(
       CRYPTO_BUFFER_new(data.data(), data.size(), GetBufferPool()));
 }
 
-bssl::UniquePtr<CRYPTO_BUFFER> CreateCryptoBuffer(base::StringPiece data) {
+bssl::UniquePtr<CRYPTO_BUFFER> CreateCryptoBuffer(std::string_view data) {
   return bssl::UniquePtr<CRYPTO_BUFFER>(
       CRYPTO_BUFFER_new(reinterpret_cast<const uint8_t*>(data.data()),
                         data.size(), GetBufferPool()));
@@ -414,8 +475,8 @@ bool CryptoBufferEqual(const CRYPTO_BUFFER* a, const CRYPTO_BUFFER* b) {
                 CRYPTO_BUFFER_len(a)) == 0;
 }
 
-base::StringPiece CryptoBufferAsStringPiece(const CRYPTO_BUFFER* buffer) {
-  return base::StringPiece(
+std::string_view CryptoBufferAsStringPiece(const CRYPTO_BUFFER* buffer) {
+  return std::string_view(
       reinterpret_cast<const char*>(CRYPTO_BUFFER_data(buffer)),
       CRYPTO_BUFFER_len(buffer));
 }
@@ -472,7 +533,7 @@ bssl::ParseCertificateOptions DefaultParseCertificateOptions() {
 }
 
 bool CalculateSha256SpkiHash(const CRYPTO_BUFFER* buffer, HashValue* hash) {
-  base::StringPiece spki;
+  std::string_view spki;
   if (!asn1::ExtractSPKIFromDERCert(CryptoBufferAsStringPiece(buffer), &spki)) {
     return false;
   }
@@ -486,8 +547,7 @@ bool SignatureVerifierInitWithCertificate(
     crypto::SignatureVerifier::SignatureAlgorithm signature_algorithm,
     base::span<const uint8_t> signature,
     const CRYPTO_BUFFER* certificate) {
-  base::StringPiece cert_der =
-      x509_util::CryptoBufferAsStringPiece(certificate);
+  std::string_view cert_der = x509_util::CryptoBufferAsStringPiece(certificate);
 
   bssl::der::Input tbs_certificate_tlv;
   bssl::der::Input signature_algorithm_tlv;
@@ -518,9 +578,7 @@ bool SignatureVerifierInitWithCertificate(
     }
   }
 
-  return verifier->VerifyInit(
-      signature_algorithm, signature,
-      base::make_span(tbs.spki_tlv.UnsafeData(), tbs.spki_tlv.Length()));
+  return verifier->VerifyInit(signature_algorithm, signature, tbs.spki_tlv);
 }
 
 bool HasRsaPkcs1Sha1Signature(const CRYPTO_BUFFER* cert_buffer) {

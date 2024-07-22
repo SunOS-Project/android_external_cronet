@@ -30,6 +30,9 @@ NET_EXPORT BASE_DECLARE_FEATURE(kAvoidH2Reprioritization);
 // origin requests are restricted to contain at most the source origin.
 NET_EXPORT BASE_DECLARE_FEATURE(kCapReferrerToOriginOnCrossOrigin);
 
+// Enables the built-in DNS resolver.
+NET_EXPORT BASE_DECLARE_FEATURE(kAsyncDns);
+
 // Support for altering the parameters used for DNS transaction timeout. See
 // ResolveContext::SecureTransactionTimeout().
 NET_EXPORT BASE_DECLARE_FEATURE(kDnsTransactionDynamicTimeouts);
@@ -87,6 +90,18 @@ NET_EXPORT extern const base::FeatureParam<base::TimeDelta>
 // Update protocol using ALPN information in HTTPS DNS records.
 NET_EXPORT BASE_DECLARE_FEATURE(kUseDnsHttpsSvcbAlpn);
 
+// If enabled, HostResolver will use the new HostResolverCache that separately
+// caches by DNS type, unlike the old HostCache that always cached by merged
+// request results. May enable related behavior such as separately sorting DNS
+// results after each transaction rather than sorting collectively after all
+// transactions complete.
+NET_EXPORT BASE_DECLARE_FEATURE(kUseHostResolverCache);
+
+// Enables the DNS ServiceEndpointRequest API, which provides intermediate
+// service endpoints in the middle of a DNS transaction so that clients of this
+// API can attempt connections as soon as candidate endpoints are available.
+NET_EXPORT BASE_DECLARE_FEATURE(kUseServiceEndpointRequest);
+
 // If the `kUseAlternativePortForGloballyReachableCheck` flag is enabled, the
 // globally reachable check will use the port number specified by
 // `kAlternativePortForGloballyReachableCheck` flag. Otherwise, the globally
@@ -99,31 +114,8 @@ NET_EXPORT BASE_DECLARE_FEATURE(kUseAlternativePortForGloballyReachableCheck);
 // IP addresses.
 NET_EXPORT BASE_DECLARE_FEATURE(kEnableIPv6ReachabilityOverride);
 
-// If enabled allows the use of SHA-1 by the server for signatures
-// in the TLS handshake.
-NET_EXPORT BASE_DECLARE_FEATURE(kSHA1ServerSignature);
-
 // Enables TLS 1.3 early data.
 NET_EXPORT BASE_DECLARE_FEATURE(kEnableTLS13EarlyData);
-
-// Enables the TLS Encrypted ClientHello feature.
-// https://datatracker.ietf.org/doc/html/draft-ietf-tls-esni-13
-NET_EXPORT BASE_DECLARE_FEATURE(kEncryptedClientHello);
-
-// Enables the TLS Encrypted ClientHello feature for QUIC. Only takes effect if
-// kEncryptedClientHello is also enabled.
-//
-// TODO(crbug.com/1287248): Remove this flag when ECH for QUIC is fully
-// implemented. This flag is just a temporary mechanism for now.
-NET_EXPORT BASE_DECLARE_FEATURE(kEncryptedClientHelloQuic);
-
-// Enables checking the X.509 keyUsage extension in TLS 1.2 for RSA server
-// certificates that chain to a local trust anchor.
-//
-// Independent of the setting of this feature, keyUsage is always checked at TLS
-// 1.3, for ECDSA certificates, and for all certificates that chain to a known
-// root.
-NET_EXPORT BASE_DECLARE_FEATURE(kRSAKeyUsageForLocalAnchors);
 
 // Enables optimizing the network quality estimation algorithms in network
 // quality estimator (NQE).
@@ -217,11 +209,6 @@ NET_EXPORT BASE_DECLARE_FEATURE(kShortLaxAllowUnsafeThreshold);
 // This only has an effect if the cookie defaults to SameSite=Lax.
 NET_EXPORT BASE_DECLARE_FEATURE(kSameSiteDefaultChecksMethodRigorously);
 
-#if BUILDFLAG(CHROME_ROOT_STORE_OPTIONAL)
-// When enabled, use the Chrome Root Store instead of the system root store
-NET_EXPORT BASE_DECLARE_FEATURE(kChromeRootStoreUsed);
-#endif  // BUILDFLAG(CHROME_ROOT_STORE_OPTIONAL)
-
 // When enabled, bssl::TrustStore implementations will use TRUSTED_LEAF,
 // TRUSTED_ANCHOR_OR_LEAF, and TRUSTED_ANCHOR as appropriate. When disabled,
 // bssl::TrustStore implementation will only use TRUSTED_ANCHOR.
@@ -302,11 +289,14 @@ NET_EXPORT BASE_DECLARE_FEATURE(kCookieSameSiteConsidersRedirectChain);
 // cookies.
 NET_EXPORT BASE_DECLARE_FEATURE(kWaitForFirstPartySetsInit);
 
-// When enabled, sites can opt-in to having their cookies partitioned by
-// top-level site with the Partitioned attribute. Partitioned cookies will only
-// be sent when the browser is on the same top-level site that it was on when
-// the cookie was set.
-NET_EXPORT BASE_DECLARE_FEATURE(kPartitionedCookies);
+// Controls the maximum time duration an outermost frame navigation should be
+// deferred by RWS initialization.
+NET_EXPORT extern const base::FeatureParam<base::TimeDelta>
+    kWaitForFirstPartySetsInitNavigationThrottleTimeout;
+
+// When enabled, a cross-site ancestor chain bit is included in the partition
+// key in partitioned cookies.
+NET_EXPORT BASE_DECLARE_FEATURE(kAncestorChainBitEnabledInPartitionedCookies);
 
 // When enabled, cookie-related code will treat cookies containing '\0', '\r',
 // and '\n' as invalid and reject the cookie.
@@ -321,12 +311,18 @@ NET_EXPORT BASE_DECLARE_FEATURE(kCookieDomainRejectNonASCII);
 NET_EXPORT BASE_DECLARE_FEATURE(kThirdPartyStoragePartitioning);
 NET_EXPORT BASE_DECLARE_FEATURE(kSupportPartitionedBlobUrl);
 
-// Feature to enable consideration of 3PCD Support settings.
-NET_EXPORT BASE_DECLARE_FEATURE(kTpcdSupportSettings);
+// Feature to enable consideration of 3PC deprecation trial settings.
+NET_EXPORT BASE_DECLARE_FEATURE(kTpcdTrialSettings);
+
+// Feature to enable consideration of top-level 3PC deprecation trial settings.
+NET_EXPORT BASE_DECLARE_FEATURE(kTopLevelTpcdTrialSettings);
 
 // Whether to enable the use of 3PC based on 3PCD metadata grants delivered via
 // component updater.
 NET_EXPORT BASE_DECLARE_FEATURE(kTpcdMetadataGrants);
+
+// Whether to enable staged rollback of the TPCD Metadata Entries.
+NET_EXPORT BASE_DECLARE_FEATURE(kTpcdMetadataStagedRollback);
 
 // Whether ALPS parsing is on for any type of frame.
 NET_EXPORT BASE_DECLARE_FEATURE(kAlpsParsing);
@@ -412,22 +408,63 @@ NET_EXPORT extern const base::FeatureParam<base::TimeDelta>
 NET_EXPORT extern const base::FeatureParam<base::TimeDelta>
     kIpPrivacyProxyListMinFetchInterval;
 
+// Overrides the ProxyA hostname normally set by the proxylist fetch.
+NET_EXPORT extern const base::FeatureParam<std::string>
+    kIpPrivacyProxyAHostnameOverride;
+
+// Overrides the ProxyB hostname normally set by the proxylist fetch.
+NET_EXPORT extern const base::FeatureParam<std::string>
+    kIpPrivacyProxyBHostnameOverride;
+
 // Controls whether IP Protection _proxying_ is bypassed by not including any
 // of the proxies in the proxy list. This supports experimental comparison of
 // connections that _would_ have been proxied, but were not.
 NET_EXPORT extern const base::FeatureParam<bool> kIpPrivacyDirectOnly;
 
-// Controls whether the BlindSignAuth library used by IP Protection should use
-// the privacy pass token format.
-NET_EXPORT extern const base::FeatureParam<bool> kIpPrivacyBsaEnablePrivacyPass;
-
 // The PSK added to connections to proxyB with `Proxy-Authorization: Preshared
 // $PSK`.
 NET_EXPORT extern const base::FeatureParam<std::string> kIpPrivacyProxyBPsk;
 
-// If true, use the `proxy_chains` provided by Phosphor. Otherwise, use the
-// `first_hop_hostnames` (and thus always single-proxy chains).
-NET_EXPORT extern const base::FeatureParam<bool> kIpPrivacyUseProxyChains;
+// If true, pass OAuth token to Phosphor in GetProxyConfig API for IP
+// Protection.
+NET_EXPORT extern const base::FeatureParam<bool>
+    kIpPrivacyIncludeOAuthTokenInGetProxyConfig;
+
+// Controls whether a header ("IP-Protection: 1") should be added to proxied
+// network requests.
+NET_EXPORT extern const base::FeatureParam<bool>
+    kIpPrivacyAddHeaderToProxiedRequests;
+
+// Token expirations will have a random time between 5 seconds and this delta
+// subtracted from their expiration, in order to even out the load on the token
+// servers.
+NET_EXPORT extern const base::FeatureParam<base::TimeDelta>
+    kIpPrivacyExpirationFuzz;
+
+// If true, only proxy traffic when the top-level site uses the http:// or
+// https:// schemes. This prevents attempts to proxy from top-level sites with
+// chrome://, chrome-extension://, or other non-standard schemes, in addition to
+// top-level sites using less common schemes like blob:// and data://.
+NET_EXPORT extern const base::FeatureParam<bool>
+    kIpPrivacyRestrictTopLevelSiteSchemes;
+
+// If true, IP protection will attempt to use QUIC to connect to proxies,
+// falling back to HTTPS.  If false, it will only use HTTPs.
+NET_EXPORT extern const base::FeatureParam<bool> kIpPrivacyUseQuicProxies;
+
+// If true, IP protection will only use QUIC to connect to proxies, with no
+// fallback to HTTPS. This is intended for development of the QUIC
+// functionality.
+NET_EXPORT extern const base::FeatureParam<bool> kIpPrivacyUseQuicProxiesOnly;
+
+// Truncate IP protection proxy chains to a single proxy. This is intended for
+// development of the QUIC functionality.
+NET_EXPORT extern const base::FeatureParam<bool> kIpPrivacyUseSingleProxy;
+
+// Send all traffic to this host via IP Protection proxies, regardless of MDL,
+// 1P/3P, or token availability. This is intended for development of the QUIC
+// functionality.
+NET_EXPORT extern const base::FeatureParam<std::string> kIpPrivacyAlwaysProxy;
 
 // Whether QuicParams::migrate_sessions_on_network_change_v2 defaults to true or
 // false. This is needed as a workaround to set this value to true on Android
@@ -452,8 +489,17 @@ NET_EXPORT BASE_DECLARE_FEATURE(kEnablePortBoundCookies);
 // enables domain cookie shadowing protection.
 NET_EXPORT BASE_DECLARE_FEATURE(kEnableSchemeBoundCookies);
 
+// Enables expiration duration limit (3 hours) for cookies on insecure websites.
+// This feature is a no-op unless kEnableSchemeBoundCookies is enabled.
+NET_EXPORT BASE_DECLARE_FEATURE(kTimeLimitedInsecureCookies);
+
 // Enables enabling third-party cookie blocking from the command line.
 NET_EXPORT BASE_DECLARE_FEATURE(kForceThirdPartyCookieBlocking);
+
+// Enables an exception for third-party cookie blocking when the request is
+// same-site with the top-level document, opted into CORS, but embedded in a
+// cross-site context.
+NET_EXPORT BASE_DECLARE_FEATURE(kThirdPartyCookieTopLevelSiteCorsException);
 
 // Enables Early Hints on HTTP/1.1.
 NET_EXPORT BASE_DECLARE_FEATURE(kEnableEarlyHintsOnHttp11);
@@ -476,16 +522,32 @@ NET_EXPORT BASE_DECLARE_FEATURE(kSpdyHeadersToHttpResponseUseBuilder);
 // Enables receiving ECN bit by sockets in Chrome.
 NET_EXPORT BASE_DECLARE_FEATURE(kReceiveEcn);
 
-NET_EXPORT BASE_DECLARE_FEATURE(kNewCertPathBuilderIterationLimit);
+// Enables using the new ALPS codepoint to negotiate application settings for
+// HTTP2.
+NET_EXPORT BASE_DECLARE_FEATURE(kUseNewAlpsCodepointHttp2);
 
-// Enables using the new ALPS codepoint to negotiate application settings.
-NET_EXPORT BASE_DECLARE_FEATURE(kUseAlpsNewCodepoint);
+// Enables using the new ALPS codepoint to negotiate application settings for
+// QUIC.
+NET_EXPORT BASE_DECLARE_FEATURE(kUseNewAlpsCodepointQUIC);
 
 // Treat HTTP header `Expires: "0"` as expired value according section 5.3 on
 // RFC 9111.
 // TODO(https://crbug.com/853508): Remove after the bug fix will go well for a
 // while on stable channels.
 NET_EXPORT BASE_DECLARE_FEATURE(kTreatHTTPExpiresHeaderValueZeroAsExpired);
+
+// Enables truncating the response body to the content length.
+NET_EXPORT BASE_DECLARE_FEATURE(kTruncateBodyToContentLength);
+
+#if BUILDFLAG(IS_MAC)
+// Reduces the frequency of IP address change notifications that result in
+// TCP and QUIC connection resets.
+NET_EXPORT BASE_DECLARE_FEATURE(kReduceIPAddressChangeNotification);
+#endif  // BUILDFLAG(IS_MAC)
+
+// This feature will enable the Device Bound Session Credentials protocol to let
+// the server assert sessions (and cookies) are bound to a specific device.
+NET_EXPORT BASE_DECLARE_FEATURE(kDeviceBoundSessions);
 
 }  // namespace net::features
 

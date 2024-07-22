@@ -46,12 +46,8 @@ public final class CronetManifest {
     @VisibleForTesting
     static final String ENABLE_TELEMETRY_META_DATA_KEY = "android.net.http.EnableTelemetry";
 
-    // DO NOT ENABLE this manifest flag in production apps. The code gated behind this flag is not
-    // ready yet.
-    // TODO: remove the "Experimental" prefix once the code for reading HTTP flags is ready.
     @VisibleForTesting
-    public static final String READ_HTTP_FLAGS_META_DATA_KEY =
-            "android.net.http.EXPERIMENTAL_ReadHttpFlags";
+    public static final String READ_HTTP_FLAGS_META_DATA_KEY = "android.net.http.ReadHttpFlags";
 
     /**
      * @return True if telemetry should be enabled, based on the {@link
@@ -72,9 +68,7 @@ public final class CronetManifest {
      * @see HttpFlagsLoader
      */
     public static boolean shouldReadHttpFlags(Context context) {
-        // TODO: switch the default to true once we confirm the HTTP flags system is working as
-        // intended.
-        return getMetaData(context).getBoolean(READ_HTTP_FLAGS_META_DATA_KEY, /* default= */ false);
+        return getMetaData(context).getBoolean(READ_HTTP_FLAGS_META_DATA_KEY, /* default= */ true);
     }
 
     /**
@@ -92,7 +86,9 @@ public final class CronetManifest {
                                             | PackageManager.MATCH_DISABLED_COMPONENTS
                                             | PackageManager.MATCH_DIRECT_BOOT_AWARE
                                             | PackageManager.MATCH_DIRECT_BOOT_UNAWARE);
-        } catch (PackageManager.NameNotFoundException e) {
+        } catch (PackageManager.NameNotFoundException | NullPointerException e) {
+            // TODO(b/331573772): Consider removing this NPE check once we can check for
+            // CRONET_SOURCE_FAKE when creating logger.
             serviceInfo = null;
         }
         return serviceInfo != null ? serviceInfo.metaData : new Bundle();

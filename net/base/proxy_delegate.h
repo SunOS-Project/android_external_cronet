@@ -20,6 +20,7 @@ namespace net {
 class HttpRequestHeaders;
 class HttpResponseHeaders;
 class ProxyInfo;
+class ProxyResolutionService;
 
 // Delegate for setting up a connection.
 class NET_EXPORT ProxyDelegate {
@@ -47,7 +48,17 @@ class NET_EXPORT ProxyDelegate {
   // network error encountered, if any, and OK if the fallback was for a reason
   // other than a network error (e.g. the proxy service was explicitly directed
   // to skip a proxy).
+  //
+  // This method is called for each bad chain in the proxy list after a request
+  // has ultimately been successful. If the request fails for all proxies in the
+  // list, this method will not be called.
   virtual void OnFallback(const ProxyChain& bad_chain, int net_error) = 0;
+
+  // Called when a request is successful after failing with one or more proxy
+  // chains in the list. This is called before OnFallback is called for each new
+  // failing proxy chain.
+  virtual void OnSuccessfulRequestAfterFailures(
+      const ProxyRetryInfoMap& proxy_retry_info) = 0;
 
   // Called immediately before a proxy tunnel request is sent. Provides the
   // embedder an opportunity to add extra request headers.
@@ -66,20 +77,10 @@ class NET_EXPORT ProxyDelegate {
       size_t chain_index,
       const HttpResponseHeaders& response_headers) = 0;
 
-  void OnBeforeTunnelRequestServerOnly(const ProxyChain& proxy_chain,
-                                       size_t proxy_chain_index,
-                                       HttpRequestHeaders* extra_headers) {
-    DCHECK(!proxy_chain.is_direct());
-    OnBeforeTunnelRequest(proxy_chain, proxy_chain_index, extra_headers);
-  }
-
-  Error OnTunnelHeadersReceivedServerOnly(
-      const ProxyChain& proxy_chain,
-      size_t proxy_chain_index,
-      const HttpResponseHeaders& response_headers) {
-    return OnTunnelHeadersReceived(proxy_chain, proxy_chain_index,
-                                   response_headers);
-  }
+  // Associates a `ProxyResolutionService` with this `ProxyDelegate`.
+  // `proxy_resolution_service` must outlive `this`.
+  virtual void SetProxyResolutionService(
+      ProxyResolutionService* proxy_resolution_service) = 0;
 };
 
 }  // namespace net

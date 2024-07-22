@@ -11,6 +11,7 @@
 #include <string.h>
 
 #include <memory>
+#include <string_view>
 
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
@@ -103,7 +104,7 @@ crypto::ScopedPK11Slot GetNssBuiltInRootCertsSlot() {
 }  // namespace
 
 bool ImportSensitiveKeyFromFile(const base::FilePath& dir,
-                                base::StringPiece key_filename,
+                                std::string_view key_filename,
                                 PK11SlotInfo* slot) {
   base::FilePath key_path = dir.AppendASCII(key_filename);
   std::string key_pkcs8;
@@ -114,9 +115,9 @@ bool ImportSensitiveKeyFromFile(const base::FilePath& dir,
   }
 
   crypto::ScopedSECKEYPrivateKey private_key(
-      crypto::ImportNSSKeyFromPrivateKeyInfo(
-          slot, base::as_bytes(base::make_span(key_pkcs8)),
-          /*permanent=*/true));
+      crypto::ImportNSSKeyFromPrivateKeyInfo(slot,
+                                             base::as_byte_span(key_pkcs8),
+                                             /*permanent=*/true));
   LOG_IF(ERROR, !private_key)
       << "Could not create key from file " << key_path.value();
   return !!private_key;
@@ -150,8 +151,8 @@ ScopedCERTCertificate ImportClientCertToSlot(
 
 scoped_refptr<X509Certificate> ImportClientCertAndKeyFromFile(
     const base::FilePath& dir,
-    base::StringPiece cert_filename,
-    base::StringPiece key_filename,
+    std::string_view cert_filename,
+    std::string_view key_filename,
     PK11SlotInfo* slot,
     ScopedCERTCertificate* nss_cert) {
   if (!ImportSensitiveKeyFromFile(dir, key_filename, slot)) {
@@ -178,8 +179,8 @@ scoped_refptr<X509Certificate> ImportClientCertAndKeyFromFile(
 
 scoped_refptr<X509Certificate> ImportClientCertAndKeyFromFile(
     const base::FilePath& dir,
-    base::StringPiece cert_filename,
-    base::StringPiece key_filename,
+    std::string_view cert_filename,
+    std::string_view key_filename,
     PK11SlotInfo* slot) {
   ScopedCERTCertificate nss_cert;
   return ImportClientCertAndKeyFromFile(dir, cert_filename, key_filename, slot,
@@ -188,7 +189,7 @@ scoped_refptr<X509Certificate> ImportClientCertAndKeyFromFile(
 
 ScopedCERTCertificate ImportCERTCertificateFromFile(
     const base::FilePath& certs_dir,
-    base::StringPiece cert_file) {
+    std::string_view cert_file) {
   scoped_refptr<X509Certificate> cert =
       ImportCertFromFile(certs_dir, cert_file);
   if (!cert)
@@ -198,7 +199,7 @@ ScopedCERTCertificate ImportCERTCertificateFromFile(
 
 ScopedCERTCertificateList CreateCERTCertificateListFromFile(
     const base::FilePath& certs_dir,
-    base::StringPiece cert_file,
+    std::string_view cert_file,
     int format) {
   CertificateList certs =
       CreateCertificateListFromFile(certs_dir, cert_file, format);
