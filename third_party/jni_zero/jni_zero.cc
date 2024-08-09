@@ -27,7 +27,17 @@ jclass GetClassInternal(JNIEnv* env,
   if (g_class_resolver != nullptr) {
     clazz = g_class_resolver(env, class_name, split_name);
   } else {
-    clazz = env->FindClass(class_name);
+    // Our generated code uses dots instead of slashes for ease of use with
+    // ClassLoader.loadCLass, so convert this.
+    size_t bufsize = strlen(class_name) + 1;
+    char slash_name[bufsize];
+    memmove(slash_name, class_name, bufsize);
+    for (size_t i = 0; i < bufsize; ++i) {
+      if (slash_name[i] == '.') {
+        slash_name[i] = '/';
+      }
+    }
+    clazz = env->FindClass(slash_name);
   }
   if (ClearException(env) || !clazz) {
     JNI_ZERO_FLOG("Failed to find class %s", class_name);
