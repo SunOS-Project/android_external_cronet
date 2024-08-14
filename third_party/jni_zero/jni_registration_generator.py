@@ -391,7 +391,7 @@ ${REGISTER_NATIVES}
       'ESCAPED_PROXY_CLASS':
       common.escape_class_name(gen_jni_class.full_name_with_slashes),
       'PROXY_CLASS':
-      gen_jni_class.full_name_with_slashes,
+      gen_jni_class.full_name_with_slashes.replace("/", "."),
       'KMETHODS':
       registration_dict['PROXY_NATIVE_METHOD_ARRAY'],
       'REGISTRATION_NAME':
