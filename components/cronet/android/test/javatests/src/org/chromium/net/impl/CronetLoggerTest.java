@@ -760,15 +760,11 @@ public final class CronetLoggerTest {
     @Test
     @SmallTest
     public void testNonEmptyHeadersSizeNative() {
-        Map<String, List<String>> headers =
-                new HashMap<String, List<String>>() {
-                    {
-                        put("header1", Arrays.asList("value1", "value2")); // 7 + 6 + 6 = 19
-                        put("header2", null); // 19 + 7 = 26
-                        put("header3", Collections.emptyList()); // 26 + 7 + 0 = 33
-                        put(null, Arrays.asList("")); // 33 + 0 + 0 = 33
-                    }
-                };
+        Map<String, List<String>> headers = new HashMap<>();
+        headers.put("header1", Arrays.asList("value1", "value2")); // 7 + 6 + 6 = 19
+        headers.put("header2", null); // 19 + 7 = 26
+        headers.put("header3", Collections.emptyList()); // 26 + 7 + 0 = 33
+        headers.put(null, Arrays.asList("")); // 33 + 0 + 0 = 33
         assertThat(CronetUrlRequest.estimateHeadersSizeInBytes(headers)).isEqualTo(33);
 
         CronetUrlRequest.HeadersList headersList = new CronetUrlRequest.HeadersList();
