@@ -215,3 +215,8 @@ java_defaults {
     ],
     sdk_version: "module_current",
 }
+
+filegroup {
+  name: "license_data",
+  srcs: ["**/README.chromium", "**/MODULE_LICENSE_*", "**/LICENSE", "**/METADATA"]
+}
