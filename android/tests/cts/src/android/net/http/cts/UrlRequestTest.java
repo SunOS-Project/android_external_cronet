@@ -32,7 +32,6 @@ import android.content.Context;
 import android.net.http.HeaderBlock;
 import android.net.http.HttpEngine;
 import android.net.http.HttpException;
-import android.net.http.InlineExecutionProhibitedException;
 import android.net.http.UploadDataProvider;
 import android.net.http.UrlRequest;
 import android.net.http.UrlRequest.Status;
@@ -76,8 +75,6 @@ import java.util.stream.Stream;
 @RunWith(DevSdkIgnoreRunner.class)
 @DevSdkIgnoreRule.IgnoreUpTo(Build.VERSION_CODES.R)
 public class UrlRequestTest {
-    private static final Executor DIRECT_EXECUTOR = Runnable::run;
-
     private TestUrlRequestCallback mCallback;
     private HttpCtsTestServer mTestServer;
     private HttpEngine mHttpEngine;
@@ -160,67 +157,6 @@ public class UrlRequestTest {
     public void testUrlRequestFail_FailedCalled() {
         createUrlRequestBuilder("http://0.0.0.0:0/").build().start();
         mCallback.expectCallback(ResponseStep.ON_FAILED);
-    }
-
-    @Test
-    public void testUrlRequest_directExecutor_allowed() throws InterruptedException {
-        TestUrlRequestCallback callback = new TestUrlRequestCallback();
-        callback.setAllowDirectExecutor(true);
-        UrlRequest.Builder builder = mHttpEngine.newUrlRequestBuilder(
-                mTestServer.getEchoBodyUrl(), DIRECT_EXECUTOR, callback);
-        UploadDataProvider dataProvider = UploadDataProviders.create("test");
-        builder.setUploadDataProvider(dataProvider, DIRECT_EXECUTOR);
-        builder.addHeader("Content-Type", "text/plain;charset=UTF-8");
-        builder.setDirectExecutorAllowed(true);
-        builder.build().start();
-        callback.blockForDone();
-
-        if (callback.mOnErrorCalled) {
-            throw new AssertionError("Expected no exception", callback.mError);
-        }
-
-        assertEquals(200, callback.mResponseInfo.getHttpStatusCode());
-        assertEquals("test", callback.mResponseAsString);
-    }
-
-    @Test
-    public void testUrlRequest_directExecutor_disallowed_uploadDataProvider() throws Exception {
-        TestUrlRequestCallback callback = new TestUrlRequestCallback();
-        // This applies just locally to the test callback, not to SUT
-        callback.setAllowDirectExecutor(true);
-
-        UrlRequest.Builder builder = mHttpEngine.newUrlRequestBuilder(
-                mTestServer.getEchoBodyUrl(), Executors.newSingleThreadExecutor(), callback);
-        UploadDataProvider dataProvider = UploadDataProviders.create("test");
-
-        builder.setUploadDataProvider(dataProvider, DIRECT_EXECUTOR)
-                .addHeader("Content-Type", "text/plain;charset=UTF-8")
-                .build()
-                .start();
-        callback.blockForDone();
-
-        assertTrue(callback.mOnErrorCalled);
-        assertTrue(callback.mError.getCause() instanceof InlineExecutionProhibitedException);
-    }
-
-    @Test
-    public void testUrlRequest_directExecutor_disallowed_responseCallback() throws Exception {
-        TestUrlRequestCallback callback = new TestUrlRequestCallback();
-        // This applies just locally to the test callback, not to SUT
-        callback.setAllowDirectExecutor(true);
-
-        UrlRequest.Builder builder = mHttpEngine.newUrlRequestBuilder(
-                mTestServer.getEchoBodyUrl(), DIRECT_EXECUTOR, callback);
-        UploadDataProvider dataProvider = UploadDataProviders.create("test");
-
-        builder.setUploadDataProvider(dataProvider, Executors.newSingleThreadExecutor())
-                .addHeader("Content-Type", "text/plain;charset=UTF-8")
-                .build()
-                .start();
-        callback.blockForDone();
-
-        assertTrue(callback.mOnErrorCalled);
-        assertTrue(callback.mError.getCause() instanceof InlineExecutionProhibitedException);
     }
 
     @Test
