@@ -189,12 +189,12 @@ android_library {
         "truth",
     ],
     libs: [
-        "android.test.base",
+        "android.test.base.stubs.system",
         "cronet_aml_api_java",
-        "framework-connectivity",
+        "framework-connectivity.stubs.module_lib",
         "framework-connectivity-pre-jarjar",
         // android.net.TrafficStats apis
-        "framework-connectivity-t",
+        "framework-connectivity-t.stubs.module_lib",
         "guava",
     ],
     lint: { test: true },
