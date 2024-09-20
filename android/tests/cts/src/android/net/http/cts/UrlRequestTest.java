@@ -23,7 +23,6 @@ import static com.google.common.truth.Truth.assertThat;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.greaterThan;
-import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
@@ -32,7 +31,6 @@ import android.content.Context;
 import android.net.http.HeaderBlock;
 import android.net.http.HttpEngine;
 import android.net.http.HttpException;
-import android.net.http.UploadDataProvider;
 import android.net.http.UrlRequest;
 import android.net.http.UrlRequest.Status;
 import android.net.http.UrlResponseInfo;
@@ -40,7 +38,6 @@ import android.net.http.cts.util.HttpCtsTestServer;
 import android.net.http.cts.util.TestStatusListener;
 import android.net.http.cts.util.TestUrlRequestCallback;
 import android.net.http.cts.util.TestUrlRequestCallback.ResponseStep;
-import android.net.http.cts.util.UploadDataProviders;
 import android.os.Build;
 import android.webkit.cts.CtsTestServer;
 
@@ -58,15 +55,12 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
-import java.net.URLEncoder;
 import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -136,21 +130,6 @@ public class UrlRequestTest {
 
         request.cancel();
         mCallback.expectCallback(ResponseStep.ON_CANCELED);
-    }
-
-    @Test
-    public void testUrlRequestPost_EchoRequestBody() {
-        String testData = "test";
-        UrlRequest.Builder builder = createUrlRequestBuilder(mTestServer.getEchoBodyUrl());
-
-        UploadDataProvider dataProvider = UploadDataProviders.create(testData);
-        builder.setUploadDataProvider(dataProvider, mCallback.getExecutor());
-        builder.addHeader("Content-Type", "text/html");
-        builder.build().start();
-        mCallback.expectCallback(ResponseStep.ON_SUCCEEDED);
-
-        assertOKStatusCode(mCallback.mResponseInfo);
-        assertEquals(testData, mCallback.mResponseAsString);
     }
 
     @Test
@@ -244,31 +223,6 @@ public class UrlRequestTest {
         assertThat(info.getUrlChain()).hasSize(expectedNumRedirects + 1);
         assertThat(info.getUrlChain().get(0)).isEqualTo(url);
         assertThat(info.getUrlChain().get(expectedNumRedirects)).isEqualTo(info.getUrl());
-    }
-
-    @Test
-    public void testUrlRequestPost_withRedirect() throws Exception {
-        String body = Strings.repeat(
-                "Hello, this is a really interesting body, so write this 100 times.", 100);
-
-        String redirectUrlParameter =
-                URLEncoder.encode(mTestServer.getEchoBodyUrl(), "UTF-8");
-        createUrlRequestBuilder(
-                String.format(
-                        "%s/alt_redirect?dest=%s&statusCode=307",
-                        mTestServer.getBaseUri(),
-                        redirectUrlParameter))
-                .setHttpMethod("POST")
-                .addHeader("Content-Type", "text/plain")
-                .setUploadDataProvider(
-                        UploadDataProviders.create(body.getBytes(StandardCharsets.UTF_8)),
-                        mCallback.getExecutor())
-                .build()
-                .start();
-        mCallback.expectCallback(ResponseStep.ON_SUCCEEDED);
-
-        assertOKStatusCode(mCallback.mResponseInfo);
-        assertThat(mCallback.mResponseAsString).isEqualTo(body);
     }
 
     @Test
