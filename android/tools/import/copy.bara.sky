@@ -16,11 +16,15 @@ common_excludes = [
     # Exclude all Android build files
     "**/Android.bp",
     "**/Android.mk",
+    # Remove Bazel BUILD files as they are recognized in AOSP (roboleaf).
+    "**/BUILD",
 
     # Exclude existing *OWNERS files
     "**/*OWNERS",
     "**/.git/**",
     "**/.gitignore",
+    "**/.gitmodules",
+    "**/.github/**",
 ]
 
 cronet_origin_files = glob(
@@ -116,6 +120,7 @@ cronet_origin_files = glob(
         "third_party/quic_trace/**",
         # Note: Only used for tests.
         "third_party/re2/**",
+        "third_party/rust/**",
         # Note: Cronet currently uses Android's zlib
         # "third_party/zlib/**",
         "url/third_party/mozilla/**",
