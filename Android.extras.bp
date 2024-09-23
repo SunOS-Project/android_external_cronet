@@ -189,12 +189,12 @@ android_library {
         "truth",
     ],
     libs: [
-        "android.test.base",
+        "android.test.base.stubs.system",
         "cronet_aml_api_java",
-        "framework-connectivity",
+        "framework-connectivity.stubs.module_lib",
         "framework-connectivity-pre-jarjar",
         // android.net.TrafficStats apis
-        "framework-connectivity-t",
+        "framework-connectivity-t.stubs.module_lib",
         "guava",
     ],
     lint: { test: true },
@@ -203,3 +203,23 @@ android_library {
     ],
 }
 
+java_defaults {
+    name: "cronet_aml_java_framework_defaults",
+    libs: [
+        "framework-connectivity-pre-jarjar-without-cronet",
+        "framework-connectivity-t.stubs.module_lib",
+        "framework-location.stubs.module_lib",
+        "framework-mediaprovider.stubs.module_lib",
+        "framework-statsd.stubs.module_lib",
+        "framework-wifi.stubs.module_lib",
+    ],
+    sdk_version: "module_current",
+    visibility: [
+        "//external/cronet:__subpackages__",
+    ],
+}
+
+filegroup {
+  name: "license_data",
+  srcs: ["**/README.chromium", "**/MODULE_LICENSE_*", "**/LICENSE", "**/METADATA"]
+}

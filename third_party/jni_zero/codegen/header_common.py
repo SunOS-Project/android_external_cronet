@@ -14,6 +14,7 @@ def class_accessors(java_classes, module_name):
     if java_class in (java_types.OBJECT_CLASS, java_types.STRING_CLASS):
       continue
     escaped_name = common.escape_class_name(java_class.full_name_with_slashes)
+    name_with_dots = java_class.full_name_with_slashes.replace("/", ".")
     # #ifdef needed when multple .h files are #included that common classes.
     sb.append(f"""\
 #ifndef {escaped_name}_clazz_defined
@@ -24,7 +25,7 @@ def class_accessors(java_classes, module_name):
     # size).
     sb.append(f"""\
 inline jclass {escaped_name}_clazz(JNIEnv* env) {{
-  static const char kClassName[] = "{java_class.full_name_with_slashes}";
+  static const char kClassName[] = "{name_with_dots}";
   static std::atomic<jclass> cached_class;
   return jni_zero::internal::LazyGetClass(env, kClassName, {split_arg}&cached_class);
 }}
