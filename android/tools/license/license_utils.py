@@ -170,6 +170,6 @@ def resolve_license_path(repo_path: str, license_path: str) -> str:
     # repository, we should not use the directory path for resolution here.
     # See https://source.chromium.org/chromium/chromium/src/+/main:third_party/rust/bytes/v1/README.chromium as
     # an example of such case.
-    return os.path.abspath(os.path.relpath(license_path[2:], repo_path))
+    return os.path.join(repo_path, license_path[2:])
   # Relative path from the README.chromium, return as-is.
   return license_path
