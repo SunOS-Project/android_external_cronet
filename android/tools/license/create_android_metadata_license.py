@@ -72,7 +72,11 @@ def _maybe_create_license_file_symlink(directory_path: str,
       raise Exception(
           f"License symlink does not exist for {license_symlink_path}")
   else:
-    os.symlink(original_license_file, license_symlink_path)
+    # license_symlink_path.relative_to(.., walk_up=True) does not exist in
+    # Python 3.10, this is the reason why os.path.relpath is used.
+    os.symlink(
+        os.path.relpath(original_license_file, license_symlink_path.parent),
+        license_symlink_path)
 
 
 def _map_rust_license_path_to_directory(license_file_path: str) -> str:
@@ -140,14 +144,14 @@ def update_license(repo_path: str = _ROOT_CRONET,
       # We must do a mapping as Chromium stores the README.chromium
       # in a different directory than where the src/LICENSE is stored.
       license_directory = os.path.join(repo_path,
-                                      _map_rust_license_path_to_directory(
-                                          metadata.get_license_file_path()))
+                                       _map_rust_license_path_to_directory(
+                                           metadata.get_license_file_path()))
 
     if metadata.get_license_type() != LicenseType.UNENCUMBERED:
       # Unencumbered license are public domains or don't have a license.
       _maybe_create_license_file_symlink(license_directory,
                                          license_utils.resolve_license_path(
-                                             repo_path,
+                                             readme_directory,
                                              metadata.get_license_file_path()),
                                          verify_only)
     _create_module_license_file(repo_path, license_directory,

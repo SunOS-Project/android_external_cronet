@@ -164,12 +164,15 @@ def parse_chromium_readme_file(readme_path: str,
   return metadata
 
 
-def resolve_license_path(repo_path: str, license_path: str) -> str:
+def resolve_license_path(readme_chromium_path: str,
+    license_path: str) -> str:
   if license_path.startswith("//"):
-    # This is an absolute path that starts from the root of external/cronet
+    # This is an relative path that starts from the root of external/cronet
     # repository, we should not use the directory path for resolution here.
     # See https://source.chromium.org/chromium/chromium/src/+/main:third_party/rust/bytes/v1/README.chromium as
     # an example of such case.
-    return os.path.join(repo_path, license_path[2:])
-  # Relative path from the README.chromium, return as-is.
-  return license_path
+    return license_path[2:]
+  # Relative path from the README.chromium, append the path from root of repo
+  # until the README.chromium so it becomes a relative path from the root of
+  # repo.
+  return os.path.join(readme_chromium_path, license_path)

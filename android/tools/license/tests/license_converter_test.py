@@ -190,6 +190,9 @@ class LicenseParserTest(unittest.TestCase):
       self.assertRegex(
           metadata_content,
           "license_type: NOTICE")
+      # Verify that the symlink is relative and not absolute path.
+      self.assertFalse(
+          os.readlink(os.path.join(crate_path, "LICENSE")).startswith("/"))
 
   def test_generate_license_for_temp_dir(self):
     with tempfile.TemporaryDirectory() as temp_directory:
