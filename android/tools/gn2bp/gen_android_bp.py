@@ -108,6 +108,16 @@ BLUEPRINTS_MAPPING = {
     "buildtools/third_party/libc++abi": "third_party/libc++abi",
 }
 
+# Usually, README.chromium lives next to the BUILD.gn. However, some cases are
+# different, this dictionary allows setting a specific README.chromium path
+# for a specific BUILD.gn
+README_MAPPING = {
+    # Moving is undergoing, see crbug/40273848
+    "buildtools/third_party/libc++": "third_party/libc++",
+    # Moving is undergoing, see crbug/40273848
+    "buildtools/third_party/libc++abi": "third_party/libc++abi",
+}
+
 # Include directories that will be removed from all targets.
 include_dirs_denylist = [
     'external/cronet/third_party/zlib/',
@@ -854,8 +864,11 @@ class Module(object):
 class Blueprint(object):
   """In-memory representation of an Android.bp file."""
 
-  def __init__(self):
+  def __init__(self, buildgn_directory_path: str = ""):
     self.modules = {}
+    # Holds the BUILD.gn path which resulted in the creation of this Android.bp.
+    self._buildgn_directory_path = buildgn_directory_path
+    self._readme_location = buildgn_directory_path
     self._package_module = None
     self._license_module = None
 
@@ -876,6 +889,15 @@ class Blueprint(object):
 
   def get_license_module(self):
     return self._license_module
+
+  def set_readme_location(self, readme_path: str):
+    self._readme_location = readme_path
+
+  def get_readme_location(self):
+    return self._readme_location
+
+  def get_buildgn_location(self):
+    return self._buildgn_directory_path
 
   def to_string(self):
     ret = []
@@ -2334,6 +2356,19 @@ def create_blueprint_for_targets(gn, targets, test_targets):
 
   return blueprint
 
+def _rebase_file(filepath: str, blueprint_path: str) -> str | None:
+  """
+  Rebases a single file, this method delegates to _rebase_files
+
+  :param filepath: a single string representing filepath.
+  :param blueprint_path: Path for which the srcs will be rebased relative to.
+  :returns The rebased filepaths or None.
+  """
+  rebased_file = _rebase_files([filepath], blueprint_path)
+  if rebased_file:
+    return list(rebased_file)[0]
+  return None
+
 def _rebase_files(filepaths, parent_prefix):
   """
   Rebase a list of filepaths according to the provided path. This assumes
@@ -2364,9 +2399,11 @@ def _rebase_files(filepaths, parent_prefix):
     rebased_srcs.add(src[len(parent_prefix) + 1:])
   return rebased_srcs
 
-def _rebase_module(module: Module) -> Module | None:
+
+# TODO: Move to Module's class.
+def _rebase_module(module: Module, blueprint_path: str) -> Module | None:
   """
-  Rebases the module specified on top of the module's build file path.
+  Rebases the module specified on top of the blueprint_path if possible.
   If the rebase operation has failed, None is returned to indicate that the
   module should stay as a top-level module.
 
@@ -2377,15 +2414,27 @@ def _rebase_module(module: Module) -> Module | None:
   """
 
   module_copy = copy.deepcopy(module)
-  module_copy.srcs = _rebase_files(module_copy.srcs, module_copy.build_file_path)
-  module_copy.jars = _rebase_files(module_copy.jars, module_copy.build_file_path)
-  # Rebase srcs and arch-variant srcs.
-  if module_copy.srcs is None:
-    return None
+  # TODO: Find a better way to rebase attribute and verify if all rebase operations
+  # have succeeded or not.
+  if module_copy.crate_root:
+    module_copy.crate_root = _rebase_file(module_copy.crate_root,
+                                           blueprint_path)
+    if module_copy.crate_root is None:
+      return None
+
+  if module_copy.srcs:
+    module_copy.srcs = _rebase_files(module_copy.srcs, blueprint_path)
+    if module_copy.srcs is None:
+      return None
+
+  if module_copy.jars:
+    module_copy.jars = _rebase_files(module_copy.jars, blueprint_path)
+    if module_copy.jars is None:
+      return None
 
   for (arch_name, arch) in module_copy.target.items():
     module_copy.target[arch_name].srcs = (
-        _rebase_files(module_copy.target[arch_name].srcs, module_copy.build_file_path))
+        _rebase_files(module_copy.target[arch_name].srcs, blueprint_path))
     if module_copy.target[arch_name].srcs is None:
       return None
 
@@ -2468,21 +2517,58 @@ def finalize_package_modules(blueprints: Dict[str, Blueprint]):
 
     blueprint.set_package_module(package_module)
 
-def create_license_modules(blueprint_paths: List[str]) -> Dict[str, Module]:
+
+def create_license_modules(blueprints: Dict[str, Blueprint]) -> Dict[
+  str, Module]:
   """
   Creates license module (if possible) for each blueprint passed, a license
   module will be created if a README.chromium exists in the same directory as
-  the blueprint.
+  the BUILD.gn which created that blueprint.
+
+  Note: A blueprint can be in a different directory than where the BUILD.gn is
+  declared, this is the case in rust crates.
 
   :param blueprints: List of paths for all possible blueprints.
   :return: Dictionary of (path, license_module).
   """
   license_modules = {}
-  for path in blueprint_paths:
-    license_module = _maybe_create_license_module(path)
+  for blueprint_path, blueprint in blueprints.items():
+    if not blueprint.get_readme_location():
+      # Don't generate a license for the top-level Android.bp as this is handled
+      # manually in Android.extras.bp
+      continue
+
+    license_module = _maybe_create_license_module(blueprint.get_readme_location())
     if license_module:
-      license_modules[path] = license_module
+      license_modules[blueprint_path] = license_module
   return license_modules
+
+
+def _get_rust_crate_root_directory_from_crate_root(crate_root: str) -> str:
+  if crate_root and crate_root.startswith(
+      "third_party/rust/chromium_crates_io/vendor"):
+    # Return the first 5 directories (a/b/c/d/e)
+    crate_root_dir = crate_root.split("/")[:5]
+    return "/".join(crate_root_dir)
+  return None
+
+
+def _locate_android_bp_destination(module: Module) -> str:
+  """Returns the appropriate location of the generated Android.bp for the
+  specified module. Sometimes it is favourable to relocate the Android.bp to
+  a different location other than next to BUILD.gn (eg: rust's BUILD.gn are
+  defined in a different directory than the source code).
+
+  :returns the appropriate location for the blueprint
+  """
+  crate_root_dir = _get_rust_crate_root_directory_from_crate_root(
+      module.crate_root)
+  if module.build_file_path in BLUEPRINTS_MAPPING:
+    return BLUEPRINTS_MAPPING[module.build_file_path]
+  elif crate_root_dir:
+    return crate_root_dir
+  else:
+    return module.build_file_path
 
 def _break_down_blueprint(top_level_blueprint: Blueprint):
   """
@@ -2505,23 +2591,24 @@ def _break_down_blueprint(top_level_blueprint: Blueprint):
       blueprints[""].add_module(module)
       continue
 
-
-    if module.build_file_path is None:
+    android_bp_path = _locate_android_bp_destination(module)
+    if android_bp_path is None:
       # Raise an exception if the module does not specify a BUILD file path.
       raise Exception(f"Found module {module_name} without a build file path.")
 
-    if module.build_file_path in BLUEPRINTS_MAPPING:
-      module.build_file_path = BLUEPRINTS_MAPPING[module.build_file_path]
-
-    rebased_module = _rebase_module(module)
+    rebased_module = _rebase_module(module, android_bp_path)
     if rebased_module:
-      if not module.build_file_path in blueprints.keys():
-        blueprints[module.build_file_path] = Blueprint()
-      blueprints[module.build_file_path].add_module(rebased_module)
+      if not android_bp_path in blueprints.keys():
+        blueprints[android_bp_path] = Blueprint(module.build_file_path)
+      blueprints[android_bp_path].add_module(rebased_module)
     else:
       # Append to the top-level blueprint.
       blueprints[""].add_module(module)
 
+  for blueprint in blueprints.values():
+    if blueprint.get_buildgn_location() in README_MAPPING:
+      blueprint.set_readme_location(README_MAPPING[
+        blueprint.get_buildgn_location()])
   return blueprints
 
 def main():
