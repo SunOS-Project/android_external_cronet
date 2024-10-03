@@ -191,8 +191,9 @@ class LicenseParserTest(unittest.TestCase):
           metadata_content,
           "license_type: NOTICE")
       # Verify that the symlink is relative and not absolute path.
-      self.assertFalse(
-          os.readlink(os.path.join(crate_path, "LICENSE")).startswith("/"))
+      self.assertRegex(os.readlink(os.path.join(crate_path, "LICENSE")),
+                       "^[^\/].*",
+                       "Symlink path must be relative.")
 
   def test_generate_license_for_temp_dir(self):
     with tempfile.TemporaryDirectory() as temp_directory:
@@ -208,7 +209,8 @@ class LicenseParserTest(unittest.TestCase):
       # they still exist.
       self._write_empty_file(os.path.join(temp_directory, "COPYING"))
       create_android_metadata_license.update_license(temp_directory, {})
-      self.assertTrue(os.path.exists(os.path.join(temp_directory, "METADATA")))
+      self.assertTrue(
+          os.path.exists(os.path.join(temp_directory, "METADATA")))
       self.assertTrue(os.path.islink(os.path.join(temp_directory, "LICENSE")))
       self.assertTrue(os.path.exists(
           os.path.join(temp_directory, "MODULE_LICENSE_APACHE_2_0")))
@@ -235,7 +237,8 @@ class LicenseParserTest(unittest.TestCase):
       # they still exist.
       self._write_empty_file(os.path.join(temp_directory, "COPYING"))
       create_android_metadata_license.update_license(temp_directory, {})
-      self.assertTrue(os.path.exists(os.path.join(temp_directory, "METADATA")))
+      self.assertTrue(
+          os.path.exists(os.path.join(temp_directory, "METADATA")))
       os.remove(os.path.join(temp_directory, "METADATA"))
       self.assertRaisesRegex(Exception, "Failed to find metadata",
                              lambda: create_android_metadata_license.update_license(
