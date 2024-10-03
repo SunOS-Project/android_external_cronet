@@ -33,8 +33,7 @@ import os
 import re
 import sys
 import copy
-
-from typing import Dict, List
+from typing import List, Dict, Set
 from pathlib import Path
 
 import gn_utils
@@ -69,6 +68,7 @@ DEFAULT_TESTS = [
   '//net/android:net_tests_java',
   '//third_party/netty-tcnative:netty-tcnative-so',
   '//third_party/netty4:netty_all_java',
+  "//build/rust/tests/test_rust_static_library:test_rust_static_library", # Added to make sure that rust still compiles
 ]
 
 EXTRAS_ANDROID_BP_FILE = "Android.extras.bp"
@@ -314,6 +314,19 @@ additional_args = {
     # end export_include_dir.
 }
 
+_FEATURE_REGEX = "feature=\\\"(.+)\\\""
+_RUST_FLAGS_TO_REMOVE = [
+    "--target", # Added by Soong
+    "--color", # Added by Soong.
+    "--edition", # Added to the appropriate field, must be removed from flags.
+    "--sysroot", # Use AOSP's stdlib so we don't need any hacks for sysroot.
+    "-Cembed-bitcode=no", # Not compatible with Thin-LTO which is added by Soong.
+    "--cfg", # Added to the appropriate field.
+    "--extern", # Soong automatically adds that for us when we use proc_macro
+    "@", # Used by build_script outputs to have rustc load flags from a file.
+    "-Z", # Those are unstable features, completely remove those.
+]
+
 def always_disable(module, arch):
   return None
 
@@ -423,6 +436,10 @@ def add_androidx_fragment_fragment(module, arch):
 # depends on. This will be applied to normal and testing targets.
 _builtin_deps = {
     '//buildtools/third_party/libunwind:libunwind':
+        always_disable,
+    # This is a binary module that generates C++ binding files, Skip this
+    # dependency completely as we construct the modules differently.
+    '//third_party/rust/cxxbridge_cmd/v1:cxxbridge':
         always_disable,
     '//net/data/ssl/chrome_root_store:gen_root_store_inc':
         always_disable,
@@ -584,6 +601,12 @@ class Module(object):
       self.ldflags = set()
       self.compile_multilib = None
       self.stem = ""
+      self.edition = ""
+      self.features = set()
+      self.cfgs = set()
+      self.flags = list()
+      self.rustlibs = set()
+      self.proc_macros = set()
       if name == 'host':
         self.compile_multilib = '64'
 
@@ -602,6 +625,12 @@ class Module(object):
       self._output_field(nested_out, 'export_generated_headers')
       self._output_field(nested_out, 'ldflags')
       self._output_field(nested_out, 'stem')
+      self._output_field(nested_out, "edition")
+      self._output_field(nested_out, 'cfgs')
+      self._output_field(nested_out, 'features')
+      self._output_field(nested_out, 'flags', False)
+      self._output_field(nested_out, 'rustlibs')
+      self._output_field(nested_out, 'proc_macros')
 
       if nested_out:
         # This is added here to make sure it doesn't add a `host` arch-specific module just for
@@ -696,6 +725,12 @@ class Module(object):
     self.license_kinds = set()
     self.license_text = set()
     self.errorprone = dict()
+    self.crate_name = None
+    # Should be arch-dependant
+    self.crate_root = None
+    self.edition = None
+    self.rustlibs = set()
+    self.proc_macros = set()
 
   def to_string(self, output):
     if self.comment:
@@ -756,6 +791,10 @@ class Module(object):
     self._output_field(output, 'license_text')
     self._output_field(output, "license_kinds")
     self._output_field(output, "errorprone")
+    self._output_field(output, 'crate_name')
+    self._output_field(output, 'crate_root')
+    self._output_field(output, 'rustlibs')
+    self._output_field(output, 'proc_macros')
     if self.rtti:
       self._output_field(output, 'rtti')
 
@@ -866,13 +905,145 @@ def label_to_module_name(label):
 
 def is_supported_source_file(name):
   """Returns True if |name| can appear in a 'srcs' list."""
-  return os.path.splitext(name)[1] in ['.c', '.cc', '.cpp', '.java', '.proto', '.S', '.aidl']
+  return os.path.splitext(name)[1] in ['.c', '.cc', '.cpp', '.java', '.proto', '.S', '.aidl', '.rs']
 
+def normalize_rust_flags(rust_flags: List[str]) -> Dict[str, Set[str] | None]:
+  """
+  Normalizes the rust params where it tries to put (key, value) param
+  as a dictionary key. A key without value will have None as value.
+
+  An example of this would be:
+
+  Input: ["--cfg=feature=\"float_roundtrip\"", "--cfg=feature=\"std\"",
+          "--edition=2021", "-Cforce-unwind-tables=no", "-Dwarnings"]
+
+  Output: {
+          "--cfg": [feature=\"float_roundtrip\", feature=\"std\"],
+          "--edition": [2021],
+          "-Cforce-unwind-tables": [no],
+          "-Dwarnings": None
+          }
+  :param rust_flags: List of rust flags.
+  :return: Dictionary of rust flags where each key will point to a list of
+  values.
+  """
+  args_mapping = {}
+  previous_key = None
+  for rust_flag in rust_flags:
+    if not rust_flag.startswith("-"):
+      # This might be a key on its own, rustc supports params with no keys
+      # such as (@path).
+      if rust_flag.startswith("@"):
+        args_mapping[rust_flag] = None
+        if previous_key:
+          args_mapping[previous_key] = None
+      else:
+        # This is the value to the previous key (eg: ["--cfg", "val"])
+        if not previous_key:
+          raise ValueError(
+            f"Field {rust_flag} does not relate to any key. Rust flags found: {rust_flags}")
+        if previous_key not in args_mapping:
+          args_mapping[previous_key] = set()
+        args_mapping[previous_key].add(rust_flag)
+        previous_key = None
+    else:
+      if previous_key:
+        # We have a previous key, that means that the previous key is
+        # a no-value key.
+        args_mapping[previous_key] = None
+        previous_key = None
+      # This can be a key-only string or key=value or
+      # key=foo=value (eg:--cfg=feature=X) or key and value in different strings.
+      if "=" in rust_flag:
+        # We found an equal, this is probably a key=value string.
+        rust_flag_split = rust_flag.split("=")
+        if len(rust_flag_split) > 3:
+          raise ValueError(f"Could not normalize flag {rust_flag} as it has multiple equal signs.")
+        if rust_flag_split[0] not in args_mapping:
+          args_mapping[rust_flag_split[0]] = set()
+        args_mapping[rust_flag_split[0]].add("=".join(rust_flag_split[1:]))
+      else:
+        # Assume this is a key-only string. This will be resolved in the next
+        # iteration.
+        previous_key = rust_flag
+  if previous_key:
+    # We have a previous key without a value, this must be a key-only string.
+    args_mapping[previous_key] = None
+  return args_mapping
+
+
+def _set_rust_flags(module: Module.Target, rust_flags: List[str], arch_name: str) -> None:
+  rust_flags_dict = normalize_rust_flags(rust_flags)
+  if "--edition" in rust_flags_dict:
+    module.edition = list(rust_flags_dict["--edition"])[0]
+
+  for cfg in rust_flags_dict.get("--cfg", set()):
+    feature_regex = re.match(_FEATURE_REGEX, cfg)
+    if feature_regex:
+      module.features.add(feature_regex.group(1))
+    else:
+      module.cfgs.add(cfg.replace("\"", "\\\""))
+
+  pre_filter_flags = []
+  for (key, values) in rust_flags_dict.items():
+    if values is None:
+      pre_filter_flags.append(key)
+    else:
+      pre_filter_flags.extend(f"{key}={param_val}" for param_val in values)
+
+  flags_to_remove = _RUST_FLAGS_TO_REMOVE
+  # AOSP compiles everything for host under panic=unwind instead of abort.
+  # In order to be consistent with the ecosystem, remove the -Cpanic flag.
+  if arch_name == "host":
+    flags_to_remove.append("-Cpanic")
+
+  # Remove restricted flags
+  for pre_filter_flag in pre_filter_flags:
+    if not any([pre_filter_flag.startswith(restricted_flag) for restricted_flag in flags_to_remove]):
+      module.flags.append(pre_filter_flag)
 
 def get_protoc_module_name(gn):
   protoc_gn_target_name = gn.get_target('//third_party/protobuf:protoc').name
   return label_to_module_name(protoc_gn_target_name)
 
+def create_rust_cxx_module(blueprint, target):
+  """Generate genrules for a CXX GN target
+
+    GN actions are used to dynamically generate files during the build. The
+    Soong equivalent is a genrule. Currently, Chromium GN targets generates
+    both .cc and .h files in the same target, we have to split this up to be
+    compatible with Soong.
+
+    CXX bridge binary is used from AOSP instead of compiling Chromium's CXX bridge.
+
+    Args:
+        blueprint: Blueprint instance which is being generated.
+        target: gn_utils.Target object.
+
+    Returns:
+        The source_genrule module.
+  """
+  header_genrule = Module("cc_genrule", label_to_module_name(target.name) + "_header", target.name)
+  header_genrule.tools = {"cxxbridge"}
+  header_genrule.cmd = "$(location cxxbridge) $(in) --header > $(out)"
+  header_genrule.srcs = set([gn_utils.label_to_path(src) for src in target.sources])
+  # The output of the cc_genrule is the input + ".h" suffix, this is because
+  # the input to a CXX genrule is just one source file.
+  header_genrule.out = set([f"{gn_utils.label_to_path(out)}.h" for out in target.sources])
+
+  cc_genrule = Module("cc_genrule", label_to_module_name(target.name), target.name)
+  cc_genrule.tools = {"cxxbridge"}
+  cc_genrule.cmd = "$(location cxxbridge) $(in) > $(out)"
+  cc_genrule.srcs = set([gn_utils.label_to_path(src) for src in target.sources])
+  cc_genrule.genrule_srcs = {f":{cc_genrule.name}"}
+  # The output of the cc_genrule is the input + ".cc" suffix, this is because
+  # the input to a CXX genrule is just one source file.
+  cc_genrule.out = set([f"{gn_utils.label_to_path(out)}.cc" for out in target.sources])
+
+  cc_genrule.genrule_headers.add(header_genrule.name)
+  blueprint.add_module(cc_genrule)
+  blueprint.add_module(header_genrule)
+  return cc_genrule
 
 def create_proto_modules(blueprint, gn, target):
   """Generate genrules for a proto GN target.
@@ -1688,7 +1859,7 @@ def merge_modules(modules, genrule_type):
   merged_module = list(modules.values())[0]
 
   # Following attributes must be the same between archs
-  for key in ('out', 'genrule_headers', 'srcs', 'tool_files'):
+  for key in ('genrule_headers', 'srcs', 'tool_files'):
     if any([getattr(merged_module, key) != getattr(module, key) for module in modules.values()]):
       raise Exception(f'{merged_module.name} has different values for {key} between archs')
 
@@ -1786,6 +1957,16 @@ def create_modules_from_target(blueprint, gn, gn_target_name, is_descendant_of_j
   if target.type == "action" and is_descendant_of_java:
     bp_module_name += "__java"
 
+  if target.type in ["rust_library", "rust_proc_macro"]:
+    # "lib{crate_name}" must be a prefix of the module name, this is a Soong
+    # restriction.
+    # https://cs.android.com/android/_/android/platform/build/soong/+/31934a55a8a1f9e4d56d68810f4a646f12ab6eb5:rust/library.go;l=724;drc=fdec8723d574daf54b956cc0f6dc879087da70a6;bpv=0;bpt=0
+    bp_module_name = f"lib{target.crate_name}_{bp_module_name}"
+
+  # There is a limit on the length of the module name as the output depends
+  # on that.
+  if len(bp_module_name) > 128:
+    bp_module_name = bp_module_name[:128]
   if bp_module_name in blueprint.modules:
     return blueprint.modules[bp_module_name]
 
@@ -1798,6 +1979,13 @@ def create_modules_from_target(blueprint, gn, gn_target_name, is_descendant_of_j
       # Can be used for both host and device targets.
       module_type = 'cc_binary'
     module = Module(module_type, bp_module_name, gn_target_name)
+  elif target.type == 'rust_executable':
+    module = Module("rust_binary", bp_module_name, gn_target_name)
+  elif target.type == "rust_library":
+    # Chromium only uses rlibs.
+    module = Module("rust_library_rlib", bp_module_name, gn_target_name)
+  elif target.type == "rust_proc_macro":
+    module = Module("rust_proc_macro", bp_module_name, gn_target_name)
   elif target.type in ['static_library', 'source_set']:
     module = Module('cc_library_static', bp_module_name, gn_target_name)
   elif target.type == 'shared_library':
@@ -1813,7 +2001,10 @@ def create_modules_from_target(blueprint, gn, gn_target_name, is_descendant_of_j
   elif target.type == 'action':
     module = create_action_module(blueprint, gn, target, 'java_genrule' if is_descendant_of_java else 'cc_genrule', is_test_target)
   elif target.type == 'action_foreach':
-    module = create_action_foreach_modules(blueprint, gn, target, is_test_target)
+    if target.script == "//third_party/rust/cxx/chromium_integration/run_cxxbridge.py":
+      module = create_rust_cxx_module(blueprint, target)
+    else:
+      module = create_action_foreach_modules(blueprint, gn, target, is_test_target)
   elif target.type == 'copy':
     # TODO: careful now! copy targets are not supported yet, but this will stop
     # traversing the dependency tree. For //base:base, this is not a big
@@ -1870,13 +2061,29 @@ def create_modules_from_target(blueprint, gn, gn_target_name, is_descendant_of_j
         module.target[arch_name].cflags.add('-march=armv8-a+memtag')
       set_module_include_dirs(module.target[arch_name], arch.cflags, arch.include_dirs)
 
-  module.host_supported = target.host_supported()
-  module.device_supported = target.device_supported()
+  if not module.type == "rust_proc_macro":
+    # rust_proc_macro modules does not support the fields of `host_supported`
+    # or `device_supported`. In a different world, we would have classes for
+    # each different module that specifies what it can support to avoid
+    # those kind of conditions.
+    #
+    # See go/android.bp for additional information.
+    module.host_supported = target.host_supported()
+    module.device_supported = target.device_supported()
+
   module.gn_type = target.type
   module.build_file_path = target.build_file_path
   # Chromium does not use visibility at all, in order to avoid visibility issues
   # in AOSP. Make every module visible to any module in external/cronet.
   module.visibility = {"//external/cronet:__subpackages__"}
+
+  if module.type.startswith("rust"):
+    module.crate_name = target.crate_name
+    module.crate_root = gn_utils.label_to_path(target.crate_root)
+    module.min_sdk_version = 30
+    module.apex_available = [tethering_apex]
+    for arch_name, arch in target.get_archs().items():
+      _set_rust_flags(module.target[arch_name], arch.rust_flags, arch_name)
 
   if module.is_genrule():
     module.apex_available.add(tethering_apex)
@@ -1889,7 +2096,8 @@ def create_modules_from_target(blueprint, gn, gn_target_name, is_descendant_of_j
       module.aidl["include_dirs"] = {"frameworks/base/core/java/"}
       module.aidl["local_include_dirs"] = target.local_aidl_includes
 
-  if module.is_compiled() and not module.type.startswith("java"):
+  if (module.is_compiled() and not module.type.startswith("java")
+      and not module.type.startswith("rust")):
     # Don't try to inject library/source dependencies into genrules or
     # filegroups because they are not compiled in the traditional sense.
     module.defaults = [cc_defaults_module]
@@ -1936,6 +2144,11 @@ def create_modules_from_target(blueprint, gn, gn_target_name, is_descendant_of_j
       builtin_deps[dep_name](module, arch_name)
       continue
 
+    # This is like the builtin_deps with always_disable except that it matches
+    # a string.
+    if "_build_script" in dep_name:
+      continue
+
     dep_module = create_modules_from_target(blueprint, gn, dep_name, is_descendant_of_java, is_test_target)
 
     if dep_module is None:
@@ -1980,6 +2193,17 @@ def create_modules_from_target(blueprint, gn, gn_target_name, is_descendant_of_j
         module_target.generated_headers.update(dep_module.generated_headers)
         module_target.shared_libs.update(dep_module.shared_libs)
         module_target.header_libs.update(dep_module.header_libs)
+      elif module.type in ["rust_library_rlib", "rust_binary"]:
+        module_target.static_libs.add(dep_module.name)
+      else:
+        raise Exception(f"Trying to add an unknown type {dep_module.type} to a type of {module.type}")
+    elif dep_module.type == "rust_library_rlib":
+      if module.type.startswith("rust_"):
+        module_target.rustlibs.add(dep_module.name)
+      else:
+        module_target.static_libs.add(dep_module.name)
+    elif dep_module.type == "rust_proc_macro":
+      module_target.proc_macros.add(dep_module.name)
     elif dep_module.type == 'cc_genrule':
       module_target.generated_headers.update(dep_module.genrule_headers)
       module_target.srcs.update(dep_module.genrule_srcs)

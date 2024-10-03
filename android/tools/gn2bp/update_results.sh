@@ -14,7 +14,7 @@ set -eux
 BASEDIR=$(dirname "$0")
 # Run the licensing script to update all the METADATA / LICENSE files.
 python3 $BASEDIR/../license/create_android_metadata_license.py && \
-python3 $BASEDIR/gen_android_bp \
+python3 $BASEDIR/gen_android_bp.py \
     --desc $BASEDIR/desc_x64.json \
     --desc $BASEDIR/desc_x86.json \
     --desc $BASEDIR/desc_arm.json \
