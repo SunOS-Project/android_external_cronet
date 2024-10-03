@@ -2272,6 +2272,11 @@ java_library {
         "//external/cronet:__subpackages__",
     ],
     jarjar_rules: ":remove_gen_jni_jarjar_rules",
+    errorprone: {
+        javacflags: [
+            "-Xep:ReturnValueIgnored:WARN",
+        ],
+    },
 }
 
 // GN: //base:base_java_url_utils_for_test__testing

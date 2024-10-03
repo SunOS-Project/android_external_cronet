@@ -303,6 +303,14 @@ additional_args = {
         "base/allocator/partition_allocator/src/",
       })
     ],
+    'cronet_aml_base_base_java_test_support__testing': [
+        ('errorprone', (
+            'javacflags', {
+                "-Xep:ReturnValueIgnored:WARN",
+            }
+          )
+        )
+    ]
     # end export_include_dir.
 }
 
@@ -687,6 +695,7 @@ class Module(object):
     self.allow_rebasing = False
     self.license_kinds = set()
     self.license_text = set()
+    self.errorprone = dict()
 
   def to_string(self, output):
     if self.comment:
@@ -746,6 +755,7 @@ class Module(object):
     self._output_field(output, 'include_build_directory')
     self._output_field(output, 'license_text')
     self._output_field(output, "license_kinds")
+    self._output_field(output, "errorprone")
     if self.rtti:
       self._output_field(output, 'rtti')
 
@@ -2079,8 +2089,6 @@ def create_blueprint_for_targets(gn, targets, test_targets):
     if module:
       module.visibility.update(root_modules_visibility)
 
-
-
   # Merge in additional hardcoded arguments.
   for module in blueprint.modules.values():
     for key, add_val in additional_args.get(module.name, []):
@@ -2095,6 +2103,8 @@ def create_blueprint_for_targets(gn, targets, test_targets):
         curr.update(add_val)
       elif isinstance(add_val[1], dict) and isinstance(curr[add_val[0]], Module.Target):
         curr[add_val[0]].__dict__.update(add_val[1])
+      elif isinstance(curr, dict):
+        curr[add_val[0]] = add_val[1]
       else:
         raise Exception('Unimplemented type %r of additional_args: %r' % (type(add_val), key))
 
