@@ -21,4 +21,5 @@ python3 $BASEDIR/gen_android_bp.py \
     --desc $BASEDIR/desc_arm64.json \
     --desc $BASEDIR/desc_riscv64.json \
     --out $BASEDIR/Android.bp \
-    --repo_root "$1"
+    --repo_root "$1" \
+    --build_script_output $BASEDIR/build_script_outputs.json

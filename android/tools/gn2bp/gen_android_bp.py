@@ -2627,6 +2627,12 @@ def main():
       help='Path to the root of the repistory'
   )
   parser.add_argument(
+      '--build_script_output',
+      help='JSON-formatted file containing output of build scripts broken down' +
+        'by architecture.',
+      required=True
+  )
+  parser.add_argument(
       '--extras',
       help='Extra targets to include at the end of the Blueprint file',
       default=os.path.join(gn_utils.repo_root(), 'Android.bp.extras'),
@@ -2653,7 +2659,10 @@ def main():
     log.basicConfig(format='%(levelname)s:%(funcName)s:%(message)s', level=log.DEBUG)
 
   targets = args.targets or DEFAULT_TARGETS
-  gn = gn_utils.GnParser(builtin_deps)
+  build_scripts_output = None
+  with open(args.build_script_output) as f:
+    build_scripts_output = json.load(f)
+  gn = gn_utils.GnParser(builtin_deps, build_scripts_output)
   for desc_file in args.desc:
     with open(desc_file) as f:
       desc = json.load(f)
