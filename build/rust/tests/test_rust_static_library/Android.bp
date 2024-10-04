@@ -108,7 +108,7 @@ cc_library_static {
 
 // GN: //build/rust/tests/test_rust_static_library:test_rust_static_library__testing
 rust_library_rlib {
-    name: "libbuild_srust_stests_stest_urust_ustatic_ulibrary_ctest_urust_ustatic_ulibrary_cronet_aml_build_rust_tests_test_rust_static_lib",
+    name: "libbuild_srust_stests_stest_urust_ustatic_ulibrary_ct__TRIMMED_cronet_aml_build_rust_tests_test_rust_static_library_test_rust_st__TRIMMED",
     srcs: [
         "src/lib.rs",
     ],
@@ -124,7 +124,7 @@ rust_library_rlib {
         "//external/cronet:__subpackages__",
         "//packages/modules/Connectivity:__subpackages__",
     ],
-    crate_name: "build_srust_stests_stest_urust_ustatic_ulibrary_ctest_urust_ustatic_ulibrary",
+    crate_name: "build_srust_stests_stest_urust_ustatic_ulibrary_ct__TRIMMED",
     crate_root: "src/lib.rs",
     rustlibs: [
         "libchromium_cronet_aml_build_rust_chromium_prelude_chromium_prelude__testing",

@@ -1957,7 +1957,7 @@ def set_module_include_dirs(module, cflags, include_dirs):
                                if d not in include_dirs_denylist]
 
 
-def create_modules_from_target(blueprint, gn, gn_target_name, is_descendant_of_java, is_test_target):
+def create_modules_from_target(blueprint, gn, gn_target_name, parent_gn_type, is_test_target):
   """Generate module(s) for a given GN target.
 
     Given a GN target name, generate one or more corresponding modules into a
@@ -1967,28 +1967,41 @@ def create_modules_from_target(blueprint, gn, gn_target_name, is_descendant_of_j
         blueprint: Blueprint instance which is being generated.
         gn: gn_utils.GnParser object.
         gn_target_name: GN target for module generation.
+        parent_gn_type: GN type of the parent node.
     """
   bp_module_name = label_to_module_name(gn_target_name)
   target = gn.get_target(gn_target_name)
-  is_descendant_of_java = is_descendant_of_java or target.type == "java_library"
 
   # Append __java suffix to actions reachable from java_library. This is necessary
   # to differentiate them from cc actions.
   # This means that a GN action of name X will be translated to two different modules of names
   # X and X__java(only if X is reachable from a java target).
-  if target.type == "action" and is_descendant_of_java:
+  if target.type == "action" and parent_gn_type == "java_library":
     bp_module_name += "__java"
 
   if target.type in ["rust_library", "rust_proc_macro"]:
     # "lib{crate_name}" must be a prefix of the module name, this is a Soong
     # restriction.
     # https://cs.android.com/android/_/android/platform/build/soong/+/31934a55a8a1f9e4d56d68810f4a646f12ab6eb5:rust/library.go;l=724;drc=fdec8723d574daf54b956cc0f6dc879087da70a6;bpv=0;bpt=0
+    if len(target.crate_name) > 50:
+      # It is unreasonable to have such a crate name, this usually happens when
+      # the name of the crate is equal to the target path, this is the default
+      # for Chromium when a crate_name is not declared. Since we are prepending
+      # the crate name to the name, let's cut it short.
+      # There is a length limit on the module name because module names
+      # are used to create files and there is a limit on file names.
+      target.crate_name = target.crate_name[:50] + "__TRIMMED"
     bp_module_name = f"lib{target.crate_name}_{bp_module_name}"
+
+    if parent_gn_type == "static_library":
+      # CC modules must depend on a different type of modules that are
+      # rust_ffi_static instead of rust_library_rlib
+      bp_module_name += "__FFI"
 
   # There is a limit on the length of the module name as the output depends
   # on that.
   if len(bp_module_name) > 128:
-    bp_module_name = bp_module_name[:128]
+    bp_module_name = bp_module_name[:128] + "__TRIMMED"
   if bp_module_name in blueprint.modules:
     return blueprint.modules[bp_module_name]
 
@@ -2004,8 +2017,13 @@ def create_modules_from_target(blueprint, gn, gn_target_name, is_descendant_of_j
   elif target.type == 'rust_executable':
     module = Module("rust_binary", bp_module_name, gn_target_name)
   elif target.type == "rust_library":
+    _type = "rust_library_rlib"
+    if parent_gn_type == "static_library":
+      # CPP modules must depend on rust_ffi_static as this generates the
+      # necessary static library that can be linked.
+      _type = "rust_ffi_static"
     # Chromium only uses rlibs.
-    module = Module("rust_library_rlib", bp_module_name, gn_target_name)
+    module = Module(_type, bp_module_name, gn_target_name)
   elif target.type == "rust_proc_macro":
     module = Module("rust_proc_macro", bp_module_name, gn_target_name)
   elif target.type in ['static_library', 'source_set']:
@@ -2021,7 +2039,7 @@ def create_modules_from_target(blueprint, gn, gn_target_name, is_descendant_of_j
     if module is None:
       return None
   elif target.type == 'action':
-    module = create_action_module(blueprint, gn, target, 'java_genrule' if is_descendant_of_java else 'cc_genrule', is_test_target)
+    module = create_action_module(blueprint, gn, target, 'java_genrule' if parent_gn_type == "java_library" else 'cc_genrule', is_test_target)
   elif target.type == 'action_foreach':
     if target.script == "//third_party/rust/cxx/chromium_integration/run_cxxbridge.py":
       module = create_rust_cxx_module(blueprint, target)
@@ -2171,7 +2189,7 @@ def create_modules_from_target(blueprint, gn, gn_target_name, is_descendant_of_j
     if "_build_script" in dep_name:
       continue
 
-    dep_module = create_modules_from_target(blueprint, gn, dep_name, is_descendant_of_java, is_test_target)
+    dep_module = create_modules_from_target(blueprint, gn, dep_name, target.type, is_test_target)
 
     if dep_module is None:
       continue
@@ -2220,9 +2238,11 @@ def create_modules_from_target(blueprint, gn, gn_target_name, is_descendant_of_j
       else:
         raise Exception(f"Trying to add an unknown type {dep_module.type} to a type of {module.type}")
     elif dep_module.type == "rust_library_rlib":
-      if module.type.startswith("rust_"):
         module_target.rustlibs.add(dep_module.name)
-      else:
+    elif dep_module.type == "rust_ffi_static":
+        assert module.type == "cc_library_static", "Only static CC libraries can depend on rust_ffi_static"
+        # CPP libraries must not depend on rust_library_rlib, they must depend
+        # on rust_ffi_rlib as per aosp/3094614 and go/android-made-to-order-rust-staticlibs.
         module_target.static_libs.add(dep_module.name)
     elif dep_module.type == "rust_proc_macro":
       module_target.proc_macros.add(dep_module.name)
@@ -2326,12 +2346,12 @@ def create_blueprint_for_targets(gn, targets, test_targets):
   blueprint.add_module(create_cc_defaults_module())
 
   for target in targets:
-    module = create_modules_from_target(blueprint, gn, target, is_descendant_of_java=False, is_test_target=False)
+    module = create_modules_from_target(blueprint, gn, target, parent_gn_type=None, is_test_target=False)
     if module:
       module.visibility.update(root_modules_visibility)
 
   for test_target in test_targets:
-    module = create_modules_from_target(blueprint, gn, test_target + gn_utils.TESTING_SUFFIX, is_descendant_of_java=False, is_test_target=True)
+    module = create_modules_from_target(blueprint, gn, test_target + gn_utils.TESTING_SUFFIX, parent_gn_type=None, is_test_target=True)
     if module:
       module.visibility.update(root_modules_visibility)
 
