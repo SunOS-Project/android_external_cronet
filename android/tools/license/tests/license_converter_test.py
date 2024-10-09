@@ -332,6 +332,7 @@ class LicenseParserTest(unittest.TestCase):
                                  temp_directory, {},
                                  verify_only=True))
 
+  @unittest.skip("b/372449684")
   def test_license_for_aosp(self):
     """This test verifies that external/cronet conforms to the licensing structure."""
     # When running inside the context of atest, the working directory contains
