@@ -4241,7 +4241,7 @@ genrule {
 }
 
 // GN: //build/android:build_config_gen__testing
-cc_object {
+cc_preprocess_no_configuration {
     name: "cronet_aml_build_android_build_config_gen__testing_preprocess",
     srcs: [
         ":cronet_aml_build_android_build_config_gen__testing_rename",
@@ -4251,7 +4251,6 @@ cc_object {
         "-E",
         "-P",
     ],
-    compile_multilib: "first",
 }
 
 // GN: //build/android:build_config_gen__testing
@@ -4267,7 +4266,7 @@ genrule {
 }
 
 // GN: //build/android:build_config_gen
-cc_object {
+cc_preprocess_no_configuration {
     name: "cronet_aml_build_android_build_config_gen_preprocess",
     srcs: [
         ":cronet_aml_build_android_build_config_gen_rename",
@@ -4277,7 +4276,6 @@ cc_object {
         "-E",
         "-P",
     ],
-    compile_multilib: "first",
 }
 
 // GN: //build/android:build_config_gen
@@ -7120,7 +7118,7 @@ genrule {
 }
 
 // GN: //components/cronet/android:load_states_list__testing
-cc_object {
+cc_preprocess_no_configuration {
     name: "cronet_aml_components_cronet_android_load_states_list__testing_preprocess",
     srcs: [
         ":cronet_aml_components_cronet_android_load_states_list__testing_rename",
@@ -7130,7 +7128,6 @@ cc_object {
         "-E",
         "-P",
     ],
-    compile_multilib: "first",
 }
 
 // GN: //components/cronet/android:load_states_list__testing
@@ -7146,7 +7143,7 @@ genrule {
 }
 
 // GN: //components/cronet/android:load_states_list
-cc_object {
+cc_preprocess_no_configuration {
     name: "cronet_aml_components_cronet_android_load_states_list_preprocess",
     srcs: [
         ":cronet_aml_components_cronet_android_load_states_list_rename",
@@ -7156,7 +7153,6 @@ cc_object {
         "-E",
         "-P",
     ],
-    compile_multilib: "first",
 }
 
 // GN: //components/cronet/android:load_states_list
@@ -7883,7 +7879,7 @@ genrule {
 }
 
 // GN: //net/android:net_errors_java__testing
-cc_object {
+cc_preprocess_no_configuration {
     name: "cronet_aml_net_android_net_errors_java__testing_preprocess",
     srcs: [
         ":cronet_aml_net_android_net_errors_java__testing_rename",
@@ -7893,7 +7889,6 @@ cc_object {
         "-E",
         "-P",
     ],
-    compile_multilib: "first",
 }
 
 // GN: //net/android:net_errors_java__testing
@@ -7909,7 +7904,7 @@ genrule {
 }
 
 // GN: //net/android:net_errors_java
-cc_object {
+cc_preprocess_no_configuration {
     name: "cronet_aml_net_android_net_errors_java_preprocess",
     srcs: [
         ":cronet_aml_net_android_net_errors_java_rename",
@@ -7919,7 +7914,6 @@ cc_object {
         "-E",
         "-P",
     ],
-    compile_multilib: "first",
 }
 
 // GN: //net/android:net_errors_java
