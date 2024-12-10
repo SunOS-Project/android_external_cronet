@@ -10,34 +10,38 @@
 
 namespace metrics::structured {
 
+namespace {
+using ::google::protobuf::RepeatedPtrField;
+}
+
 TestEventStorage::TestEventStorage() = default;
 
 TestEventStorage::~TestEventStorage() = default;
 
-void TestEventStorage::AddEvent(StructuredEventProto&& event) {
-  *events()->add_non_uma_events() = event;
+void TestEventStorage::AddEvent(StructuredEventProto event) {
+  events()->mutable_events()->Add(std::move(event));
 }
 
-void TestEventStorage::MoveEvents(ChromeUserMetricsExtension& uma_proto) {
-  StructuredDataProto* proto = uma_proto.mutable_structured_data();
-  proto->mutable_events()->Swap(events_.mutable_non_uma_events());
-
-  events_.clear_uma_events();
-  events_.clear_non_uma_events();
+RepeatedPtrField<StructuredEventProto> TestEventStorage::TakeEvents() {
+  return std::move(*events_.mutable_events());
 }
 
 int TestEventStorage::RecordedEventsCount() const {
-  return events_.non_uma_events_size();
+  return events_.events_size();
 }
 
 void TestEventStorage::Purge() {
   events_.clear_uma_events();
-  events_.clear_non_uma_events();
+  events_.clear_events();
 }
 
 void TestEventStorage::AddBatchEvents(
-    const google::protobuf::RepeatedPtrField<StructuredEventProto>& events) {
-  events_.mutable_non_uma_events()->MergeFrom(events);
+    const RepeatedPtrField<StructuredEventProto>& events) {
+  events_.mutable_events()->MergeFrom(events);
+}
+
+void TestEventStorage::CopyEvents(EventsProto* proto) const {
+  proto->mutable_events()->MergeFrom(events_.events());
 }
 
 }  // namespace metrics::structured

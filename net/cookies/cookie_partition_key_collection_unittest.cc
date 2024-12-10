@@ -57,12 +57,12 @@ TEST(CookiePartitionKeyCollectionTest, ContainsAll) {
 
 TEST(CookiePartitionKeyCollectionTest, FromOptional) {
   CookiePartitionKeyCollection key_collection =
-      CookiePartitionKeyCollection::FromOptional(absl::nullopt);
+      CookiePartitionKeyCollection::FromOptional(std::nullopt);
   EXPECT_TRUE(key_collection.IsEmpty());
   EXPECT_FALSE(key_collection.ContainsAllKeys());
 
   key_collection = CookiePartitionKeyCollection::FromOptional(
-      absl::make_optional<CookiePartitionKey>(
+      std::make_optional<CookiePartitionKey>(
           CookiePartitionKey::FromURLForTesting(GURL("https://www.foo.com"))));
   EXPECT_FALSE(key_collection.IsEmpty());
   EXPECT_FALSE(key_collection.ContainsAllKeys());
@@ -103,6 +103,30 @@ TEST(CookiePartitionKeyCollectionTest, Contains) {
     EXPECT_EQ(test_case.expects_contains,
               test_case.keychain.Contains(test_case.key));
   }
+}
+
+TEST(CookiePartitionKeyCollectionTest, Equals) {
+  CookiePartitionKeyCollection empty;
+  CookiePartitionKeyCollection foo(
+      CookiePartitionKey::FromURLForTesting(GURL("https://foo.test")));
+  CookiePartitionKeyCollection bar(
+      CookiePartitionKey::FromURLForTesting(GURL("https://bar.test")));
+  CookiePartitionKeyCollection all =
+      CookiePartitionKeyCollection::ContainsAll();
+
+  EXPECT_EQ(empty, empty);
+  EXPECT_EQ(foo, foo);
+  EXPECT_EQ(bar, bar);
+  EXPECT_EQ(all, all);
+
+  EXPECT_NE(foo, empty);
+  EXPECT_NE(empty, foo);
+
+  EXPECT_NE(foo, bar);
+  EXPECT_NE(bar, foo);
+
+  EXPECT_NE(foo, all);
+  EXPECT_NE(all, foo);
 }
 
 }  // namespace net

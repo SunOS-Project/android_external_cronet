@@ -5,6 +5,7 @@
 #include "base/win/shortcut.h"
 
 #include <objbase.h>
+
 #include <propkey.h>
 #include <shlobj.h>
 #include <wrl/client.h>
@@ -204,7 +205,7 @@ bool CreateOrUpdateShortcutLink(const FilePath& shortcut_path,
     return false;
 
   SHChangeNotify(shortcut_existed ? SHCNE_UPDATEITEM : SHCNE_CREATE,
-                 SHCNF_PATH | SHCNF_FLUSHNOWAIT, shortcut_path.value().c_str(),
+                 SHCNF_PATH | SHCNF_FLUSH, shortcut_path.value().c_str(),
                  nullptr);
 
   return true;

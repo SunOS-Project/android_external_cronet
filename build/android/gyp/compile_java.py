@@ -420,6 +420,8 @@ def _OnStaleMd5(changes, options, javac_cmd, javac_args, java_files, kt_files):
         '--add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED',
         '--add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED',
         '--add-exports=jdk.compiler/com.sun.tools.javac.main=ALL-UNNAMED',
+        '--add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED',
+        '--add-exports=jdk.internal.opt/jdk.internal.opt=ALL-UNNAMED',
         '-jar',
         _JAVAC_EXTRACTOR,
     ]
@@ -764,6 +766,8 @@ def main(argv):
       # Do not warn about finalize() methods. Android still intends to support
       # them.
       '-Xlint:-removal',
+      # https://crbug.com/1441023
+      '-J-XX:+PerfDisableSharedMem',
   ]
 
   if options.enable_errorprone:

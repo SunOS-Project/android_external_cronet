@@ -6,8 +6,10 @@
 
 #include <algorithm>
 #include <memory>
+#include <string_view>
 #include <utility>
 
+#include "base/check.h"
 #include "base/compiler_specific.h"
 #include "base/functional/bind.h"
 #include "base/logging.h"
@@ -16,6 +18,7 @@
 #include "base/numerics/clamped_math.h"
 #include "base/strings/string_util.h"
 #include "base/values.h"
+#include "net/base/features.h"
 #include "net/base/io_buffer.h"
 #include "net/base/ip_endpoint.h"
 #include "net/base/upload_data_stream.h"
@@ -187,7 +190,9 @@ HttpStreamParser::HttpStreamParser(StreamSocket* stream_socket,
       response_header_start_offset_(std::string::npos),
       stream_socket_(stream_socket),
       connection_is_reused_(connection_is_reused),
-      net_log_(net_log) {
+      net_log_(net_log),
+      truncate_to_content_length_enabled_(base::FeatureList::IsEnabled(
+          net::features::kTruncateBodyToContentLength)) {
   io_callback_ = base::BindRepeating(&HttpStreamParser::OnIOComplete,
                                      weak_ptr_factory_.GetWeakPtr());
 }
@@ -543,7 +548,7 @@ int HttpStreamParser::DoSendRequestReadBodyComplete(int result) {
       sent_last_chunk_ = true;
     }
     // Encode the buffer as 1 chunk.
-    const base::StringPiece payload(request_body_read_buf_->data(), result);
+    const std::string_view payload(request_body_read_buf_->data(), result);
     request_body_send_buf_->Clear();
     result = EncodeChunk(payload,
                          request_body_send_buf_->data(),
@@ -645,17 +650,35 @@ int HttpStreamParser::DoReadBody() {
   // Added to investigate crbug.com/499663.
   CHECK(user_read_buf_.get());
 
+  // There may be additional data after the end of the body waiting in
+  // the socket, but in order to find out, we need to read as much as possible.
+  // If there is additional data, discard it and close the connection later.
+  int64_t remaining_read_len = user_read_buf_len_;
+  int64_t remaining_body = 0;
+  if (truncate_to_content_length_enabled_ && !chunked_decoder_.get() &&
+      response_body_length_ >= 0) {
+    remaining_body = response_body_length_ - response_body_read_;
+    remaining_read_len = std::min(remaining_read_len, remaining_body);
+  }
+
   // There may be some data left over from reading the response headers.
   if (read_buf_->offset()) {
-    int available = read_buf_->offset() - read_buf_unused_offset_;
+    int64_t available = read_buf_->offset() - read_buf_unused_offset_;
     if (available) {
       CHECK_GT(available, 0);
-      int bytes_from_buffer = std::min(available, user_read_buf_len_);
+      int64_t bytes_from_buffer = std::min(available, remaining_read_len);
       memcpy(user_read_buf_->data(),
              read_buf_->StartOfBuffer() + read_buf_unused_offset_,
              bytes_from_buffer);
       read_buf_unused_offset_ += bytes_from_buffer;
-      if (bytes_from_buffer == available) {
+      // Clear out the remaining data if we've reached the end of the body.
+      if (truncate_to_content_length_enabled_ &&
+          (remaining_body == bytes_from_buffer) &&
+          (available > bytes_from_buffer)) {
+        read_buf_->SetCapacity(0);
+        read_buf_unused_offset_ = 0;
+        discarded_extra_data_ = true;
+      } else if (bytes_from_buffer == available) {
         read_buf_->SetCapacity(0);
         read_buf_unused_offset_ = 0;
       }
@@ -670,12 +693,31 @@ int HttpStreamParser::DoReadBody() {
   if (IsResponseBodyComplete())
     return 0;
 
+  // DoReadBodyComplete will truncate the amount read if necessary whether the
+  // read completes synchronously or asynchronously.
   DCHECK_EQ(0, read_buf_->offset());
   return stream_socket_->Read(user_read_buf_.get(), user_read_buf_len_,
                               io_callback_);
 }
 
 int HttpStreamParser::DoReadBodyComplete(int result) {
+  // Check to see if we've read too much and need to discard data before we
+  // increment received_bytes_ and response_body_read_ or otherwise start
+  // processing the data.
+  if (truncate_to_content_length_enabled_ && !chunked_decoder_.get() &&
+      response_body_length_ >= 0) {
+    // Calculate how much we should have been allowed to read to not go beyond
+    // the Content-Length.
+    int64_t remaining_body = response_body_length_ - response_body_read_;
+    int64_t remaining_read_len =
+        std::min(static_cast<int64_t>(user_read_buf_len_), remaining_body);
+    if (result > remaining_read_len) {
+      // Truncate to only what is in the body.
+      result = remaining_read_len;
+      discarded_extra_data_ = true;
+    }
+  }
+
   // When the connection is closed, there are numerous ways to interpret it.
   //
   //  - If a Content-Length header is present and the body contains exactly that
@@ -834,6 +876,17 @@ int HttpStreamParser::HandleReadHeaderResult(int result) {
   }
 
   if (result < 0) {
+    if (result == ERR_SSL_CLIENT_AUTH_CERT_NEEDED) {
+      // TODO(https://crbug.com/332234173): Assuming this isn't hit, remove the
+      // SchemeIsCryptographic() check.
+      DUMP_WILL_BE_CHECK(request_->url.SchemeIsCryptographic());
+      if (request_->url.SchemeIsCryptographic()) {
+        response_->cert_request_info =
+            base::MakeRefCounted<SSLCertRequestInfo>();
+        stream_socket_->GetSSLCertRequestInfo(
+            response_->cert_request_info.get());
+      }
+    }
     io_state_ = STATE_DONE;
     return result;
   }
@@ -875,6 +928,13 @@ int HttpStreamParser::HandleReadHeaderResult(int result) {
   } else {
     CalculateResponseBodySize();
 
+    // Record the response start time if this response is not informational
+    // (non-1xx).
+    if (response_->headers->response_code() / 100 != 1) {
+      DCHECK(non_informational_response_start_time_.is_null());
+      non_informational_response_start_time_ = current_response_start_time_;
+    }
+
     // If the body is zero length, the caller may not call ReadResponseBody,
     // which is where any extra data is copied to read_buf_, so we move the
     // data here.
@@ -910,13 +970,6 @@ int HttpStreamParser::HandleReadHeaderResult(int result) {
         io_state_ = STATE_DONE;
       }
       return OK;
-    }
-
-    // Record the response start time if this response is not informational
-    // (non-1xx).
-    if (response_->headers->response_code() / 100 != 1) {
-      DCHECK(non_informational_response_start_time_.is_null());
-      non_informational_response_start_time_ = current_response_start_time_;
     }
 
     // Only set keep-alive based on final set of headers.
@@ -979,7 +1032,7 @@ int HttpStreamParser::ParseResponseHeaders(int end_offset) {
   if (response_header_start_offset_ != std::string::npos) {
     received_bytes_ += end_offset;
     headers = HttpResponseHeaders::TryToCreate(
-        base::StringPiece(read_buf_->StartOfBuffer(), end_offset));
+        std::string_view(read_buf_->StartOfBuffer(), end_offset));
     if (!headers)
       return net::ERR_INVALID_HTTP_RESPONSE;
     has_seen_status_line_ = true;
@@ -993,7 +1046,7 @@ int HttpStreamParser::ParseResponseHeaders(int end_offset) {
       return ERR_INVALID_HTTP_RESPONSE;
     }
 
-    base::StringPiece scheme = request_->url.scheme_piece();
+    std::string_view scheme = request_->url.scheme_piece();
     if (url::DefaultPortForScheme(scheme.data(), scheme.length()) !=
         request_->url.EffectiveIntPort()) {
       // If the port is not the default for the scheme, assume it's not a real
@@ -1005,7 +1058,7 @@ int HttpStreamParser::ParseResponseHeaders(int end_offset) {
       // https://groups.google.com/a/chromium.org/forum/#!topic/blink-dev/qS63pYso4P0
       if (read_buf_->offset() < 3 || scheme != "http" ||
           !base::EqualsCaseInsensitiveASCII(
-              base::StringPiece(read_buf_->StartOfBuffer(), 3), "icy")) {
+              std::string_view(read_buf_->StartOfBuffer(), 3), "icy")) {
         return ERR_INVALID_HTTP_RESPONSE;
       }
     }
@@ -1126,8 +1179,10 @@ bool HttpStreamParser::CanReuseConnection() const {
   //
   // TODO(mmenke): Consider logging this - hard to decipher socket reuse
   //     behavior makes NetLogs harder to read.
-  if (IsResponseBodyComplete() && IsMoreDataBuffered())
+  if ((IsResponseBodyComplete() && IsMoreDataBuffered()) ||
+      discarded_extra_data_) {
     return false;
+  }
 
   return stream_socket_->IsConnected();
 }
@@ -1138,14 +1193,7 @@ void HttpStreamParser::OnConnectionClose() {
   stream_socket_ = nullptr;
 }
 
-void HttpStreamParser::GetSSLCertRequestInfo(
-    SSLCertRequestInfo* cert_request_info) {
-  cert_request_info->Reset();
-  if (request_->url.SchemeIsCryptographic())
-    stream_socket_->GetSSLCertRequestInfo(cert_request_info);
-}
-
-int HttpStreamParser::EncodeChunk(base::StringPiece payload,
+int HttpStreamParser::EncodeChunk(std::string_view payload,
                                   char* output,
                                   size_t output_size) {
   if (output_size < payload.size() + kChunkHeaderFooterSize)

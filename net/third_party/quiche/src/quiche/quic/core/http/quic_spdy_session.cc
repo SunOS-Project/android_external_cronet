@@ -147,6 +147,19 @@ class AlpsFrameDecoder : public HttpDecoder::Visitor {
       WebTransportSessionId /*session_id*/) override {
     QUICHE_NOTREACHED();
   }
+  bool OnMetadataFrameStart(QuicByteCount /*header_length*/,
+                            QuicByteCount /*payload_length*/) override {
+    error_detail_ = "METADATA frame forbidden";
+    return false;
+  }
+  bool OnMetadataFramePayload(absl::string_view /*payload*/) override {
+    QUICHE_NOTREACHED();
+    return false;
+  }
+  bool OnMetadataFrameEnd() override {
+    QUICHE_NOTREACHED();
+    return false;
+  }
   bool OnUnknownFrameStart(uint64_t /*frame_type*/,
                            QuicByteCount
                            /*header_length*/,
@@ -169,6 +182,15 @@ class AlpsFrameDecoder : public HttpDecoder::Visitor {
   // True if SETTINGS frame has been received via ALPS.
   bool settings_frame_received_via_alps_ = false;
 };
+
+uint64_t GetDefaultQpackMaximumDynamicTableCapacity(Perspective perspective) {
+  if (perspective == Perspective::IS_SERVER &&
+      GetQuicFlag(quic_server_disable_qpack_dynamic_table)) {
+    return 0;
+  }
+
+  return kDefaultQpackMaxDynamicTableCapacity;
+}
 
 }  // namespace
 
@@ -466,7 +488,7 @@ QuicSpdySession::QuicSpdySession(
       qpack_encoder_send_stream_(nullptr),
       qpack_decoder_send_stream_(nullptr),
       qpack_maximum_dynamic_table_capacity_(
-          kDefaultQpackMaxDynamicTableCapacity),
+          GetDefaultQpackMaximumDynamicTableCapacity(perspective())),
       qpack_maximum_blocked_streams_(kDefaultMaximumBlockedStreams),
       max_inbound_header_list_size_(kDefaultMaxUncompressedHeaderSize),
       max_outbound_header_list_size_(std::numeric_limits<size_t>::max()),
@@ -480,9 +502,7 @@ QuicSpdySession::QuicSpdySession(
       destruction_indicator_(123456789),
       allow_extended_connect_(perspective() == Perspective::IS_SERVER &&
                               VersionUsesHttp3(transport_version())),
-      force_buffer_requests_until_settings_(false),
-      quic_enable_h3_datagrams_flag_(
-          GetQuicReloadableFlag(quic_enable_h3_datagrams)) {
+      force_buffer_requests_until_settings_(false) {
   h2_deframer_.set_visitor(spdy_framer_visitor_.get());
   h2_deframer_.set_debug_visitor(spdy_framer_visitor_.get());
   spdy_framer_.set_debug_visitor(spdy_framer_visitor_.get());
@@ -515,7 +535,7 @@ void QuicSpdySession::Initialize() {
     headers_stream_ = headers_stream.get();
     ActivateStream(std::move(headers_stream));
   } else {
-    qpack_encoder_ = std::make_unique<QpackEncoder>(this);
+    qpack_encoder_ = std::make_unique<QpackEncoder>(this, huffman_encoding_);
     qpack_decoder_ =
         std::make_unique<QpackDecoder>(qpack_maximum_dynamic_table_capacity_,
                                        qpack_maximum_blocked_streams_, this);
@@ -525,7 +545,7 @@ void QuicSpdySession::Initialize() {
   spdy_framer_visitor_->set_max_header_list_size(max_inbound_header_list_size_);
 
   // Limit HPACK buffering to 2x header list size limit.
-  h2_deframer_.GetHpackDecoder()->set_max_decode_buffer_size_bytes(
+  h2_deframer_.GetHpackDecoder().set_max_decode_buffer_size_bytes(
       2 * max_inbound_header_list_size_);
 }
 
@@ -544,7 +564,6 @@ void QuicSpdySession::FillSettingsFrame() {
         settings_.values[SETTINGS_H3_DATAGRAM_DRAFT04] = 1;
         break;
       case HttpDatagramSupport::kRfc:
-        QUIC_RELOADABLE_FLAG_COUNT(quic_enable_h3_datagrams);
         settings_.values[SETTINGS_H3_DATAGRAM] = 1;
         break;
       case HttpDatagramSupport::kRfcAndDraft04:
@@ -847,7 +866,7 @@ void QuicSpdySession::SendInitialData() {
 }
 
 bool QuicSpdySession::CheckStreamWriteBlocked(QuicStream* stream) const {
-  if (GetQuicRestartFlag(quic_opport_bundle_qpack_decoder_data2) &&
+  if (GetQuicRestartFlag(quic_opport_bundle_qpack_decoder_data4) &&
       qpack_decoder_send_stream_ != nullptr &&
       stream->id() == qpack_decoder_send_stream_->id()) {
     // Decoder data is always bundled opportunistically.
@@ -1897,10 +1916,7 @@ void QuicSpdySession::DatagramObserver::OnDatagramProcessed(
 }
 
 HttpDatagramSupport QuicSpdySession::LocalHttpDatagramSupport() {
-  if (quic_enable_h3_datagrams_flag_) {
-    return HttpDatagramSupport::kRfc;
-  }
-  return HttpDatagramSupport::kNone;
+  return HttpDatagramSupport::kRfc;
 }
 
 std::string HttpDatagramSupportToString(

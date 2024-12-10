@@ -101,6 +101,8 @@ class QUICHE_EXPORT PendingStream
   // OnDataAvailable().
   void StopReading();
 
+  QuicTime creation_time() const { return creation_time_; }
+
  private:
   friend class QuicStream;
 
@@ -133,6 +135,8 @@ class QUICHE_EXPORT PendingStream
   QuicStreamSequencer sequencer_;
   // The error code received from QuicStopSendingFrame (if any).
   std::optional<QuicResetStreamError> stop_sending_error_code_;
+  // The time when this pending stream is created.
+  const QuicTime creation_time_;
 };
 
 class QUICHE_EXPORT QuicStream : public QuicStreamSequencer::StreamInterface {
@@ -216,6 +220,10 @@ class QUICHE_EXPORT QuicStream : public QuicStreamSequencer::StreamInterface {
 
   QuicRstStreamErrorCode stream_error() const {
     return stream_error_.internal_code();
+  }
+  // Application error code of RESET_STREAM.
+  uint64_t ietf_application_error() const {
+    return stream_error_.ietf_application_code();
   }
   QuicErrorCode connection_error() const { return connection_error_; }
 
@@ -349,9 +357,10 @@ class QUICHE_EXPORT QuicStream : public QuicStreamSequencer::StreamInterface {
   // Commits data into the stream write buffer, and potentially sends it over
   // the wire.  This method has all-or-nothing semantics: if the write buffer is
   // not full, all of the memslices in |span| are moved into it; otherwise,
-  // nothing happens.
+  // nothing happens. If `buffer_unconditionally` is set to true, behaves
+  // similar to `WriteOrBufferData()` in terms of buffering.
   QuicConsumedData WriteMemSlices(absl::Span<quiche::QuicheMemSlice> span,
-                                  bool fin);
+                                  bool fin, bool buffer_uncondtionally = false);
   QuicConsumedData WriteMemSlice(quiche::QuicheMemSlice span, bool fin);
 
   // Returns true if any stream data is lost (including fin) and needs to be
@@ -393,6 +402,8 @@ class QUICHE_EXPORT QuicStream : public QuicStreamSequencer::StreamInterface {
   // Returns the min of stream level flow control window size and connection
   // level flow control window size.
   QuicByteCount CalculateSendWindowSize() const;
+
+  const QuicTime::Delta pending_duration() const { return pending_duration_; }
 
  protected:
   // Called when data of [offset, offset + data_length] is buffered in send
@@ -490,7 +501,8 @@ class QUICHE_EXPORT QuicStream : public QuicStreamSequencer::StreamInterface {
              QuicStreamSequencer sequencer, bool is_static, StreamType type,
              uint64_t stream_bytes_read, bool fin_received,
              std::optional<QuicFlowController> flow_controller,
-             QuicFlowController* connection_flow_controller);
+             QuicFlowController* connection_flow_controller,
+             QuicTime::Delta pending_duration);
 
   // Calls MaybeSendBlocked on the stream's flow controller and the connection
   // level flow controller.  If the stream is flow control blocked by the
@@ -601,6 +613,10 @@ class QUICHE_EXPORT QuicStream : public QuicStreamSequencer::StreamInterface {
 
   // Creation time of this stream, as reported by the QuicClock.
   const QuicTime creation_time_;
+
+  // The duration when the data for this stream was stored in a PendingStream
+  // before being moved to this QuicStream.
+  const QuicTime::Delta pending_duration_;
 
   Perspective perspective_;
 };

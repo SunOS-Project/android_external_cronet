@@ -20,10 +20,10 @@ MockHttpStreamFactoryJob::MockHttpStreamFactoryJob(
     HttpStreamFactory::Job::Delegate* delegate,
     HttpStreamFactory::JobType job_type,
     HttpNetworkSession* session,
-    const HttpRequestInfo& request_info,
+    const HttpStreamFactory::StreamRequestInfo& request_info,
     RequestPriority priority,
     ProxyInfo proxy_info,
-    const SSLConfig& server_ssl_config,
+    const std::vector<SSLConfig::CertAndStatus>& allowed_bad_certs,
     url::SchemeHostPort destination,
     GURL origin_url,
     NextProto alternative_protocol,
@@ -37,7 +37,7 @@ MockHttpStreamFactoryJob::MockHttpStreamFactoryJob(
                              request_info,
                              priority,
                              proxy_info,
-                             server_ssl_config,
+                             allowed_bad_certs,
                              std::move(destination),
                              origin_url,
                              alternative_protocol,
@@ -62,10 +62,10 @@ std::unique_ptr<HttpStreamFactory::Job> TestJobFactory::CreateJob(
     HttpStreamFactory::Job::Delegate* delegate,
     HttpStreamFactory::JobType job_type,
     HttpNetworkSession* session,
-    const HttpRequestInfo& request_info,
+    const HttpStreamFactory::StreamRequestInfo& request_info,
     RequestPriority priority,
     const ProxyInfo& proxy_info,
-    const SSLConfig& server_ssl_config,
+    const std::vector<SSLConfig::CertAndStatus>& allowed_bad_certs,
     url::SchemeHostPort destination,
     GURL origin_url,
     bool is_websocket,
@@ -76,8 +76,9 @@ std::unique_ptr<HttpStreamFactory::Job> TestJobFactory::CreateJob(
         quic::ParsedQuicVersion::Unsupported()) {
   auto job = std::make_unique<MockHttpStreamFactoryJob>(
       delegate, job_type, session, request_info, priority, proxy_info,
-      SSLConfig(), std::move(destination), origin_url, alternative_protocol,
-      quic_version, is_websocket, enable_ip_based_pooling, net_log);
+      allowed_bad_certs, std::move(destination), origin_url,
+      alternative_protocol, quic_version, is_websocket, enable_ip_based_pooling,
+      net_log);
 
   // Keep raw pointer to Job but pass ownership.
   switch (job_type) {

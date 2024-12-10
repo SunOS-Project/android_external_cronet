@@ -11,6 +11,10 @@ import("//build/config/gclient_args.gni")
 import("//build/config/python.gni")
 import("//build_overrides/build.gni")
 
+if (build_with_chromium) {
+  import("//base/allocator/partition_allocator/partition_alloc.gni")
+}
+
 if (enable_java_templates) {
   # Create or update the API versions cache if necessary by running a
   # functionally empty lint task. This prevents racy creation of the
@@ -40,6 +44,7 @@ if (enable_java_templates) {
     ]
     sources = [
       "java/src/org/chromium/build/annotations/AlwaysInline.java",
+      "java/src/org/chromium/build/annotations/AssumeNonNull.java",
       "java/src/org/chromium/build/annotations/CheckDiscard.java",
       "java/src/org/chromium/build/annotations/DoNotClassMerge.java",
       "java/src/org/chromium/build/annotations/DoNotInline.java",
@@ -148,6 +153,7 @@ python_library("test_runner_core_py") {
   data = [
     "pylib/gtest/filter/",
     "pylib/instrumentation/render_test.html.jinja",
+    "pylib/local/machine/local_machine_hostside_tradefed_config.xml",
     "test_wrapper/logdog_wrapper.py",
     "//third_party/requests/",
   ]
@@ -168,6 +174,7 @@ group("test_runner_device_support") {
   # in pylib's constants.
   data = [
     "${public_android_sdk_build_tools}/aapt",
+    "${public_android_sdk_build_tools}/aapt2",
     "${public_android_sdk_build_tools}/dexdump",
     "${public_android_sdk_build_tools}/lib64/libc++.so",
     "${public_android_sdk_build_tools}/split-select",
@@ -190,6 +197,9 @@ group("test_runner_device_support") {
     }
     if (is_asan) {
       data_deps += [ "//tools/android/asan/third_party:asan_device_setup" ]
+    }
+    if (use_full_mte) {
+      data_deps += [ "//tools/android/mte:mte_device_setup" ]
     }
   }
 

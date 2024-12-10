@@ -39,6 +39,12 @@ declare_args() {
   # chain of stores leading from allocation site to use site.
   msan_track_origins = 2
 
+  # Enables "param-retval" mode, which finds more uses of uninitialized data and
+  # reduces code size. Behind a flag as there are a number of previously
+  # undetected violations that still need to be fixed.
+  # TODO(crbug.com/1369167): Default this to true and remove.
+  msan_eager_checks = false
+
   # Use dynamic libraries instrumented by one of the sanitizers instead of the
   # standard system libraries. Set this flag to build the libraries from source.
   use_locally_built_instrumented_libraries = false
@@ -96,6 +102,10 @@ declare_args() {
   #     trace-pc-guard,indirect-calls
   sanitizer_coverage_flags = ""
 
+  # A sanitizer coverage allowlist, specifying exactly which
+  # files or symbol names should be instrumented, rather than all of them.
+  sanitizer_coverage_allowlist = ""
+
   # When enabled, only relevant sanitizer defines are set, but compilation
   # happens with no extra flags. This is useful when in component build
   # enabling sanitizers only in some of the components.
@@ -107,12 +117,13 @@ declare_args() {
   # When true, sanitizer warnings will cause test case failures.
   fail_on_san_warnings = false
 
-  # The fuzztest library builds only on some platforms, so for now,
-  # all targets depending on fuzztest need to be configured according
-  # to this.
-  # TODO(crbug.com/1494445): remove this when all build permutations
-  # work
-  fuzztest_supported = !(is_win && is_component_build)
+  # When true, only builds fuzzer targets that require high end machines to run.
+  # Otherwise, builds all the targets.
+  # TODO(paulsemel): once we have everything implemented on the recipe side, we
+  # can change the behaviour for the false case, and only build the non high-end
+  # jobs, so that they do not appear in the zip. As for now, this behaviour
+  # ensures nothing breaks.
+  high_end_fuzzer_targets = false
 }
 
 declare_args() {
@@ -199,9 +210,7 @@ use_prebuilt_instrumented_libraries = is_msan
 use_fuzzing_engine =
     use_libfuzzer || use_afl || use_centipede || use_external_fuzzing_engine
 
-# Whether the current fuzzing engine supports libprotobuf_mutator. Right now
-# this is just libfuzzer, but others are likely to support this in future,
-# so it's preferable to check this.
+# Whether the current fuzzing engine supports libprotobuf_mutator.
 use_fuzzing_engine_with_lpm = use_libfuzzer || use_centipede
 
 # Whether the fuzzing engine supports fuzzers which supply their own
@@ -324,6 +333,10 @@ assert(
     "crbug.com/753445: use_sanitizer_coverage=true is not supported by the " +
         "Chromium mac_clang_x64 toolchain on iOS distribution. Please set " +
         "the argument value to false.")
+
+assert(
+    sanitizer_coverage_allowlist == "" || use_sanitizer_coverage,
+    "Can't specify a sanitizer coverage allowlist without using sanitizer coverage.")
 
 # Use these lists of configs to disable instrumenting code that is part of a
 # fuzzer, but which isn't being targeted (such as libprotobuf-mutator, *.pb.cc

@@ -77,8 +77,6 @@ cronet_origin_files = glob(
         # of libc++[abi]
         "buildtools/third_party/libc++/**",
         "buildtools/third_party/libc++abi/**",
-        # Note: Only used for tests.
-        "net/third_party/nist-pkits/**",
         "net/third_party/quiche/**",
         "net/third_party/uri_template/**",
         "third_party/abseil-cpp/**",

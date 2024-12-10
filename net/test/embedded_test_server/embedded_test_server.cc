@@ -7,6 +7,8 @@
 #include <stdint.h>
 
 #include <memory>
+#include <optional>
+#include <string_view>
 #include <utility>
 
 #include "base/files/file_path.h"
@@ -20,7 +22,6 @@
 #include "base/process/process_metrics.h"
 #include "base/run_loop.h"
 #include "base/strings/string_number_conversions.h"
-#include "base/strings/string_piece.h"
 #include "base/strings/string_util.h"
 #include "base/strings/stringprintf.h"
 #include "base/task/current_thread.h"
@@ -52,7 +53,6 @@
 #include "net/test/revocation_builder.h"
 #include "net/test/test_data_directory.h"
 #include "net/third_party/quiche/src/quiche/spdy/core/spdy_frame_builder.h"
-#include "third_party/abseil-cpp/absl/types/optional.h"
 #include "third_party/boringssl/src/pki/extended_key_usage.h"
 #include "url/origin.h"
 
@@ -317,7 +317,7 @@ EmbeddedTestServerHandle EmbeddedTestServer::StartAndReturnHandle(int port) {
   return result ? EmbeddedTestServerHandle(this) : EmbeddedTestServerHandle();
 }
 
-bool EmbeddedTestServer::Start(int port, base::StringPiece address) {
+bool EmbeddedTestServer::Start(int port, std::string_view address) {
   bool success = InitializeAndListen(port, address);
   if (success)
     StartAcceptingConnections();
@@ -325,7 +325,7 @@ bool EmbeddedTestServer::Start(int port, base::StringPiece address) {
 }
 
 bool EmbeddedTestServer::InitializeAndListen(int port,
-                                             base::StringPiece address) {
+                                             std::string_view address) {
   DCHECK(!Started());
 
   const int max_tries = 5;
@@ -515,12 +515,17 @@ bool EmbeddedTestServer::GenerateCertAndKey() {
     leaf->SetCaIssuersAndOCSPUrls(leaf_ca_issuers_urls, leaf_ocsp_urls);
   }
 
-  if (cert_config_.intermediate == IntermediateType::kByAIA) {
+  if (cert_config_.intermediate == IntermediateType::kByAIA ||
+      cert_config_.intermediate == IntermediateType::kMissing) {
     // Server certificate chain does not include the intermediate.
     x509_cert_ = leaf->GetX509Certificate();
   } else {
     // Server certificate chain will include the intermediate, if there is one.
     x509_cert_ = leaf->GetX509CertificateChain();
+  }
+
+  if (intermediate) {
+    intermediate_ = intermediate->GetX509Certificate();
   }
 
   private_key_ = bssl::UpRef(leaf->GetKey());
@@ -552,7 +557,7 @@ bool EmbeddedTestServer::InitializeSSLServerContext() {
       size_t frame_size = spdy::kFrameHeaderSize;
       // Figure out size and generate origins
       for (const auto& pair : alps_accept_ch_) {
-        base::StringPiece hostname = pair.first;
+        std::string_view hostname = pair.first;
         std::string accept_ch = pair.second;
 
         GURL url = hostname.empty() ? GetURL("/") : GetURL(hostname, "/");
@@ -567,8 +572,8 @@ bool EmbeddedTestServer::InitializeSSLServerContext() {
       spdy::SpdyFrameBuilder builder(frame_size);
       builder.BeginNewFrame(spdy::SpdyFrameType::ACCEPT_CH, 0, 0);
       for (const auto& pair : origin_accept_ch) {
-        base::StringPiece origin = pair.first;
-        base::StringPiece accept_ch = pair.second;
+        std::string_view origin = pair.first;
+        std::string_view accept_ch = pair.second;
 
         builder.WriteUInt16(origin.size());
         builder.WriteBytes(origin.data(), origin.size());
@@ -634,6 +639,11 @@ void EmbeddedTestServer::StartAcceptingConnections() {
 bool EmbeddedTestServer::ShutdownAndWaitUntilComplete() {
   DCHECK(thread_checker_.CalledOnValidThread());
 
+  if (!io_thread_) {
+    // Can't stop a server that never started.
+    return true;
+  }
+
   // Ensure that the AIA HTTP server is no longer Started().
   bool aia_http_server_not_started = true;
   if (aia_http_server_ && aia_http_server_->Started()) {
@@ -698,14 +708,14 @@ void EmbeddedTestServer::HandleRequest(
   response_ptr->SendResponse(delegate);
 }
 
-GURL EmbeddedTestServer::GetURL(base::StringPiece relative_url) const {
+GURL EmbeddedTestServer::GetURL(std::string_view relative_url) const {
   DCHECK(Started()) << "You must start the server first.";
   DCHECK(relative_url.starts_with("/")) << relative_url;
   return base_url_.Resolve(relative_url);
 }
 
-GURL EmbeddedTestServer::GetURL(base::StringPiece hostname,
-                                base::StringPiece relative_url) const {
+GURL EmbeddedTestServer::GetURL(std::string_view hostname,
+                                std::string_view relative_url) const {
   GURL local_url = GetURL(relative_url);
   GURL::Replacements replace_host;
   replace_host.SetHostStr(hostname);
@@ -713,7 +723,7 @@ GURL EmbeddedTestServer::GetURL(base::StringPiece hostname,
 }
 
 url::Origin EmbeddedTestServer::GetOrigin(
-    const absl::optional<std::string>& hostname) const {
+    const std::optional<std::string>& hostname) const {
   if (hostname)
     return url::Origin::Create(GetURL(*hostname, "/"));
   return url::Origin::Create(base_url_);
@@ -759,6 +769,13 @@ void EmbeddedTestServer::SetSSLConfig(
 void EmbeddedTestServer::SetSSLConfig(
     const ServerCertificateConfig& cert_config) {
   SetSSLConfigInternal(CERT_AUTO, &cert_config, SSLServerConfig());
+}
+
+void EmbeddedTestServer::SetCertHostnames(std::vector<std::string> hostnames) {
+  ServerCertificateConfig cert_config;
+  cert_config.dns_names = std::move(hostnames);
+  cert_config.ip_addresses = {net::IPAddress::IPv4Localhost()};
+  SetSSLConfig(cert_config);
 }
 
 bool EmbeddedTestServer::ResetSSLConfigOnIOThread(
@@ -829,13 +846,19 @@ scoped_refptr<X509Certificate> EmbeddedTestServer::GetCertificate() {
   return x509_cert_;
 }
 
+scoped_refptr<X509Certificate> EmbeddedTestServer::GetGeneratedIntermediate() {
+  DCHECK(is_using_ssl_);
+  DCHECK(!UsingStaticCert());
+  return intermediate_;
+}
+
 void EmbeddedTestServer::ServeFilesFromDirectory(
     const base::FilePath& directory) {
   RegisterDefaultHandler(base::BindRepeating(&HandleFileRequest, directory));
 }
 
 void EmbeddedTestServer::ServeFilesFromSourceDirectory(
-    base::StringPiece relative) {
+    std::string_view relative) {
   base::FilePath test_data_dir;
   CHECK(base::PathService::Get(base::DIR_SRC_TEST_DATA_ROOT, &test_data_dir));
   ServeFilesFromDirectory(test_data_dir.AppendASCII(relative));

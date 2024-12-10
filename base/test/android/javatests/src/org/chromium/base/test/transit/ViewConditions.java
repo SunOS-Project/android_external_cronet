@@ -10,7 +10,6 @@ import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
 
 import static org.hamcrest.CoreMatchers.allOf;
 import static org.hamcrest.CoreMatchers.any;
-import static org.hamcrest.CoreMatchers.is;
 
 import android.content.res.Resources;
 import android.view.View;
@@ -38,6 +37,41 @@ public class ViewConditions {
         }
     }
 
+    /**
+     * Fulfilled when a single matching View exists and is displayed, but ignored if |gate| returns
+     * true.
+     */
+    public static class GatedDisplayedCondition extends InstrumentationThreadCondition {
+
+        private final DisplayedCondition mDisplayedCondition;
+        private final Condition mGate;
+
+        public GatedDisplayedCondition(Matcher<View> matcher, Condition gate) {
+            super();
+            mDisplayedCondition = new DisplayedCondition(matcher);
+            mGate = gate;
+        }
+
+        @Override
+        public ConditionStatus check() throws Exception {
+            ConditionStatus gateStatus = mGate.check();
+            String gateMessage = gateStatus.getMessageAsGate();
+            if (!gateStatus.isFulfilled()) {
+                return fulfilled(gateMessage);
+            }
+
+            ConditionStatus status = mDisplayedCondition.check();
+            status.amendMessage(gateMessage);
+            return status;
+        }
+
+        @Override
+        public String buildDescription() {
+            return String.format(
+                    "%s (if %s)", mDisplayedCondition.buildDescription(), mGate.buildDescription());
+        }
+    }
+
     /** Fulfilled when a single matching View exists. */
     public static class ExistsCondition extends InstrumentationThreadCondition {
         private final Matcher<View> mMatcher;
@@ -54,8 +88,9 @@ public class ViewConditions {
         }
 
         @Override
-        public boolean check() {
+        public ConditionStatus check() {
             ViewInteraction viewInteraction = onView(mMatcher);
+            String[] message = new String[1];
             try {
                 viewInteraction.perform(
                         new ViewAction() {
@@ -72,15 +107,15 @@ public class ViewConditions {
                             @Override
                             public void perform(UiController uiController, View view) {
                                 if (mViewMatched != null && mViewMatched != view) {
-                                    throw new IllegalStateException(
+                                    message[0] =
                                             String.format(
                                                     "Matched a different view, was %s, now %s",
-                                                    mViewMatched, view));
+                                                    mViewMatched, view);
                                 }
                                 mViewMatched = view;
                             }
                         });
-                return true;
+                return fulfilled(message[0]);
             } catch (NoMatchingViewException
                     | NoMatchingRootException
                     | AmbiguousViewMatcherException e) {
@@ -91,58 +126,32 @@ public class ViewConditions {
                                     mViewMatched, e.getClass().getSimpleName()),
                             e);
                 }
-                return false;
+                return notFulfilled(e.getClass().getSimpleName());
             }
-        }
-
-        public View getViewMatched() {
-            return mViewMatched;
         }
     }
 
-    /** Fulfilled when no matching Views exist. */
-    public static class DoesNotExistAnymoreCondition extends InstrumentationThreadCondition {
+    /** Fulfilled when no matching Views exist and are displayed. */
+    public static class NotDisplayedAnymoreCondition extends InstrumentationThreadCondition {
         private final Matcher<View> mMatcher;
-        private Matcher<View> mStricterMatcher;
-        private final ExistsCondition mExistsCondition;
 
-        public DoesNotExistAnymoreCondition(
-                Matcher<View> matcher, ExistsCondition existsCondition) {
+        public NotDisplayedAnymoreCondition(Matcher<View> matcher) {
             super();
-            mMatcher = matcher;
-            mExistsCondition = existsCondition;
+            mMatcher = allOf(matcher, isDisplayed());
         }
 
         @Override
         public String buildDescription() {
-            if (mStricterMatcher != null) {
-                return "No more view: "
-                        + ViewConditions.createMatcherDescription(mMatcher)
-                        + " that exactly "
-                        + ViewConditions.createMatcherDescription(mStricterMatcher);
-            } else {
-                return "No more view: " + ViewConditions.createMatcherDescription(mMatcher);
-            }
+            return "No more view: " + ViewConditions.createMatcherDescription(mMatcher);
         }
 
         @Override
-        public boolean check() {
-            Matcher<View> matcherToUse;
-            if (mStricterMatcher != null) {
-                matcherToUse = mStricterMatcher;
-            } else if (mExistsCondition.getViewMatched() != null) {
-                mStricterMatcher = is(mExistsCondition.getViewMatched());
-                rebuildDescription();
-                matcherToUse = mStricterMatcher;
-            } else {
-                matcherToUse = mMatcher;
-            }
-
+        public ConditionStatus check() {
             try {
-                onView(matcherToUse).check(doesNotExist());
-                return true;
+                onView(mMatcher).check(doesNotExist());
+                return fulfilled();
             } catch (AssertionError e) {
-                return false;
+                return notFulfilled();
             }
         }
     }

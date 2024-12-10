@@ -27,3 +27,4 @@ org\.chromium\.net\.LogcatCapture(\$.+)?
 org\.chromium\.net\.ReportingCollector(\$.+)?
 org\.chromium\.net\.Http2TestServer(\$.+)?
 org\.chromium\.net\.Http2TestHandler(\$.+)?
+org\.chromium\.net\.AndroidNetworkLibrary(\$.+)?

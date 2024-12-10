@@ -141,7 +141,10 @@ class PacketCollector : public QuicPacketCreator::DelegateInterface,
     return true;
   }
 
-  void MaybeBundleOpportunistically() override { QUICHE_DCHECK(false); }
+  void MaybeBundleOpportunistically(
+      TransmissionType /*transmission_type*/) override {
+    QUICHE_DCHECK(false);
+  }
 
   QuicByteCount GetFlowControlSendWindowSize(QuicStreamId /*id*/) override {
     QUICHE_DCHECK(false);
@@ -401,14 +404,13 @@ void QuicDispatcher::ProcessPacket(const QuicSocketAddress& self_address,
   }
   // The framer might have extracted the incorrect Connection ID length from a
   // short header. |packet| could be gQUIC; if Q043, the connection ID has been
-  // parsed correctly thanks to the fixed bit. If a Q046 or Q050 short header,
+  // parsed correctly thanks to the fixed bit. If a Q046 short header,
   // the dispatcher might have assumed it was a long connection ID when (because
   // it was gQUIC) it actually issued or kept an 8-byte ID. The other case is
   // where NEW_CONNECTION_IDs are not using the generator, and the dispatcher
   // is, due to flag misconfiguration.
   if (!packet_info.version_flag &&
-      (IsSupportedVersion(ParsedQuicVersion::Q046()) ||
-       IsSupportedVersion(ParsedQuicVersion::Q050()))) {
+      IsSupportedVersion(ParsedQuicVersion::Q046())) {
     ReceivedPacketInfo gquic_packet_info(self_address, peer_address, packet);
     // Try again without asking |connection_id_generator_| for the length.
     const QuicErrorCode gquic_error = QuicFramer::ParsePublicHeaderDispatcher(
@@ -435,7 +437,8 @@ namespace {
 constexpr bool IsSourceUdpPortBlocked(uint16_t port) {
   // These UDP source ports have been observed in large scale denial of service
   // attacks and are not expected to ever carry user traffic, they are therefore
-  // blocked as a safety measure. See draft-ietf-quic-applicability for details.
+  // blocked as a safety measure. See section 8.1 of RFC 9308 for details.
+  // https://www.rfc-editor.org/rfc/rfc9308.html#section-8.1
   constexpr uint16_t blocked_ports[] = {
       0,      // We cannot send to port 0 so drop that source port.
       17,     // Quote of the Day, can loop with QUIC.
@@ -1303,17 +1306,25 @@ std::shared_ptr<QuicSession> QuicDispatcher::CreateSessionFromChlo(
   if (!replaced_connection_id) {
     server_connection_id = original_connection_id;
   }
+  QUIC_CODE_COUNT(quic_connection_id_chosen);
   if (reference_counted_session_map_.count(*server_connection_id) > 0) {
     // The new connection ID is owned by another session. Avoid creating one
     // altogether, as this connection attempt cannot possibly succeed.
-    if (replaced_connection_id) {
+    QUIC_CODE_COUNT(quic_connection_id_collision);
+    QuicConnection* other_connection =
+        reference_counted_session_map_[*server_connection_id]->connection();
+    if (other_connection != nullptr) {  // Just make sure there is no crash.
       QUIC_LOG_EVERY_N_SEC(ERROR, 10)
           << "QUIC Connection ID collision. original_connection_id:"
           << original_connection_id.ToString()
           << " server_connection_id:" << server_connection_id->ToString()
           << ", version:" << version << ", self_address:" << self_address
           << ", peer_address:" << peer_address
-          << ", parsed_chlo:" << parsed_chlo;
+          << ", parsed_chlo:" << parsed_chlo
+          << ", other peer address: " << other_connection->peer_address();
+    }
+    if (replaced_connection_id) {
+      QUIC_CODE_COUNT(quic_replaced_connection_id_collision);
       // The original connection ID does not correspond to an existing
       // session. It is safe to send CONNECTION_CLOSE and add to TIME_WAIT.
       StatelesslyTerminateConnection(

@@ -2,17 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "partition_alloc/partition_alloc_base/threading/platform_thread_for_testing.h"
-
 #include <pthread.h>
-#include <stddef.h>
+
+#include <cstddef>
+
+#include "partition_alloc/partition_alloc_base/threading/platform_thread_for_testing.h"
 
 namespace partition_alloc::internal::base {
 
 void InitThreading() {}
 
 void TerminateOnThread() {
-  // partition alloc tests don't use AttachCurrentThread(), because
+  // PartitionAlloc tests don't use AttachCurrentThread(), because
   // the tests don't set / get any thread priority. So no need to do
   // "base::android::DetachFromVM();" here.
 }

@@ -4,6 +4,7 @@
 
 package org.chromium.net.telemetry;
 
+import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.TruthJUnit.assume;
 
 import static org.mockito.Mockito.never;
@@ -36,9 +37,6 @@ public final class CronetLoggerImplTest {
     public CronetLoggerImplTest() {
         // CronetLoggerImpl only supports R+
         assume().that(Build.VERSION.SDK_INT).isAtLeast(Build.VERSION_CODES.R);
-        // TODO(crbug.com/1503671): Chromium Mockito doesn't work on Android 14. Remove this line
-        // once Mockito is fixed.
-        assume().that(Build.VERSION.SDK_INT).isLessThan(Build.VERSION_CODES.UPSIDE_DOWN_CAKE);
     }
 
     @Rule public final MockitoRule mockito = MockitoJUnit.rule();
@@ -55,6 +53,15 @@ public final class CronetLoggerImplTest {
     @Before
     public void setUp() {
         mCronetLoggerImpl = spy(new CronetLoggerImpl(1));
+    }
+
+    @Test
+    public void testGenerateId() {
+        long id = mCronetLoggerImpl.generateId();
+        assertThat(id).isNotEqualTo(Long.MIN_VALUE);
+        assertThat(id).isNotEqualTo(Long.MAX_VALUE);
+        assertThat(id).isNotEqualTo(-1);
+        assertThat(id).isNotEqualTo(0);
     }
 
     @Test

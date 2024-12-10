@@ -7,6 +7,7 @@
 #include <utility>
 
 #include "base/check_op.h"
+#include "base/containers/heap_array.h"
 #include "base/numerics/safe_math.h"
 
 namespace net {
@@ -23,9 +24,13 @@ void IOBuffer::AssertValidBufferSize(size_t size) {
 
 IOBuffer::IOBuffer() = default;
 
-IOBuffer::IOBuffer(char* data, size_t size) : data_(data), size_(size) {
-  AssertValidBufferSize(size);
+IOBuffer::IOBuffer(base::span<char> data)
+    : data_(data.data()), size_(data.size()) {
+  AssertValidBufferSize(size_);
 }
+
+IOBuffer::IOBuffer(base::span<uint8_t> data)
+    : IOBuffer(base::as_writable_chars(data)) {}
 
 IOBuffer::~IOBuffer() = default;
 
@@ -33,14 +38,14 @@ IOBufferWithSize::IOBufferWithSize() = default;
 
 IOBufferWithSize::IOBufferWithSize(size_t buffer_size) {
   AssertValidBufferSize(buffer_size);
-  if (buffer_size) {
-    size_ = buffer_size;
-    data_ = new char[buffer_size];
-  }
+  storage_ = base::HeapArray<char>::Uninit(buffer_size);
+  size_ = storage_.size();
+  data_ = storage_.data();
 }
 
 IOBufferWithSize::~IOBufferWithSize() {
-  data_.ClearAndDeleteArray();
+  // Clear pointer before this destructor makes it dangle.
+  data_ = nullptr;
 }
 
 StringIOBuffer::StringIOBuffer(std::string s) : string_data_(std::move(s)) {
@@ -59,7 +64,7 @@ StringIOBuffer::~StringIOBuffer() {
 }
 
 DrainableIOBuffer::DrainableIOBuffer(scoped_refptr<IOBuffer> base, size_t size)
-    : IOBuffer(base->data(), size), base_(std::move(base)) {}
+    : IOBuffer(base->span().first(size)), base_(std::move(base)) {}
 
 void DrainableIOBuffer::DidConsume(int bytes) {
   SetOffset(used_ + bytes);
@@ -121,6 +126,20 @@ char* GrowableIOBuffer::StartOfBuffer() {
   return real_data_.get();
 }
 
+base::span<uint8_t> GrowableIOBuffer::everything() {
+  return base::as_writable_bytes(
+      // SAFETY: The capacity_ is the size of the allocation.
+      UNSAFE_BUFFERS(
+          base::span(real_data_.get(), base::checked_cast<size_t>(capacity_))));
+}
+
+base::span<const uint8_t> GrowableIOBuffer::everything() const {
+  return base::as_bytes(
+      // SAFETY: The capacity_ is the size of the allocation.
+      UNSAFE_BUFFERS(
+          base::span(real_data_.get(), base::checked_cast<size_t>(capacity_))));
+}
+
 GrowableIOBuffer::~GrowableIOBuffer() {
   data_ = nullptr;
 }
@@ -137,8 +156,11 @@ PickledIOBuffer::~PickledIOBuffer() {
   data_ = nullptr;
 }
 
-WrappedIOBuffer::WrappedIOBuffer(const char* data, size_t size)
-    : IOBuffer(const_cast<char*>(data), size) {}
+WrappedIOBuffer::WrappedIOBuffer(base::span<const char> data)
+    : IOBuffer(base::make_span(const_cast<char*>(data.data()), data.size())) {}
+
+WrappedIOBuffer::WrappedIOBuffer(base::span<const uint8_t> data)
+    : WrappedIOBuffer(base::as_chars(data)) {}
 
 WrappedIOBuffer::~WrappedIOBuffer() = default;
 

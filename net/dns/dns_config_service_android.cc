@@ -7,6 +7,7 @@
 #include <sys/system_properties.h>
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 
@@ -26,7 +27,6 @@
 #include "net/dns/dns_config_service.h"
 #include "net/dns/public/dns_protocol.h"
 #include "net/dns/serial_worker.h"
-#include "third_party/abseil-cpp/absl/types/optional.h"
 
 namespace net {
 namespace internal {
@@ -142,7 +142,7 @@ class DnsConfigServiceAndroid::ConfigReader : public SerialWorker {
    private:
     friend class ConfigReader;
     android::DnsServerGetter dns_server_getter_;
-    absl::optional<DnsConfig> dns_config_;
+    std::optional<DnsConfig> dns_config_;
   };
 
   android::DnsServerGetter dns_server_getter_;

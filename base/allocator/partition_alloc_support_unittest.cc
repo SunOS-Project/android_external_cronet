@@ -10,13 +10,13 @@
 #include <vector>
 
 #include "base/allocator/partition_alloc_features.h"
-#include "base/allocator/partition_allocator/src/partition_alloc/dangling_raw_ptr_checks.h"
-#include "base/allocator/partition_allocator/src/partition_alloc/partition_alloc_base/cpu.h"
-#include "base/allocator/partition_allocator/src/partition_alloc/partition_alloc_buildflags.h"
 #include "base/test/gtest_util.h"
 #include "base/test/scoped_feature_list.h"
 #include "base/test/task_environment.h"
 #include "build/build_config.h"
+#include "partition_alloc/dangling_raw_ptr_checks.h"
+#include "partition_alloc/partition_alloc_base/cpu.h"
+#include "partition_alloc/partition_alloc_buildflags.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
@@ -254,19 +254,7 @@ TEST(PartitionAllocDanglingPtrChecks,
 
 #endif
 
-TEST(PartitionAllocSupportTest,
-     ProposeSyntheticFinchTrials_RendererLiveBackupRefPtr) {
-  const std::string group = ProposeSyntheticFinchTrials()[std::string(
-      base::features::kRendererLiveBRPSyntheticTrialName)];
-
-#if BUILDFLAG(FORCIBLY_ENABLE_BACKUP_REF_PTR_IN_ALL_PROCESSES)
-  EXPECT_EQ(group, "Enabled");
-#else
-  EXPECT_EQ(group, "Control");
-#endif
-}
-
-#if PA_CONFIG(HAS_MEMORY_TAGGING)
+#if BUILDFLAG(HAS_MEMORY_TAGGING)
 TEST(PartitionAllocSupportTest,
      ProposeSyntheticFinchTrials_MemoryTaggingDogfood) {
   {
@@ -295,6 +283,6 @@ TEST(PartitionAllocSupportTest,
     EXPECT_EQ(group_iter->second, expectation);
   }
 }
-#endif
+#endif  // BUILDFLAG(HAS_MEMORY_TAGGING)
 
 }  // namespace base::allocator

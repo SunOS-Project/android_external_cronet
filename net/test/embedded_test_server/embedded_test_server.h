@@ -9,7 +9,9 @@
 
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "base/files/file_path.h"
@@ -17,7 +19,6 @@
 #include "base/memory/raw_ptr.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/memory/weak_ptr.h"
-#include "base/strings/string_piece.h"
 #include "base/threading/thread.h"
 #include "base/threading/thread_checker.h"
 #include "net/base/address_list.h"
@@ -31,7 +32,6 @@
 #include "net/ssl/ssl_server_config.h"
 #include "net/test/cert_builder.h"
 #include "net/test/embedded_test_server/http_connection.h"
-#include "third_party/abseil-cpp/absl/types/optional.h"
 #include "third_party/boringssl/src/pki/ocsp_revocation_status.h"
 #include "third_party/boringssl/src/pki/parse_certificate.h"
 #include "url/gurl.h"
@@ -184,6 +184,9 @@ class EmbeddedTestServer {
     // included in the TLS handshake, but is available through the leaf's
     // AIA caIssuers URL.
     kByAIA,
+    // Generated cert is issued by a generated intermediate, which is NOT
+    // included in the TLS handshake and not served by an AIA server.
+    kMissing,
   };
 
   struct OCSPConfig {
@@ -374,13 +377,13 @@ class EmbeddedTestServer {
   // Equivalent of StartAndReturnHandle(), but requires manual Shutdown() by
   // the caller.
   [[nodiscard]] bool Start(int port = 0,
-                           base::StringPiece address = "127.0.0.1");
+                           std::string_view address = "127.0.0.1");
 
   // Starts listening for incoming connections but will not yet accept them.
   // Returns whether a listening socket has been successfully created.
   [[nodiscard]] bool InitializeAndListen(
       int port = 0,
-      base::StringPiece address = "127.0.0.1");
+      std::string_view address = "127.0.0.1");
 
   // Starts the Accept IO Thread and begins accepting connections.
   [[nodiscard]] EmbeddedTestServerHandle
@@ -412,18 +415,18 @@ class EmbeddedTestServer {
   // Returns a URL to the server based on the given relative URL, which
   // should start with '/'. For example: GetURL("/path?query=foo") =>
   // http://127.0.0.1:<port>/path?query=foo.
-  GURL GetURL(base::StringPiece relative_url) const;
+  GURL GetURL(std::string_view relative_url) const;
 
   // Similar to the above method with the difference that it uses the supplied
   // |hostname| for the URL instead of 127.0.0.1. The hostname should be
   // resolved to 127.0.0.1.
-  GURL GetURL(base::StringPiece hostname, base::StringPiece relative_url) const;
+  GURL GetURL(std::string_view hostname, std::string_view relative_url) const;
 
   // Convenience function equivalent to calling url::Origin::Create(base_url()).
   // Will use the GetURL() variant that takes a hostname as the base URL, if
   // `hostname` is non-null.
   url::Origin GetOrigin(
-      const absl::optional<std::string>& hostname = absl::nullopt) const;
+      const std::optional<std::string>& hostname = std::nullopt) const;
 
   // Returns the address list needed to connect to the server.
   [[nodiscard]] bool GetAddressList(AddressList* address_list) const;
@@ -447,10 +450,24 @@ class EmbeddedTestServer {
   bool ResetSSLConfig(ServerCertificate cert,
                       const SSLServerConfig& ssl_config);
 
+  // Configures the test server to generate a certificate that covers the
+  // specified hostnames. This implicitly also includes 127.0.0.1 in the
+  // certificate. It is invalid to call after the server is started. If called
+  // multiple times, the last call will have effect.
+  // Convenience method for configuring an HTTPS test server when a test needs
+  // to support a set of hostnames over HTTPS, rather than explicitly setting
+  /// up a full config using SetSSLConfig().
+  void SetCertHostnames(std::vector<std::string> hostnames);
+
   // Returns the certificate that the server is using.
   // If using a generated ServerCertificate type, this must not be called before
   // InitializeAndListen() has been called.
   scoped_refptr<X509Certificate> GetCertificate();
+
+  // Returns any generated intermediates that the server may be using. May
+  // return null if no intermediate is generated. Must not be called before
+  // InitializeAndListen().
+  scoped_refptr<X509Certificate> GetGeneratedIntermediate();
 
   // Registers request handler which serves files from |directory|.
   // For instance, a request to "/foo.html" is served by "foo.html" under
@@ -461,7 +478,7 @@ class EmbeddedTestServer {
   void ServeFilesFromDirectory(const base::FilePath& directory);
 
   // Serves files relative to DIR_SRC_TEST_DATA_ROOT.
-  void ServeFilesFromSourceDirectory(base::StringPiece relative);
+  void ServeFilesFromSourceDirectory(std::string_view relative);
   void ServeFilesFromSourceDirectory(const base::FilePath& relative);
 
   // Registers the default handlers and serve additional files from the
@@ -604,6 +621,8 @@ class EmbeddedTestServer {
   ServerCertificate cert_ = CERT_OK;
   ServerCertificateConfig cert_config_;
   scoped_refptr<X509Certificate> x509_cert_;
+  // May be null if no intermediate is generated.
+  scoped_refptr<X509Certificate> intermediate_;
   bssl::UniquePtr<EVP_PKEY> private_key_;
   base::flat_map<std::string, std::string> alps_accept_ch_;
   std::unique_ptr<SSLServerContext> context_;

@@ -6,6 +6,8 @@
 
 #include <Security/Security.h>
 
+#include <string_view>
+
 #include "base/apple/foundation_util.h"
 #include "base/apple/osstatus_logging.h"
 #include "base/atomicops.h"
@@ -214,8 +216,7 @@ TrustStatus IsCertificateTrustedForPolicyInDomain(
   // more than one domain it would generally be because one domain is
   // overriding the setting in the next, so it would only get done once anyway.
   base::apple::ScopedCFTypeRef<SecCertificateRef> cert_handle =
-      x509_util::CreateSecCertificateFromBytes(cert->der_cert().UnsafeData(),
-                                               cert->der_cert().Length());
+      x509_util::CreateSecCertificateFromBytes(cert->der_cert());
   if (!cert_handle)
     return TrustStatus::UNSPECIFIED;
 
@@ -264,8 +265,7 @@ TrustStatus IsCertificateTrustedForPolicy(const bssl::ParsedCertificate* cert,
 TrustStatus IsCertificateTrustedForPolicy(const bssl::ParsedCertificate* cert,
                                           const CFStringRef policy_oid) {
   base::apple::ScopedCFTypeRef<SecCertificateRef> cert_handle =
-      x509_util::CreateSecCertificateFromBytes(cert->der_cert().UnsafeData(),
-                                               cert->der_cert().Length());
+      x509_util::CreateSecCertificateFromBytes(cert->der_cert());
 
   if (!cert_handle)
     return TrustStatus::UNSPECIFIED;
@@ -406,7 +406,7 @@ class TrustDomainCacheFullCerts {
 
  private:
   void HistogramTrustDomainCertCount(size_t count) const {
-    base::StringPiece domain_name;
+    std::string_view domain_name;
     switch (domain_) {
       case kSecTrustSettingsDomainUser:
         domain_name = "User";
@@ -432,7 +432,7 @@ class TrustDomainCacheFullCerts {
 
 SHA256HashValue CalculateFingerprint256(const bssl::der::Input& buffer) {
   SHA256HashValue sha256;
-  SHA256(buffer.UnsafeData(), buffer.Length(), sha256.data);
+  SHA256(buffer.data(), buffer.size(), sha256.data);
   return sha256;
 }
 
@@ -1165,8 +1165,7 @@ base::apple::ScopedCFTypeRef<CFDataRef> TrustStoreMac::GetMacNormalizedIssuer(
   // There does not appear to be any public API to get the normalized version
   // of a Name without creating a SecCertificate.
   base::apple::ScopedCFTypeRef<SecCertificateRef> cert_handle(
-      x509_util::CreateSecCertificateFromBytes(cert->der_cert().UnsafeData(),
-                                               cert->der_cert().Length()));
+      x509_util::CreateSecCertificateFromBytes(cert->der_cert()));
   if (!cert_handle) {
     LOG(ERROR) << "CreateCertBufferFromBytes";
     return name_data;

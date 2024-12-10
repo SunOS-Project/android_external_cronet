@@ -32,14 +32,14 @@ public final class NativeTestServer {
     }
 
     public static boolean startNativeTestServerWithHTTPS(
-        Context context, @ServerCertificate int serverCertificate) {
+            Context context, @ServerCertificate int serverCertificate) {
         TestFilesInstaller.installIfNeeded(context);
         return NativeTestServerJni.get()
-            .startNativeTestServer(
-                TestFilesInstaller.getInstalledPath(context),
-                UrlUtils.getIsolatedTestRoot(),
-                true, // useHttps
-                serverCertificate);
+                .startNativeTestServer(
+                        TestFilesInstaller.getInstalledPath(context),
+                        UrlUtils.getIsolatedTestRoot(),
+                        true, // useHttps
+                        serverCertificate);
     }
 
     public static void shutdownNativeTestServer() {
@@ -113,6 +113,7 @@ public final class NativeTestServer {
                 String testDataDir,
                 boolean useHttps,
                 @ServerCertificate int certificate);
+
         void shutdownNativeTestServer();
 
         String getEchoBodyURL();

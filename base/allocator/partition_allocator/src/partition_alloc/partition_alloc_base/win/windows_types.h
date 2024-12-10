@@ -5,11 +5,12 @@
 // This file contains defines and typedefs that allow popular Windows types to
 // be used without the overhead of including windows.h.
 
-#ifndef BASE_ALLOCATOR_PARTITION_ALLOCATOR_SRC_PARTITION_ALLOC_PARTITION_ALLOC_BASE_WIN_WINDOWS_TYPES_H_
-#define BASE_ALLOCATOR_PARTITION_ALLOCATOR_SRC_PARTITION_ALLOC_PARTITION_ALLOC_BASE_WIN_WINDOWS_TYPES_H_
+#ifndef PARTITION_ALLOC_PARTITION_ALLOC_BASE_WIN_WINDOWS_TYPES_H_
+#define PARTITION_ALLOC_PARTITION_ALLOC_BASE_WIN_WINDOWS_TYPES_H_
 
 // Needed for function prototypes.
 #include <specstrings.h>
+#include <cstdint>
 
 #ifdef __cplusplus
 extern "C" {
@@ -19,8 +20,8 @@ extern "C" {
 
 typedef unsigned long DWORD;
 typedef long LONG;
-typedef __int64 LONGLONG;
-typedef unsigned __int64 ULONGLONG;
+typedef int64_t LONGLONG;
+typedef uint64_t ULONGLONG;
 
 #define VOID void
 typedef char CHAR;
@@ -29,7 +30,7 @@ typedef long LONG;
 typedef int INT;
 typedef unsigned int UINT;
 typedef unsigned int* PUINT;
-typedef unsigned __int64 UINT64;
+typedef uint64_t UINT64;
 typedef void* LPVOID;
 typedef void* PVOID;
 typedef void* HANDLE;
@@ -87,4 +88,4 @@ WINBASEAPI VOID WINAPI SetLastError(_In_ DWORD dwErrCode);
 }
 #endif
 
-#endif  // BASE_ALLOCATOR_PARTITION_ALLOCATOR_SRC_PARTITION_ALLOC_PARTITION_ALLOC_BASE_WIN_WINDOWS_TYPES_H_
+#endif  // PARTITION_ALLOC_PARTITION_ALLOC_BASE_WIN_WINDOWS_TYPES_H_

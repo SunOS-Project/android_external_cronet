@@ -158,20 +158,7 @@ public class NQETest {
     @Test
     @SmallTest
     public void testQuicDisabled() throws Exception {
-        // Set up HistogramWatcher before starting CronetEngine. This is because the
-        // HistogramWatcher takes a snapshot of the starting sample count and uses the delta of this
-        // and the count at assertExpected() call time to confirm that new samples are logged.
         UmaRecorderHolder.onLibraryLoaded(); // Hackish workaround to crbug.com/1338919
-        var writeCountHistogram =
-                HistogramWatcher.newBuilder()
-                        .expectIntRecord("NQE.Prefs.WriteCount", 1)
-                        .allowExtraRecordsForHistogramsAbove()
-                        .build();
-        var readCountHistogram =
-                HistogramWatcher.newBuilder()
-                        .expectIntRecord("NQE.Prefs.ReadCount", 1)
-                        .allowExtraRecordsForHistogramsAbove()
-                        .build();
         assertThat(RttThroughputValues.INVALID_RTT_THROUGHPUT).isLessThan(0);
         Executor listenersExecutor = Executors.newSingleThreadExecutor(new ExecutorThreadFactory());
         TestNetworkQualityRttListener rttListener =
@@ -224,9 +211,6 @@ public class NQETest {
 
         assertThat(throughputListener.throughputObservationCount()).isGreaterThan(0);
 
-        // Prefs must be read at startup.
-        readCountHistogram.assertExpected();
-
         // Check RTT observation count after throughput observation has been received. This ensures
         // that executor has finished posting the RTT observation to the RTT listeners.
         assertThat(rttListener.rttObservationCount()).isGreaterThan(0);
@@ -271,7 +255,6 @@ public class NQETest {
         assertThat(prefsFileContainsString("network_qualities")).isTrue();
 
         cronetEngine.shutdown();
-        writeCountHistogram.assertExpected();
     }
 
     @Test
@@ -282,30 +265,6 @@ public class NQETest {
 
         UmaRecorderHolder.onLibraryLoaded(); // Hackish workaround to crbug.com/1338919
         for (int i = 0; i <= 1; ++i) {
-            // Set up HistogramWatcher before starting CronetEngine. This is because the
-            // HistogramWatcher takes a snapshot of the starting sample count and uses the delta of
-            // this and the count at assertExpected() call time to confirm that new samples are
-            // logged.
-            HistogramWatcher readCountHistogram =
-                    HistogramWatcher.newBuilder()
-                            .expectIntRecord("NQE.Prefs.ReadCount", 1)
-                            .allowExtraRecordsForHistogramsAbove()
-                            .build();
-
-            // Stored network quality in the pref should be read in the second iteration.
-            HistogramWatcher readPrefsSizeHistogram;
-            if (i == 0) {
-                readPrefsSizeHistogram =
-                        HistogramWatcher.newBuilder()
-                                .expectIntRecord("NQE.Prefs.ReadSize", 0)
-                                .build();
-            } else {
-                readPrefsSizeHistogram =
-                        HistogramWatcher.newBuilder()
-                                .expectIntRecord("NQE.Prefs.ReadSize", 1)
-                                .allowExtraRecordsForHistogramsAbove()
-                                .build();
-            }
 
             // NETWORK_QUALITY_OBSERVATION_SOURCE_HTTP_CACHED_ESTIMATE: 3
             HistogramWatcher cachedRttHistogram =
@@ -354,9 +313,6 @@ public class NQETest {
             // Wait for RTT observation (at the URL request layer) to be posted.
             rttListener.waitUntilFirstUrlRequestRTTReceived();
 
-            // Prefs must be read at startup.
-            readCountHistogram.assertExpected();
-
             // Check RTT observation count after throughput observation has been received. This
             // ensures that executor has finished posting the RTT observation to the RTT
             // listeners.
@@ -374,7 +330,6 @@ public class NQETest {
                 assertThat(prefsFileContainsString("network_qualities")).isTrue();
             }
 
-            readPrefsSizeHistogram.assertExpected();
             if (i > 0) {
                 cachedRttHistogram.assertExpected();
             }

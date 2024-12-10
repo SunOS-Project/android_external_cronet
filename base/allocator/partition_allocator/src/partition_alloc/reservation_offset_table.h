@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef BASE_ALLOCATOR_PARTITION_ALLOCATOR_SRC_PARTITION_ALLOC_RESERVATION_OFFSET_TABLE_H_
-#define BASE_ALLOCATOR_PARTITION_ALLOCATOR_SRC_PARTITION_ALLOC_RESERVATION_OFFSET_TABLE_H_
+#ifndef PARTITION_ALLOC_RESERVATION_OFFSET_TABLE_H_
+#define PARTITION_ALLOC_RESERVATION_OFFSET_TABLE_H_
 
 #include <cstddef>
 #include <cstdint>
@@ -100,8 +100,16 @@ class PA_COMPONENT_EXPORT(PARTITION_ALLOC)
   // If thread isolation support is enabled, we need to write-protect the tables
   // of the thread isolated pool. For this, we need to pad the tables so that
   // the thread isolated ones start on a page boundary.
+#if defined(__clang__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wzero-length-array"
+#endif
   char pad_[PA_THREAD_ISOLATED_ARRAY_PAD_SZ(_ReservationOffsetTable,
                                             kNumPools)] = {};
+#if defined(__clang__)
+#pragma clang diagnostic pop
+#endif
+
   struct _ReservationOffsetTable tables[kNumPools];
   static PA_CONSTINIT ReservationOffsetTable singleton_;
 #else
@@ -155,8 +163,8 @@ PA_ALWAYS_INLINE const uint16_t* GetReservationOffsetTableEnd(
 PA_ALWAYS_INLINE uint16_t* ReservationOffsetPointer(uintptr_t address) {
 #if BUILDFLAG(HAS_64_BIT_POINTERS)
   // In 64-bit mode, find the owning Pool and compute the offset from its base.
-  auto [pool, unused_base, offset] = GetPoolInfo(address);
-  return ReservationOffsetPointer(pool, offset);
+  PartitionAddressSpace::PoolInfo info = GetPoolInfo(address);
+  return ReservationOffsetPointer(info.handle, info.offset);
 #else
   size_t table_index = address >> kSuperPageShift;
   PA_DCHECK(table_index <
@@ -281,4 +289,4 @@ PA_ALWAYS_INLINE bool IsManagedByNormalBucketsOrDirectMap(uintptr_t address) {
 
 }  // namespace partition_alloc::internal
 
-#endif  // BASE_ALLOCATOR_PARTITION_ALLOCATOR_SRC_PARTITION_ALLOC_RESERVATION_OFFSET_TABLE_H_
+#endif  // PARTITION_ALLOC_RESERVATION_OFFSET_TABLE_H_

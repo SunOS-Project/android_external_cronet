@@ -8,7 +8,9 @@
 #include <stdint.h>
 
 #include <ostream>
+#include <string_view>
 
+#include "base/containers/span.h"
 #include "base/hash/hash.h"
 #include "base/rand_util.h"
 #include "base/strings/string_util.h"
@@ -67,7 +69,7 @@ Uuid Uuid::GenerateRandomV4() {
   uint8_t sixteen_bytes[kGuidV4InputLength];
   // Use base::RandBytes instead of crypto::RandBytes, because crypto calls the
   // base version directly, and to prevent the dependency from base/ to crypto/.
-  RandBytes(&sixteen_bytes, sizeof(sixteen_bytes));
+  RandBytes(sixteen_bytes);
   return FormatRandomDataAsV4Impl(sixteen_bytes);
 }
 
@@ -115,28 +117,28 @@ Uuid Uuid::FormatRandomDataAsV4Impl(base::span<const uint8_t, 16> input) {
 }
 
 // static
-Uuid Uuid::ParseCaseInsensitive(StringPiece input) {
+Uuid Uuid::ParseCaseInsensitive(std::string_view input) {
   Uuid uuid;
   uuid.lowercase_ = GetCanonicalUuidInternal(input, /*strict=*/false);
   return uuid;
 }
 
 // static
-Uuid Uuid::ParseCaseInsensitive(StringPiece16 input) {
+Uuid Uuid::ParseCaseInsensitive(std::u16string_view input) {
   Uuid uuid;
   uuid.lowercase_ = GetCanonicalUuidInternal(input, /*strict=*/false);
   return uuid;
 }
 
 // static
-Uuid Uuid::ParseLowercase(StringPiece input) {
+Uuid Uuid::ParseLowercase(std::string_view input) {
   Uuid uuid;
   uuid.lowercase_ = GetCanonicalUuidInternal(input, /*strict=*/true);
   return uuid;
 }
 
 // static
-Uuid Uuid::ParseLowercase(StringPiece16 input) {
+Uuid Uuid::ParseLowercase(std::u16string_view input) {
   Uuid uuid;
   uuid.lowercase_ = GetCanonicalUuidInternal(input, /*strict=*/true);
   return uuid;

@@ -598,10 +598,9 @@ static MailtoURLParseCase mailto_cases[] = {
 TEST(URLParser, MailtoUrl) {
   // Declared outside for loop to try to catch cases in init() where we forget
   // to reset something that is reset by the constructor.
-  Parsed parsed;
   for (const auto& mailto_case : mailto_cases) {
     const char* url = mailto_case.input;
-    ParseMailtoURL(url, static_cast<int>(strlen(url)), &parsed);
+    Parsed parsed = ParseMailtoURL(url);
     int port = ParsePort(url, parsed.port);
 
     EXPECT_TRUE(ComponentMatches(url, mailto_case.scheme, parsed.scheme));
@@ -636,10 +635,9 @@ static FileSystemURLParseCase filesystem_cases[] = {
 TEST(URLParser, FileSystemURL) {
   // Declared outside for loop to try to catch cases in init() where we forget
   // to reset something that is reset by the constructor.
-  Parsed parsed;
   for (const auto& filesystem_case : filesystem_cases) {
     const char* url = filesystem_case.input;
-    ParseFileSystemURL(url, static_cast<int>(strlen(url)), &parsed);
+    Parsed parsed = ParseFileSystemURL(url);
 
     EXPECT_TRUE(ComponentMatches(url, "filesystem", parsed.scheme));
     EXPECT_EQ(!filesystem_case.inner_scheme, !parsed.inner_parsed());
@@ -685,6 +683,13 @@ static URLParseCase non_special_cases[] = {
     {"git://host/a b", "git", nullptr, nullptr, "host", -1, "/a b", nullptr,
      nullptr},
     {"git://ho\\st/", "git", nullptr, nullptr, "ho\\st", -1, "/", nullptr,
+     nullptr},
+    // Empty users
+    {"git://@host", "git", "", nullptr, "host", -1, nullptr, nullptr, nullptr},
+    // Empty user and invalid host. "git://@" is an invalid URL.
+    {"git://@", "git", "", nullptr, nullptr, -1, nullptr, nullptr, nullptr},
+    // Invalid host and non-empty port. "git://:80" is an invalid URL.
+    {"git://:80", "git", nullptr, nullptr, nullptr, 80, nullptr, nullptr,
      nullptr},
     // Empty host cases
     {"git://", "git", nullptr, nullptr, "", -1, nullptr, nullptr, nullptr},

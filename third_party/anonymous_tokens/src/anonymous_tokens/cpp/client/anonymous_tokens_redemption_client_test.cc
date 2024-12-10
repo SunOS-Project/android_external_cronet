@@ -26,7 +26,6 @@
 #include "anonymous_tokens/cpp/testing/utils.h"
 #include "anonymous_tokens/proto/anonymous_tokens.pb.h"
 
-
 namespace anonymous_tokens {
 namespace {
 
@@ -145,14 +144,6 @@ TEST_F(AnonymousTokensRedemptionClientTest, InvalidKeyVersions) {
   EXPECT_EQ(redemption_client_1.status().code(),
             absl::StatusCode::kInvalidArgument);
   EXPECT_THAT(redemption_client_1.status().message(),
-              HasSubstr("must be greater than 0"));
-  // Key version negative.
-  absl::StatusOr<std::unique_ptr<AnonymousTokensRedemptionClient>>
-      redemption_client_2 =
-          AnonymousTokensRedemptionClient::Create(TEST_USE_CASE, -10);
-  EXPECT_EQ(redemption_client_2.status().code(),
-            absl::StatusCode::kInvalidArgument);
-  EXPECT_THAT(redemption_client_2.status().message(),
               HasSubstr("must be greater than 0"));
 }
 
@@ -422,7 +413,7 @@ TEST_F(AnonymousTokensRedemptionClientTest,
       client_->ProcessAnonymousTokensRedemptionResponse(dummy_response_));
   auto tokens_to_result_map = CreateTokenToRedemptionResultMap(dummy_response_);
   // Checks
-  ASSERT_EQ(rsa_blind_sig_redemption_results.size(), 1);
+  ASSERT_EQ(rsa_blind_sig_redemption_results.size(), 1u);
   std::string token =
       rsa_blind_sig_redemption_results[0].token_with_input().token().token();
   ASSERT_TRUE(tokens_to_result_map.contains(token));
@@ -465,7 +456,7 @@ TEST_F(AnonymousTokensRedemptionClientTest,
   *(dummy_response_.add_anonymous_token_redemption_results()) =
       CreateRedemptionResultForTesting(tokens_with_inputs[1], false, true,
                                        TEST_USE_CASE, 1);
-  for (int i = 2; i < tokens_with_inputs.size(); ++i) {
+  for (size_t i = 2; i < tokens_with_inputs.size(); ++i) {
     *(dummy_response_.add_anonymous_token_redemption_results()) =
         CreateRedemptionResultForTesting(tokens_with_inputs[i]);
   }
@@ -475,7 +466,7 @@ TEST_F(AnonymousTokensRedemptionClientTest,
   auto tokens_to_result_map = CreateTokenToRedemptionResultMap(dummy_response_);
   // Checks
   ASSERT_EQ(tokens_with_inputs.size(), rsa_blind_sig_redemption_results.size());
-  for (int i = 0; i < rsa_blind_sig_redemption_results.size(); ++i) {
+  for (size_t i = 0; i < rsa_blind_sig_redemption_results.size(); ++i) {
     std::string token =
         rsa_blind_sig_redemption_results[i].token_with_input().token().token();
     ASSERT_TRUE(tokens_to_result_map.contains(token));

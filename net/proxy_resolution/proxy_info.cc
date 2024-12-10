@@ -17,7 +17,6 @@ ProxyInfo::~ProxyInfo() = default;
 void ProxyInfo::Use(const ProxyInfo& other) {
   proxy_resolve_start_time_ = other.proxy_resolve_start_time_;
   proxy_resolve_end_time_ = other.proxy_resolve_end_time_;
-  is_for_ip_protection_ = other.is_for_ip_protection_;
   proxy_list_ = other.proxy_list_;
   proxy_retry_info_ = other.proxy_retry_info_;
   did_bypass_proxy_ = other.did_bypass_proxy_;
@@ -25,7 +24,7 @@ void ProxyInfo::Use(const ProxyInfo& other) {
 
 void ProxyInfo::UseDirect() {
   Reset();
-  proxy_list_.SetSingleProxyServer(ProxyServer::Direct());
+  proxy_list_.SetSingleProxyChain(ProxyChain::Direct());
 }
 
 void ProxyInfo::UseDirectWithBypassedProxy() {
@@ -69,70 +68,11 @@ std::string ProxyInfo::ToPacString() const {
   return proxy_list_.ToPacString();
 }
 
-bool ProxyInfo::is_https() const {
-  if (is_empty() || is_direct()) {
+bool ProxyInfo::is_for_ip_protection() const {
+  if (is_empty()) {
     return false;
   }
-  if (proxy_chain().is_multi_proxy()) {
-    CHECK(AllChainProxiesAreHttps());
-    return true;
-  }
-  return proxy_chain().GetProxyServer(/*chain_index=*/0).is_https();
-}
-
-bool ProxyInfo::is_http_like() const {
-  if (is_empty() || is_direct()) {
-    return false;
-  }
-  if (proxy_chain().is_multi_proxy()) {
-    CHECK(AllChainProxiesAreHttps());
-    return true;
-  }
-  return proxy_chain().GetProxyServer(/*chain_index=*/0).is_http_like();
-}
-
-bool ProxyInfo::is_secure_http_like() const {
-  if (is_empty() || is_direct()) {
-    return false;
-  }
-  if (proxy_chain().is_multi_proxy()) {
-    CHECK(AllChainProxiesAreHttps());
-    return true;
-  }
-  return proxy_chain().GetProxyServer(/*chain_index=*/0).is_secure_http_like();
-}
-
-bool ProxyInfo::is_http() const {
-  if (is_empty() || is_direct()) {
-    return false;
-  }
-  if (proxy_chain().is_multi_proxy()) {
-    CHECK(AllChainProxiesAreHttps());
-    return false;
-  }
-  return proxy_chain().GetProxyServer(/*chain_index=*/0).is_http();
-}
-
-bool ProxyInfo::is_quic() const {
-  if (is_empty() || is_direct()) {
-    return false;
-  }
-  if (proxy_chain().is_multi_proxy()) {
-    CHECK(AllChainProxiesAreHttps());
-    return false;
-  }
-  return proxy_chain().GetProxyServer(/*chain_index=*/0).is_quic();
-}
-
-bool ProxyInfo::is_socks() const {
-  if (is_empty() || is_direct()) {
-    return false;
-  }
-  if (proxy_chain().is_multi_proxy()) {
-    CHECK(AllChainProxiesAreHttps());
-    return false;
-  }
-  return proxy_chain().GetProxyServer(/*chain_index=*/0).is_socks();
+  return proxy_chain().is_for_ip_protection();
 }
 
 std::string ProxyInfo::ToDebugString() const {
@@ -155,7 +95,6 @@ void ProxyInfo::RemoveProxiesWithoutScheme(int scheme_bit_field) {
 void ProxyInfo::Reset() {
   proxy_resolve_start_time_ = base::TimeTicks();
   proxy_resolve_end_time_ = base::TimeTicks();
-  is_for_ip_protection_ = false;
   proxy_list_.Clear();
   proxy_retry_info_.clear();
   did_bypass_proxy_ = false;

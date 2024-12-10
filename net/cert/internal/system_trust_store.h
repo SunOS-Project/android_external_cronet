@@ -5,8 +5,7 @@
 #ifndef NET_CERT_INTERNAL_SYSTEM_TRUST_STORE_H_
 #define NET_CERT_INTERNAL_SYSTEM_TRUST_STORE_H_
 
-#include <vector>
-
+#include "base/containers/span.h"
 #include "build/build_config.h"
 #include "net/base/net_export.h"
 #include "net/net_buildflags.h"
@@ -14,6 +13,8 @@
 #include "third_party/boringssl/src/pki/trust_store.h"
 
 namespace net {
+
+struct ChromeRootCertConstraints;
 
 // The SystemTrustStore interface is used to encapsulate a bssl::TrustStore for
 // the current platform, with some extra bells and whistles. Implementations
@@ -42,6 +43,11 @@ class SystemTrustStore {
   // Returns the current version of the Chrome Root Store being used. If
   // Chrome Root Store is not in use, returns 0.
   virtual int64_t chrome_root_store_version() const = 0;
+
+  // Returns the Chrome Root Store constraints for `cert`, or nullptr if the
+  // certificate is not constrained.
+  virtual base::span<const ChromeRootCertConstraints> GetChromeRootConstraints(
+      const bssl::ParsedCertificate* cert) const = 0;
 #endif
 };
 
@@ -59,6 +65,12 @@ class TrustStoreChrome;
 // anchors. This cannot return nullptr.
 NET_EXPORT std::unique_ptr<SystemTrustStore>
 CreateSslSystemTrustStoreChromeRoot(
+    std::unique_ptr<TrustStoreChrome> chrome_root);
+
+// Creates an instance of SystemTrustStore that only uses the Chrome Root Store
+// trust anchors.
+// This cannot return nullptr.
+NET_EXPORT std::unique_ptr<SystemTrustStore> CreateChromeOnlySystemTrustStore(
     std::unique_ptr<TrustStoreChrome> chrome_root);
 
 NET_EXPORT_PRIVATE std::unique_ptr<SystemTrustStore>

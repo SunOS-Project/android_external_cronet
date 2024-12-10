@@ -3,9 +3,12 @@
 // found in the LICENSE file.
 package org.chromium.net.impl;
 
+import static android.os.Process.THREAD_PRIORITY_BACKGROUND;
 import static android.os.Process.THREAD_PRIORITY_LOWEST;
 
 import android.content.Context;
+import android.os.Process;
+import android.os.SystemClock;
 import android.util.Base64;
 
 import androidx.annotation.IntDef;
@@ -13,6 +16,7 @@ import androidx.annotation.VisibleForTesting;
 
 import org.chromium.net.CronetEngine;
 import org.chromium.net.ICronetEngineBuilder;
+import org.chromium.net.impl.CronetLogger.CronetSource;
 
 import java.io.File;
 import java.lang.annotation.Retention;
@@ -125,18 +129,23 @@ public abstract class CronetEngineBuilderImpl extends ICronetEngineBuilder {
 
     private static final int INVALID_THREAD_PRIORITY = THREAD_PRIORITY_LOWEST + 1;
 
+    @VisibleForTesting
+    static int sApiLevel = VersionSafeCallbacks.ApiVersion.getMaximumAvailableApiLevel();
+
+    protected final CronetLogger mLogger;
+
     // Private fields are simply storage of configuration for the resulting CronetEngine.
     // See setters below for verbose descriptions.
     private final Context mApplicationContext;
     private final List<QuicHint> mQuicHints = new LinkedList<>();
     private final List<Pkp> mPkps = new LinkedList<>();
+    private final CronetSource mSource;
     private boolean mPublicKeyPinningBypassForLocalTrustAnchorsEnabled;
     private String mUserAgent;
     private String mStoragePath;
     private boolean mQuicEnabled;
     private boolean mHttp2Enabled;
     private boolean mBrotiEnabled;
-    private boolean mDisableCache;
     private HttpCacheMode mHttpCacheMode;
     private long mHttpCacheMaxSize;
     private String mExperimentalOptions;
@@ -146,16 +155,65 @@ public abstract class CronetEngineBuilderImpl extends ICronetEngineBuilder {
 
     /**
      * Default config enables SPDY and QUIC, disables SDCH and HTTP cache.
+     *
      * @param context Android {@link Context} for engine to use.
      */
-    public CronetEngineBuilderImpl(Context context) {
+    public CronetEngineBuilderImpl(Context context, CronetSource source) {
+        var startUptimeMillis = SystemClock.uptimeMillis();
+        boolean successful = false;
         mApplicationContext = context.getApplicationContext();
-        enableQuic(true);
-        enableHttp2(true);
-        enableBrotli(false);
-        enableHttpCache(CronetEngine.Builder.HTTP_CACHE_DISABLED, 0);
-        enableNetworkQualityEstimator(false);
-        enablePublicKeyPinningBypassForLocalTrustAnchors(true);
+        mSource = source;
+        mLogger = CronetLoggerFactory.createLogger(mApplicationContext, mSource);
+        try {
+            enableQuic(true);
+            enableHttp2(true);
+            enableBrotli(false);
+            enableHttpCache(CronetEngine.Builder.HTTP_CACHE_DISABLED, 0);
+            enableNetworkQualityEstimator(false);
+            enablePublicKeyPinningBypassForLocalTrustAnchors(true);
+
+            successful = true;
+        } finally {
+            maybeLogCronetEngineBuilderInitializedInfo(startUptimeMillis, successful);
+        }
+    }
+
+    /** TODO(b/332878149): Remove once this has landed internally and we've fixed all failures. */
+    public CronetEngineBuilderImpl(Context context) {
+        this(context, CronetSource.CRONET_SOURCE_UNSPECIFIED);
+    }
+
+    private void maybeLogCronetEngineBuilderInitializedInfo(
+            long startUptimeMillis, boolean successful) {
+        // Normally, the API code is responsible for logging this. However this only happens if the
+        // app is bundling an API jar that is recent enough to include the logging code. If it does
+        // not, we are on the hook for doing the logging here in impl code.
+        //
+        // The addition of logging code to the API was accompanied by an API level bump so that we
+        // can detect this case.
+        if (sApiLevel >= 30) return;
+
+        var logInfo = new CronetLogger.CronetEngineBuilderInitializedInfo();
+        logInfo.creationSuccessful = false;
+        try {
+            logInfo.author = CronetLogger.CronetEngineBuilderInitializedInfo.Author.IMPL;
+            logInfo.uid = Process.myUid();
+            logInfo.implVersion = new CronetLogger.CronetVersion(ImplVersion.getCronetVersion());
+            logInfo.source = mSource;
+            logInfo.apiVersion =
+                    new CronetLogger.CronetVersion(
+                            VersionSafeCallbacks.ApiVersion.getCronetVersion());
+            logInfo.cronetInitializationRef = getLogCronetInitializationRef();
+            logInfo.creationSuccessful = successful;
+        } finally {
+            logInfo.engineBuilderCreatedLatencyMillis =
+                    (int) (SystemClock.uptimeMillis() - startUptimeMillis);
+            mLogger.logCronetEngineBuilderInitializedInfo(logInfo);
+        }
+    }
+
+    CronetSource getCronetSource() {
+        return mSource;
     }
 
     @Override
@@ -455,7 +513,14 @@ public abstract class CronetEngineBuilderImpl extends ICronetEngineBuilder {
         return this;
     }
 
-    /** @return thread priority provided by user, or {@code defaultThreadPriority} if none provided. */
+    @Override
+    protected long getLogCronetInitializationRef() {
+        return 0;
+    }
+
+    /**
+     * @return thread priority provided by user, or {@code defaultThreadPriority} if none provided.
+     */
     @VisibleForTesting
     public int threadPriority(int defaultThreadPriority) {
         return mThreadPriority == INVALID_THREAD_PRIORITY ? defaultThreadPriority : mThreadPriority;
@@ -468,5 +533,20 @@ public abstract class CronetEngineBuilderImpl extends ICronetEngineBuilder {
      */
     Context getContext() {
         return mApplicationContext;
+    }
+
+    CronetLogger.CronetEngineBuilderInfo toLoggerInfo() {
+        return new CronetLogger.CronetEngineBuilderInfo(
+                /* publicKeyPinningBypassForLocalTrustAnchorsEnabled= */ publicKeyPinningBypassForLocalTrustAnchorsEnabled(),
+                /* userAgent= */ getUserAgent(),
+                /* storagePath= */ storagePath(),
+                /* quicEnabled= */ quicEnabled(),
+                /* http2Enabled= */ http2Enabled(),
+                /* brotiEnabled= */ brotliEnabled(),
+                /* httpCacheMode= */ publicBuilderHttpCacheMode(),
+                /* experimentalOptions= */ experimentalOptions(),
+                /* networkQualityEstimatorEnabled= */ networkQualityEstimatorEnabled(),
+                /* threadPriority= */ threadPriority(THREAD_PRIORITY_BACKGROUND),
+                /* cronetInitializationRef= */ getLogCronetInitializationRef());
     }
 }

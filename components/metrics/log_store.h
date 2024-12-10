@@ -5,11 +5,11 @@
 #ifndef COMPONENTS_METRICS_LOG_STORE_H_
 #define COMPONENTS_METRICS_LOG_STORE_H_
 
+#include <optional>
 #include <string>
 
 #include "base/strings/string_piece.h"
 #include "components/metrics/metrics_log.h"
-#include "third_party/abseil-cpp/absl/types/optional.h"
 
 namespace metrics {
 
@@ -43,7 +43,7 @@ class LogStore {
   // recorded during no particular user session or during guest session.
   //
   // Will trigger a DCHECK if there is no staged log.
-  virtual absl::optional<uint64_t> staged_log_user_id() const = 0;
+  virtual std::optional<uint64_t> staged_log_user_id() const = 0;
 
   // LogMetadata associated with the staged log.
   virtual const LogMetadata staged_log_metadata() const = 0;
@@ -66,7 +66,7 @@ class LogStore {
   // |overwrite_in_memory_store| is false, we will still not persist logs that
   // should be trimmed away, but they will still be available in memory
   // (allowing them to still be eligible for upload this session).
-  // TODO(crbug/1171830): Revisit call sites and determine what value of
+  // TODO(crbug.com/40745324): Revisit call sites and determine what value of
   // |overwrite_in_memory_store| they should use.
   virtual void TrimAndPersistUnsentLogs(bool overwrite_in_memory_store) = 0;
 

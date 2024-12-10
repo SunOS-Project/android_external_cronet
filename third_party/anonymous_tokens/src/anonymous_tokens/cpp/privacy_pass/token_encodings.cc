@@ -34,7 +34,6 @@
 #include <openssl/bytestring.h>
 #include <openssl/mem.h>
 
-
 namespace anonymous_tokens {
 
 namespace {
@@ -676,7 +675,7 @@ absl::Status ValidateExtensionsOrderAndValues(
         absl::StrFormat("Expected %d type, got %d", expected_types.size(),
                         extensions.extensions.size()));
   }
-  for (int i = 0; i < expected_types.size(); i++) {
+  for (size_t i = 0; i < expected_types.size(); i++) {
     if (expected_types[i] != extensions.extensions[i].extension_type) {
       return absl::InvalidArgumentError(absl::StrFormat(
           "Expected %x type at index %d, got %x", expected_types[i], i,
@@ -759,4 +758,3 @@ absl::Status ValidateExtensionsValues(const Extensions& extensions,
 }
 
 }  // namespace anonymous_tokens
-

@@ -203,6 +203,12 @@ template("generate_icu_component") {
       # take effect.
       configs += [ ":icu_code" ]
       configs += extra_configs
+      # Add Fuchsia-specific configs
+      configs += icu_fuchsia_extra_configs
+      # Remove Fuchsia-specific configs, the "add-then-remove" ensures that
+      # removing a config that is not there does not fail.
+      configs += icu_fuchsia_remove_configs
+      configs -= icu_fuchsia_remove_configs
       public_configs = [ ":icu_config" ]
     }
   } else {
@@ -253,6 +259,10 @@ template("generate_icu_component") {
       # take effect.
       configs += [ ":icu_code" ]
       configs += extra_configs
+      # See a similar stanza above for details.
+      configs += icu_fuchsia_extra_configs
+      configs += icu_fuchsia_remove_configs
+      configs -= icu_fuchsia_remove_configs
       public_configs = [ ":icu_config" ]
 
       # Make icu into a standalone static library. Currently This is only useful
@@ -288,7 +298,7 @@ template("generate_icui18n") {
     defines = [ "U_I18N_IMPLEMENTATION" ]
     deps = icuuc_deps
 
-    # TODO(fxbug.dev/98632): workaround for toolchain issues, see bug
+    # TODO(fxbug.dev/42180987): workaround for toolchain issues, see bug
     if (icu_is_in_fuchsia && is_fuchsia) {
       deps += [ "//build/config/fuchsia:uses-outline-atomics-fxbug98632" ]
     }
@@ -297,11 +307,23 @@ template("generate_icui18n") {
 
 generate_icui18n("icui18n") {
   extra_configs = []
+  if (icu_is_in_fuchsia) {
+      # See similar stanza above for details.
+      extra_configs += icu_fuchsia_extra_configs
+      extra_configs += icu_fuchsia_remove_configs
+      extra_configs -= icu_fuchsia_remove_configs
+  }
   icuuc_deps = [ ":icuuc_private" ]
 }
 
 generate_icui18n("icui18n_hidden_visibility") {
   extra_configs = [ ":visibility_hidden" ]
+  if (icu_is_in_fuchsia) {
+      # See similar stanza above for details.
+      extra_configs += icu_fuchsia_extra_configs
+      extra_configs += icu_fuchsia_remove_configs
+      extra_configs -= icu_fuchsia_remove_configs
+  }
   icuuc_deps = [ ":icuuc_private_hidden_visibility" ]
   if (is_fuchsia && !icu_is_in_fuchsia) {
     fuchsia_output_name_postfix = "_hidden_visibility"
@@ -338,7 +360,7 @@ template("generate_icuuc") {
 
     defines += [ "U_ICUDATAENTRY_IN_COMMON" ]
 
-    # TODO(fxbug.dev/98632): workaround for toolchain issues, see bug
+    # TODO(fxbug.dev/42180987): workaround for toolchain issues, see bug
     if (icu_is_in_fuchsia && is_fuchsia) {
       deps += [ "//build/config/fuchsia:uses-outline-atomics-fxbug98632" ]
     }
@@ -359,6 +381,12 @@ source_set("icuuc_public") {
 
 generate_icuuc("icuuc_private") {
   extra_configs = []
+  if (icu_is_in_fuchsia) {
+      # See similar stanza above for details.
+      extra_configs += icu_fuchsia_extra_configs
+      extra_configs += icu_fuchsia_remove_configs
+      extra_configs -= icu_fuchsia_remove_configs
+  }
   output_name = "icuuc"
   visibility = [
     ":icui18n",
@@ -368,6 +396,12 @@ generate_icuuc("icuuc_private") {
 
 generate_icuuc("icuuc_private_hidden_visibility") {
   extra_configs = [ ":visibility_hidden" ]
+  if (icu_is_in_fuchsia) {
+      # See similar stanza above for details.
+      extra_configs += icu_fuchsia_extra_configs
+      extra_configs += icu_fuchsia_remove_configs
+      extra_configs -= icu_fuchsia_remove_configs
+  }
   output_name = "icuuc_hidden_visibility"
   visibility = [
     ":icui18n_hidden_visibility",
@@ -482,7 +516,13 @@ if (icu_use_data_file) {
       if (is_mac || is_ios) {
         args += [ "--mac" ]
       } else if (is_win) {
-        args += [ "--win" ]
+        if (target_cpu == "arm64" || target_cpu == "x64") {
+          args += [ "--win64" ]
+        } else if (target_cpu == "arm" || target_cpu == "x86") {
+          args += [ "--win32" ]
+        } else {
+          assert(false)
+        }
       }
     }
   }

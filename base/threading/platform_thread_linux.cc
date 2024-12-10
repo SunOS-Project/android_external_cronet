@@ -4,14 +4,21 @@
 // Description: Linux specific functionality. Other Linux-derivatives layer on
 // top of this translation unit.
 
-#include "base/no_destructor.h"
 #include "base/threading/platform_thread.h"
 
 #include <errno.h>
+#include <pthread.h>
 #include <sched.h>
 #include <stddef.h>
-#include <cstdint>
+#include <sys/prctl.h>
+#include <sys/resource.h>
+#include <sys/time.h>
+#include <sys/types.h>
+#include <unistd.h>
+
 #include <atomic>
+#include <cstdint>
+#include <optional>
 
 #include "base/base_switches.h"
 #include "base/command_line.h"
@@ -21,6 +28,7 @@
 #include "base/lazy_instance.h"
 #include "base/logging.h"
 #include "base/metrics/field_trial_params.h"
+#include "base/no_destructor.h"
 #include "base/notreached.h"
 #include "base/process/internal_linux.h"
 #include "base/strings/string_number_conversions.h"
@@ -29,14 +37,6 @@
 #include "base/threading/thread_id_name_manager.h"
 #include "base/threading/thread_type_delegate.h"
 #include "build/build_config.h"
-#include "third_party/abseil-cpp/absl/types/optional.h"
-
-#include <pthread.h>
-#include <sys/prctl.h>
-#include <sys/resource.h>
-#include <sys/time.h>
-#include <sys/types.h>
-#include <unistd.h>
 
 namespace base {
 
@@ -153,18 +153,11 @@ bool CanSetThreadTypeToRealtimeAudio() {
 
 bool SetCurrentThreadTypeForPlatform(ThreadType thread_type,
                                      MessagePumpType pump_type_hint) {
-  const PlatformThreadId tid = PlatformThread::CurrentId();
-
-  if (g_thread_type_delegate &&
-      g_thread_type_delegate->HandleThreadTypeChange(tid, thread_type)) {
-    return true;
-  }
-
-  PlatformThread::SetThreadType(getpid(), tid, thread_type, IsViaIPC(false));
+  PlatformThreadLinux::SetThreadType(PlatformThread::CurrentId(), thread_type);
   return true;
 }
 
-absl::optional<ThreadPriorityForTest>
+std::optional<ThreadPriorityForTest>
 GetCurrentThreadPriorityForPlatformForTest() {
   int maybe_sched_rr = 0;
   struct sched_param maybe_realtime_prio = {0};
@@ -173,9 +166,9 @@ GetCurrentThreadPriorityForPlatformForTest() {
       maybe_sched_rr == SCHED_RR &&
       maybe_realtime_prio.sched_priority ==
           PlatformThreadLinux::kRealTimeAudioPrio.sched_priority) {
-    return absl::make_optional(ThreadPriorityForTest::kRealtimeAudio);
+    return std::make_optional(ThreadPriorityForTest::kRealtimeAudio);
   }
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 }  // namespace internal
@@ -276,6 +269,24 @@ void PlatformThreadLinux::SetThreadType(ProcessId process_id,
                                         PlatformThreadId thread_id,
                                         ThreadType thread_type,
                                         IsViaIPC via_ipc) {
+  SetThreadTypeInternal(process_id, thread_id, thread_type, via_ipc);
+}
+
+// static
+void PlatformThreadLinux::SetThreadType(PlatformThreadId thread_id,
+                                        ThreadType thread_type) {
+  if (g_thread_type_delegate &&
+      g_thread_type_delegate->HandleThreadTypeChange(thread_id, thread_type)) {
+    return;
+  }
+  SetThreadTypeInternal(getpid(), thread_id, thread_type, IsViaIPC(false));
+}
+
+// static
+void PlatformThreadLinux::SetThreadTypeInternal(ProcessId process_id,
+                                                PlatformThreadId thread_id,
+                                                ThreadType thread_type,
+                                                IsViaIPC via_ipc) {
   SetThreadCgroupsForThreadType(thread_id, thread_type);
 
   // Some scheduler syscalls require thread ID of 0 for current thread.

@@ -2,11 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef BASE_ALLOCATOR_PARTITION_ALLOCATOR_SRC_PARTITION_ALLOC_POINTERS_RAW_PTR_HOOKABLE_IMPL_H_
-#define BASE_ALLOCATOR_PARTITION_ALLOCATOR_SRC_PARTITION_ALLOC_POINTERS_RAW_PTR_HOOKABLE_IMPL_H_
+#ifndef PARTITION_ALLOC_POINTERS_RAW_PTR_HOOKABLE_IMPL_H_
+#define PARTITION_ALLOC_POINTERS_RAW_PTR_HOOKABLE_IMPL_H_
 
-#include <stddef.h>
-
+#include <cstddef>
 #include <type_traits>
 
 #include "partition_alloc/partition_alloc_base/compiler_specific.h"
@@ -133,7 +132,8 @@ struct RawPtrHookableImpl {
       typename Z,
       typename =
           std::enable_if_t<partition_alloc::internal::is_offset_type<Z>, void>>
-  PA_ALWAYS_INLINE static constexpr T* Advance(T* wrapped_ptr, Z delta_elems) {
+  PA_ALWAYS_INLINE static constexpr T*
+  Advance(T* wrapped_ptr, Z delta_elems, bool /*is_in_pointer_modification*/) {
     if (!partition_alloc::internal::base::is_constant_evaluated()) {
       if (EnableHooks) {
         GetRawPtrHooks()->advance(
@@ -150,7 +150,8 @@ struct RawPtrHookableImpl {
       typename Z,
       typename =
           std::enable_if_t<partition_alloc::internal::is_offset_type<Z>, void>>
-  PA_ALWAYS_INLINE static constexpr T* Retreat(T* wrapped_ptr, Z delta_elems) {
+  PA_ALWAYS_INLINE static constexpr T*
+  Retreat(T* wrapped_ptr, Z delta_elems, bool /*is_in_pointer_modification*/) {
     if (!partition_alloc::internal::base::is_constant_evaluated()) {
       if (EnableHooks) {
         GetRawPtrHooks()->advance(
@@ -204,6 +205,10 @@ struct RawPtrHookableImpl {
     return wrapped_ptr;
   }
 
+  template <typename T>
+  static constexpr void Trace(uint64_t owner_id, T* wrapped_ptr) {}
+  static constexpr void Untrace(uint64_t owner_id) {}
+
   // This is for accounting only, used by unit tests.
   PA_ALWAYS_INLINE static constexpr void IncrementSwapCountForTest() {}
   PA_ALWAYS_INLINE static constexpr void IncrementLessCountForTest() {}
@@ -211,4 +216,4 @@ struct RawPtrHookableImpl {
 
 }  // namespace base::internal
 
-#endif  // BASE_ALLOCATOR_PARTITION_ALLOCATOR_SRC_PARTITION_ALLOC_POINTERS_RAW_PTR_HOOKABLE_IMPL_H_
+#endif  // PARTITION_ALLOC_POINTERS_RAW_PTR_HOOKABLE_IMPL_H_

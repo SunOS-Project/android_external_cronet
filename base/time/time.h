@@ -66,6 +66,7 @@
 #include <time.h>
 
 #include <compare>
+#include <concepts>
 #include <iosfwd>
 #include <limits>
 #include <ostream>
@@ -115,7 +116,9 @@ struct TimeSpan;
 
 namespace base {
 
+#if BUILDFLAG(IS_WIN)
 class PlatformThreadHandle;
+#endif
 class TimeDelta;
 
 template <typename T>
@@ -663,11 +666,10 @@ class BASE_EXPORT Time : public time_internal::TimeBase<Time> {
   // version; otherwise such calls would need to manually cast their args to
   // int64_t, since the compiler isn't sure whether to promote to int64_t or
   // double.
-  template <typename T,
-            typename = std::enable_if_t<
-                std::is_integral_v<T> && !std::is_same_v<T, int64_t> &&
-                (sizeof(T) < sizeof(int64_t) ||
-                 (sizeof(T) == sizeof(int64_t) && std::is_signed_v<T>))>>
+  template <typename T>
+    requires(std::integral<T> && !std::same_as<T, int64_t> &&
+             (sizeof(T) < sizeof(int64_t) ||
+              (sizeof(T) == sizeof(int64_t) && std::is_signed_v<T>)))
   static constexpr Time FromMillisecondsSinceUnixEpoch(T ms_since_epoch) {
     return FromMillisecondsSinceUnixEpoch(int64_t{ms_since_epoch});
   }
@@ -1212,7 +1214,7 @@ class BASE_EXPORT TimeTicks : public time_internal::TimeBase<TimeTicks> {
 
 #endif  // BUILDFLAG(IS_APPLE)
 
-#if BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_CHROMEOS_ASH)
+#if BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_CHROMEOS)
   // Converts to TimeTicks the value obtained from SystemClock.uptimeMillis().
   // Note: this conversion may be non-monotonic in relation to previously
   // obtained TimeTicks::Now() values because of the truncation (to

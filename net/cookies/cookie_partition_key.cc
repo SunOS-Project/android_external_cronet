@@ -10,20 +10,61 @@
 #include "base/feature_list.h"
 #include "base/logging.h"
 #include "base/types/optional_util.h"
-#include "net/base/features.h"
+#include "net/base/cronet_buildflags.h"
 #include "net/cookies/cookie_constants.h"
+#include "net/cookies/site_for_cookies.h"
+
+#if !BUILDFLAG(CRONET_BUILD)
+#include "mojo/public/cpp/bindings/default_construct_tag.h"
+#endif
 
 namespace net {
 
-CookiePartitionKey::CookiePartitionKey() = default;
+namespace {
+
+base::unexpected<std::string> WarnAndCreateUnexpected(
+    const std::string& message) {
+  DLOG(WARNING) << message;
+  return base::unexpected(message);
+}
+
+}  // namespace
+
+CookiePartitionKey::SerializedCookiePartitionKey::SerializedCookiePartitionKey(
+    const std::string& site,
+    bool has_cross_site_ancestor)
+    : top_level_site_(site),
+      has_cross_site_ancestor_(has_cross_site_ancestor) {}
+
+const std::string&
+CookiePartitionKey::SerializedCookiePartitionKey::TopLevelSite() const {
+  return top_level_site_;
+}
+
+#if !BUILDFLAG(CRONET_BUILD)
+CookiePartitionKey::CookiePartitionKey(mojo::DefaultConstruct::Tag) {}
+#endif
+bool CookiePartitionKey::SerializedCookiePartitionKey::has_cross_site_ancestor()
+    const {
+  return has_cross_site_ancestor_;
+}
+
+// static
+CookiePartitionKey::AncestorChainBit CookiePartitionKey::BoolToAncestorChainBit(
+    bool cross_site) {
+  return cross_site ? AncestorChainBit::kCrossSite
+                    : AncestorChainBit::kSameSite;
+}
 
 CookiePartitionKey::CookiePartitionKey(
     const SchemefulSite& site,
-    absl::optional<base::UnguessableToken> nonce)
-    : site_(site), nonce_(nonce) {}
-
-CookiePartitionKey::CookiePartitionKey(const GURL& url)
-    : site_(SchemefulSite(url)) {}
+    std::optional<base::UnguessableToken> nonce,
+    AncestorChainBit ancestor_chain_bit)
+    : site_(site), nonce_(nonce), ancestor_chain_bit_(ancestor_chain_bit) {
+  if (nonce.has_value()) {
+    CHECK_EQ(ancestor_chain_bit, AncestorChainBit::kCrossSite);
+  }
+}
 
 CookiePartitionKey::CookiePartitionKey(bool from_script)
     : from_script_(from_script) {}
@@ -42,99 +83,134 @@ CookiePartitionKey& CookiePartitionKey::operator=(CookiePartitionKey&& other) =
 CookiePartitionKey::~CookiePartitionKey() = default;
 
 bool CookiePartitionKey::operator==(const CookiePartitionKey& other) const {
-  return site_ == other.site_ && nonce_ == other.nonce_;
+  AncestorChainBit this_bit = MaybeAncestorChainBit();
+  AncestorChainBit other_bit = other.MaybeAncestorChainBit();
+
+  return std::tie(site_, nonce_, this_bit) ==
+         std::tie(other.site_, other.nonce_, other_bit);
 }
 
 bool CookiePartitionKey::operator!=(const CookiePartitionKey& other) const {
-  return site_ != other.site_ || nonce_ != other.nonce_;
+  return !(*this == other);
 }
 
 bool CookiePartitionKey::operator<(const CookiePartitionKey& other) const {
-  return std::tie(site_, nonce_) < std::tie(other.site_, other.nonce_);
+  AncestorChainBit this_bit = MaybeAncestorChainBit();
+  AncestorChainBit other_bit = other.MaybeAncestorChainBit();
+  return std::tie(site_, nonce_, this_bit) <
+         std::tie(other.site_, other.nonce_, other_bit);
 }
 
 // static
-bool CookiePartitionKey::Serialize(const absl::optional<CookiePartitionKey>& in,
-                                   std::string& out) {
+base::expected<CookiePartitionKey::SerializedCookiePartitionKey, std::string>
+CookiePartitionKey::Serialize(const std::optional<CookiePartitionKey>& in) {
   if (!in) {
-    out = kEmptyCookiePartitionKey;
-    return true;
+    return base::ok(
+        SerializedCookiePartitionKey(kEmptyCookiePartitionKey, true));
   }
+
   if (!in->IsSerializeable()) {
-    DLOG(WARNING) << "CookiePartitionKey is not serializeable";
-    return false;
+    return WarnAndCreateUnexpected("CookiePartitionKey is not serializeable");
   }
-  out = in->site_.GetURL().SchemeIsFile()
-            ? in->site_.SerializeFileSiteWithHost()
-            : in->site_.Serialize();
-  return true;
+
+  return base::ok(SerializedCookiePartitionKey(
+      in->site_.GetURL().SchemeIsFile() ? in->site_.SerializeFileSiteWithHost()
+                                        : in->site_.Serialize(),
+      in->IsThirdParty()));
 }
 
-// static
-bool CookiePartitionKey::Deserialize(const std::string& in,
-                                     absl::optional<CookiePartitionKey>& out) {
-  if (in == kEmptyCookiePartitionKey) {
-    out = absl::nullopt;
-    return true;
-  }
-  if (!base::FeatureList::IsEnabled(features::kPartitionedCookies)) {
-    DLOG(WARNING) << "Attempting to deserialize CookiePartitionKey when "
-                     "PartitionedCookies is disabled";
-    return false;
-  }
-  auto schemeful_site = SchemefulSite::Deserialize(in);
-  // SchemfulSite is opaque if the input is invalid.
-  if (schemeful_site.opaque()) {
-    DLOG(WARNING) << "Cannot deserialize opaque origin to CookiePartitionKey";
-    return false;
-  }
-  out = absl::make_optional(CookiePartitionKey(schemeful_site, absl::nullopt));
-  return true;
-}
-
-absl::optional<CookiePartitionKey> CookiePartitionKey::FromNetworkIsolationKey(
-    const NetworkIsolationKey& network_isolation_key) {
-  if (!base::FeatureList::IsEnabled(features::kPartitionedCookies)) {
-    return absl::nullopt;
-  }
-
-  const absl::optional<base::UnguessableToken>& nonce =
+std::optional<CookiePartitionKey> CookiePartitionKey::FromNetworkIsolationKey(
+    const NetworkIsolationKey& network_isolation_key,
+    SiteForCookies site_for_cookies,
+    SchemefulSite request_site) {
+  const std::optional<base::UnguessableToken>& nonce =
       network_isolation_key.GetNonce();
 
-  // Use frame site for nonced partitions. Since the nonce is unique, this still
-  // creates a unique partition key. The reason we use the frame site is to
-  // align CookiePartitionKey's implementation of nonced partitions with
+  // Use frame site for nonced partitions. Since the nonce is unique, this
+  // still creates a unique partition key. The reason we use the frame site is
+  // to align CookiePartitionKey's implementation of nonced partitions with
   // StorageKey's. See https://crbug.com/1440765.
-  const absl::optional<SchemefulSite>& partition_key_site =
+  const std::optional<SchemefulSite>& partition_key_site =
       nonce ? network_isolation_key.GetFrameSiteForCookiePartitionKey(
                   NetworkIsolationKey::CookiePartitionKeyPassKey())
             : network_isolation_key.GetTopFrameSite();
-  if (!partition_key_site)
-    return absl::nullopt;
+  if (!partition_key_site) {
+    return std::nullopt;
+  }
 
-  return net::CookiePartitionKey(*partition_key_site, nonce);
+  const auto ancestor_chain_bit =
+      (nonce || site_for_cookies.IsNull())
+          ? AncestorChainBit::kCrossSite
+          : BoolToAncestorChainBit(
+                !site_for_cookies.IsFirstParty(request_site.GetURL()));
+
+  return CookiePartitionKey(*partition_key_site, nonce, ancestor_chain_bit);
 }
 
 // static
-absl::optional<net::CookiePartitionKey>
-CookiePartitionKey::FromStorageKeyComponents(
+std::optional<CookiePartitionKey> CookiePartitionKey::FromStorageKeyComponents(
     const SchemefulSite& site,
-    const absl::optional<base::UnguessableToken>& nonce) {
-  if (!base::FeatureList::IsEnabled(features::kPartitionedCookies)) {
-    return absl::nullopt;
+    AncestorChainBit ancestor_chain_bit,
+    const std::optional<base::UnguessableToken>& nonce) {
+  return CookiePartitionKey::FromWire(site, ancestor_chain_bit, nonce);
+}
+
+// static
+base::expected<std::optional<CookiePartitionKey>, std::string>
+CookiePartitionKey::FromStorage(const std::string& top_level_site,
+                                bool has_cross_site_ancestor) {
+  if (top_level_site == kEmptyCookiePartitionKey) {
+    return base::ok(std::nullopt);
   }
-  return CookiePartitionKey::FromWire(site, nonce);
+
+  base::expected<CookiePartitionKey, std::string> key = DeserializeInternal(
+      top_level_site, BoolToAncestorChainBit(has_cross_site_ancestor));
+  if (!key.has_value()) {
+    DLOG(WARNING) << key.error();
+  }
+
+  return key;
+}
+
+// static
+base::expected<CookiePartitionKey, std::string>
+CookiePartitionKey::FromUntrustedInput(const std::string& top_level_site,
+                                       bool has_cross_site_ancestor) {
+  if (top_level_site.empty()) {
+    return WarnAndCreateUnexpected("top_level_site is unexpectedly empty");
+  }
+
+  base::expected<CookiePartitionKey, std::string> key = DeserializeInternal(
+      top_level_site, BoolToAncestorChainBit(has_cross_site_ancestor));
+  if (!key.has_value()) {
+    return WarnAndCreateUnexpected(key.error());
+  }
+  return key;
+}
+
+base::expected<CookiePartitionKey, std::string>
+CookiePartitionKey::DeserializeInternal(
+    const std::string& top_level_site,
+    CookiePartitionKey::AncestorChainBit has_cross_site_ancestor) {
+  auto schemeful_site = SchemefulSite::Deserialize(top_level_site);
+  if (schemeful_site.opaque()) {
+    return WarnAndCreateUnexpected(
+        "Cannot deserialize opaque origin to CookiePartitionKey");
+  }
+  return base::ok(CookiePartitionKey(schemeful_site, std::nullopt,
+                                     has_cross_site_ancestor));
 }
 
 bool CookiePartitionKey::IsSerializeable() const {
-  if (!base::FeatureList::IsEnabled(features::kPartitionedCookies)) {
-    DLOG(WARNING) << "Attempting to serialize CookiePartitionKey when "
-                     "PartitionedCookies feature is disabled";
-    return false;
-  }
   // We should not try to serialize a partition key created by a renderer.
   DCHECK(!from_script_);
   return !site_.opaque() && !nonce_.has_value();
+}
+
+CookiePartitionKey::AncestorChainBit CookiePartitionKey::MaybeAncestorChainBit()
+    const {
+  return ancestor_chain_enabled_ ? ancestor_chain_bit_
+                                 : AncestorChainBit::kCrossSite;
 }
 
 std::ostream& operator<<(std::ostream& os, const CookiePartitionKey& cpk) {
@@ -142,6 +218,7 @@ std::ostream& operator<<(std::ostream& os, const CookiePartitionKey& cpk) {
   if (cpk.nonce().has_value()) {
     os << ",nonced";
   }
+  os << (cpk.IsThirdParty() ? ",cross_site" : ",same_site");
   return os;
 }
 

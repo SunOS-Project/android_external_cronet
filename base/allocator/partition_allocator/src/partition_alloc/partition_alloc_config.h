@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef BASE_ALLOCATOR_PARTITION_ALLOCATOR_SRC_PARTITION_ALLOC_PARTITION_ALLOC_CONFIG_H_
-#define BASE_ALLOCATOR_PARTITION_ALLOCATOR_SRC_PARTITION_ALLOC_PARTITION_ALLOC_CONFIG_H_
+#ifndef PARTITION_ALLOC_PARTITION_ALLOC_CONFIG_H_
+#define PARTITION_ALLOC_PARTITION_ALLOC_CONFIG_H_
 
 #include "build/build_config.h"
 #include "partition_alloc/partition_alloc_base/debug/debugging_buildflags.h"
@@ -146,42 +146,18 @@ static_assert(sizeof(void*) != 8, "");
 // Enable free list shadow entry to strengthen hardening as much as possible.
 // The shadow entry is an inversion (bitwise-NOT) of the encoded `next` pointer.
 //
-// Disabled when ref-count is placed in the previous slot, as it will overlap
-// with the shadow for the smallest slots.
-//
 // Disabled on Big Endian CPUs, because encoding is also a bitwise-NOT there,
 // making the shadow entry equal to the original, valid pointer to the next
 // slot. In case Use-after-Free happens, we'd rather not hand out a valid,
 // ready-to-use pointer.
-#if !BUILDFLAG(PUT_REF_COUNT_IN_PREVIOUS_SLOT) && \
-    defined(ARCH_CPU_LITTLE_ENDIAN)
+#if defined(ARCH_CPU_LITTLE_ENDIAN)
 #define PA_CONFIG_HAS_FREELIST_SHADOW_ENTRY() 1
 #else
 #define PA_CONFIG_HAS_FREELIST_SHADOW_ENTRY() 0
 #endif
 
-#if defined(ARCH_CPU_ARM64) && defined(__clang__) && \
-    !defined(ADDRESS_SANITIZER) &&                   \
-    (BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_ANDROID))
-#define PA_CONFIG_HAS_MEMORY_TAGGING() 1
-#else
-#define PA_CONFIG_HAS_MEMORY_TAGGING() 0
-#endif
-
-#if PA_CONFIG(HAS_MEMORY_TAGGING)
+#if BUILDFLAG(HAS_MEMORY_TAGGING)
 static_assert(sizeof(void*) == 8);
-#endif
-
-// If memory tagging is enabled with BRP previous slot, the MTE tag and BRP ref
-// count will cause a race (crbug.com/1445816). To prevent this, the
-// ref_count_size is increased to the MTE granule size and the ref count is not
-// tagged.
-#if PA_CONFIG(HAS_MEMORY_TAGGING) &&            \
-    BUILDFLAG(ENABLE_BACKUP_REF_PTR_SUPPORT) && \
-    BUILDFLAG(PUT_REF_COUNT_IN_PREVIOUS_SLOT)
-#define PA_CONFIG_INCREASE_REF_COUNT_SIZE_FOR_MTE() 1
-#else
-#define PA_CONFIG_INCREASE_REF_COUNT_SIZE_FOR_MTE() 0
 #endif
 
 // Specifies whether allocation extras need to be added.
@@ -265,29 +241,30 @@ constexpr bool kUseLazyCommit = false;
 #define PA_CONFIG_USE_PARTITION_ROOT_ENUMERATOR() 0
 #endif
 
-// Due to potential conflict with the free list pointer in the "previous slot"
-// mode in the smallest bucket, we can't check both the cookie and the dangling
-// raw_ptr at the same time.
-#define PA_CONFIG_REF_COUNT_CHECK_COOKIE()         \
-  (!(BUILDFLAG(ENABLE_DANGLING_RAW_PTR_CHECKS) &&  \
-     BUILDFLAG(PUT_REF_COUNT_IN_PREVIOUS_SLOT)) && \
-   (BUILDFLAG(PA_DCHECK_IS_ON) ||                  \
+// Enable in-slot metadata cookie checks when dcheck_is_on or BRP slow checks
+// are on. However, don't do this if that would cause InSlotMetadata to grow
+// past the size that would fit in InSlotMetadataTable (see
+// partition_alloc_constants.h), which currently can happen only when DPD is on.
+#define PA_CONFIG_IN_SLOT_METADATA_CHECK_COOKIE() \
+  (!(BUILDFLAG(ENABLE_DANGLING_RAW_PTR_CHECKS) && \
+     BUILDFLAG(ENABLE_BACKUP_REF_PTR_SUPPORT)) && \
+   (BUILDFLAG(PA_DCHECK_IS_ON) ||                 \
     BUILDFLAG(ENABLE_BACKUP_REF_PTR_SLOW_CHECKS)))
 
 // Use available space in the reference count to store the initially requested
 // size from the application. This is used for debugging.
-#if !PA_CONFIG(REF_COUNT_CHECK_COOKIE) && \
+#if !PA_CONFIG(IN_SLOT_METADATA_CHECK_COOKIE) && \
     !BUILDFLAG(ENABLE_DANGLING_RAW_PTR_CHECKS)
 // Set to 1 when needed.
-#define PA_CONFIG_REF_COUNT_STORE_REQUESTED_SIZE() 0
+#define PA_CONFIG_IN_SLOT_METADATA_STORE_REQUESTED_SIZE() 0
 #else
 // You probably want it at 0, outside of local testing, or else
 // PartitionRefCount will grow past 8B.
-#define PA_CONFIG_REF_COUNT_STORE_REQUESTED_SIZE() 0
+#define PA_CONFIG_IN_SLOT_METADATA_STORE_REQUESTED_SIZE() 0
 #endif
 
-#if PA_CONFIG(REF_COUNT_STORE_REQUESTED_SIZE) && \
-    PA_CONFIG(REF_COUNT_CHECK_COOKIE)
+#if PA_CONFIG(IN_SLOT_METADATA_STORE_REQUESTED_SIZE) && \
+    PA_CONFIG(IN_SLOT_METADATA_CHECK_COOKIE)
 #error "Cannot use a cookie *and* store the allocation size"
 #endif
 
@@ -299,9 +276,9 @@ constexpr bool kUseLazyCommit = false;
 // This is intended to roll out more broadly, but only enabled on Linux for now
 // to get performance bot and real-world data pre-A/B experiment.
 //
-// Also enabled on ARM64 macOS, as the 16kiB pages on this platform lead to
-// larger slot spans.
-#if BUILDFLAG(IS_LINUX) || (BUILDFLAG(IS_MAC) && defined(ARCH_CPU_ARM64))
+// Also enabled on ARM64 macOS and iOS, as the 16kiB pages on this platform lead
+// to larger slot spans.
+#if BUILDFLAG(IS_LINUX) || (BUILDFLAG(IS_APPLE) && defined(ARCH_CPU_ARM64))
 #define PA_CONFIG_PREFER_SMALLER_SLOT_SPANS() 1
 #else
 #define PA_CONFIG_PREFER_SMALLER_SLOT_SPANS() 0
@@ -320,7 +297,7 @@ constexpr bool kUseLazyCommit = false;
 #define PA_CONFIG_ENABLE_SHADOW_METADATA() 0
 #endif
 
-// According to crbug.com/1349955#c24, macOS 11 has a bug where they asset that
+// According to crbug.com/1349955#c24, macOS 11 has a bug where they assert that
 // malloc_size() of an allocation is equal to the requested size. This is
 // generally not true. The assert passed only because it happened to be true for
 // the sizes they requested. BRP changes that, hence can't be deployed without a
@@ -328,15 +305,21 @@ constexpr bool kUseLazyCommit = false;
 //
 // The bug has been fixed in macOS 12. Here we can only check the platform, and
 // the version is checked dynamically later.
-#define PA_CONFIG_ENABLE_MAC11_MALLOC_SIZE_HACK() \
-  (BUILDFLAG(ENABLE_BACKUP_REF_PTR_SUPPORT) && BUILDFLAG(IS_MAC))
+//
+// The settings has MAYBE_ in the name, because the final decision to enable is
+// based on the operarting system version check done at run-time.
+#if BUILDFLAG(ENABLE_BACKUP_REF_PTR_SUPPORT) && BUILDFLAG(IS_MAC)
+#define PA_CONFIG_MAYBE_ENABLE_MAC11_MALLOC_SIZE_HACK() 1
+#else
+#define PA_CONFIG_MAYBE_ENABLE_MAC11_MALLOC_SIZE_HACK() 0
+#endif
 
 #if BUILDFLAG(ENABLE_POINTER_COMPRESSION)
 
 #if PA_CONFIG(DYNAMICALLY_SELECT_POOL_SIZE)
 #error "Dynamically selected pool size is currently not supported"
 #endif
-#if PA_CONFIG(HAS_MEMORY_TAGGING)
+#if BUILDFLAG(HAS_MEMORY_TAGGING)
 // TODO(1376980): Address MTE once it's enabled.
 #error "Compressed pointers don't support tag in the upper bits"
 #endif
@@ -352,4 +335,10 @@ constexpr bool kUseLazyCommit = false;
 #define PA_CONFIG_IS_NONCLANG_MSVC() 0
 #endif
 
-#endif  // BASE_ALLOCATOR_PARTITION_ALLOCATOR_SRC_PARTITION_ALLOC_PARTITION_ALLOC_CONFIG_H_
+// Set GN build override 'assert_cpp_20' to false to disable assertion.
+#if BUILDFLAG(ASSERT_CPP_20)
+static_assert(__cplusplus >= 202002L,
+              "PartitionAlloc targets C++20 or higher.");
+#endif  // BUILDFLAG(ASSERT_CPP_20)
+
+#endif  // PARTITION_ALLOC_PARTITION_ALLOC_CONFIG_H_

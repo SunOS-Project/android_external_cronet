@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef BASE_ALLOCATOR_PARTITION_ALLOCATOR_SRC_PARTITION_ALLOC_PARTITION_DCHECK_HELPER_H_
-#define BASE_ALLOCATOR_PARTITION_ALLOCATOR_SRC_PARTITION_ALLOC_PARTITION_DCHECK_HELPER_H_
+#ifndef PARTITION_ALLOC_PARTITION_DCHECK_HELPER_H_
+#define PARTITION_ALLOC_PARTITION_DCHECK_HELPER_H_
 
 #include "partition_alloc/partition_alloc_base/compiler_specific.h"
 #include "partition_alloc/partition_alloc_base/component_export.h"
@@ -52,8 +52,7 @@ void DCheckIsValidShiftFromSlotStart(internal::SlotSpanMetadata* slot_span,
                                      size_t shift_from_slot_start)
     PA_EMPTY_BODY_IF_DCHECK_IS_OFF();
 
-// Checks that the object is exactly |extras_offset| away from a multiple of
-// slot size (i.e. from a slot start).
+// Checks that the object is a multiple of slot size (i.e. at a slot start).
 PA_EXPORT_IF_DCHECK_IS_ON()
 void DCheckIsValidObjectAddress(internal::SlotSpanMetadata* slot_span,
                                 uintptr_t object_addr)
@@ -65,4 +64,4 @@ void DCheckRootLockIsAcquired(PartitionRoot* root)
 
 }  // namespace partition_alloc::internal
 
-#endif  // BASE_ALLOCATOR_PARTITION_ALLOCATOR_SRC_PARTITION_ALLOC_PARTITION_DCHECK_HELPER_H_
+#endif  // PARTITION_ALLOC_PARTITION_DCHECK_HELPER_H_

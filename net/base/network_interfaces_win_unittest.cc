@@ -4,8 +4,9 @@
 
 #include "net/base/network_interfaces_win.h"
 
-#include <iphlpapi.h>
 #include <objbase.h>
+
+#include <iphlpapi.h>
 
 #include <ostream>
 #include <string>
@@ -252,7 +253,6 @@ bool read_int_or_bool(DWORD data_size, PVOID data) {
       return !!*reinterpret_cast<uint32_t*>(data);
     default:
       LOG(FATAL) << "That is not a type I know!";
-      return false;
   }
 }
 

@@ -7,7 +7,6 @@
 #include <array>
 #include <cstdint>
 #include <cstring>
-#include <optional>
 #include <string>
 
 #include "absl/strings/escaping.h"
@@ -17,35 +16,33 @@
 
 namespace quic {
 
-namespace {
+LoadBalancerServerId::LoadBalancerServerId(absl::string_view data)
+    : LoadBalancerServerId(absl::MakeSpan(
+          reinterpret_cast<const uint8_t*>(data.data()), data.length())) {}
 
-// Helper to allow setting the const array during initialization.
-std::array<uint8_t, kLoadBalancerMaxServerIdLen> MakeArray(
-    const absl::Span<const uint8_t> data, const uint8_t length) {
-  std::array<uint8_t, kLoadBalancerMaxServerIdLen> array;
-  memcpy(array.data(), data.data(), length);
-  return array;
+LoadBalancerServerId::LoadBalancerServerId(absl::Span<const uint8_t> data)
+    : length_(data.length()) {
+  if (length_ == 0 || length_ > kLoadBalancerMaxServerIdLen) {
+    QUIC_BUG(quic_bug_433312504_02)
+        << "Attempted to create LoadBalancerServerId with length "
+        << static_cast<int>(length_);
+    length_ = 0;
+    return;
+  }
+  memcpy(data_.data(), data.data(), data.length());
 }
 
-}  // namespace
-
-std::optional<LoadBalancerServerId> LoadBalancerServerId::Create(
-    const absl::Span<const uint8_t> data) {
-  if (data.length() == 0 || data.length() > kLoadBalancerMaxServerIdLen) {
-    QUIC_BUG(quic_bug_433312504_01)
-        << "Attempted to create LoadBalancerServerId with length "
-        << data.length();
-    return std::optional<LoadBalancerServerId>();
-  }
-  return LoadBalancerServerId(data);
+void LoadBalancerServerId::set_length(uint8_t length) {
+  QUIC_BUG_IF(quic_bug_599862571_01,
+              length == 0 || length > kLoadBalancerMaxServerIdLen)
+      << "Attempted to set LoadBalancerServerId length to "
+      << static_cast<int>(length);
+  length_ = length;
 }
 
 std::string LoadBalancerServerId::ToString() const {
   return absl::BytesToHexString(
       absl::string_view(reinterpret_cast<const char*>(data_.data()), length_));
 }
-
-LoadBalancerServerId::LoadBalancerServerId(const absl::Span<const uint8_t> data)
-    : data_(MakeArray(data, data.length())), length_(data.length()) {}
 
 }  // namespace quic

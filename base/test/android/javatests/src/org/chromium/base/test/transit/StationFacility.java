@@ -4,6 +4,7 @@
 
 package org.chromium.base.test.transit;
 
+import org.chromium.base.test.transit.Transition.TransitionOptions;
 import org.chromium.base.test.transit.Transition.Trigger;
 
 /**
@@ -33,8 +34,13 @@ public abstract class StationFacility<T extends TransitStation> extends Conditio
     /**
      * Constructor.
      *
-     * <p>Instantiate a subclass, then call {@link #enterSync(StationFacility, Trigger)} to enter
-     * it.
+     * <p>Instantiate a concrete subclass instead of this base class.
+     *
+     * <p>If the TransitStation is still NEW, the Enter conditions of this facility with be added to
+     * the transition to the station.
+     *
+     * <p>If the TransitStation is already ACTIVE, call {@link #enterSync(StationFacility, Trigger)}
+     * to enter this Facility synchronously with a Transition.
      *
      * @param station the TransitStation this StationFacility is scoped to.
      */
@@ -59,7 +65,13 @@ public abstract class StationFacility<T extends TransitStation> extends Conditio
      * @param <F> the type of StationFacility entered.
      */
     public static <F extends StationFacility> F enterSync(F facility, Trigger trigger) {
-        FacilityCheckIn checkIn = new FacilityCheckIn(facility, trigger);
+        return enterSync(facility, TransitionOptions.DEFAULT, trigger);
+    }
+
+    /** Version of #enterSync() with extra TransitionOptions. */
+    public static <F extends StationFacility> F enterSync(
+            F facility, TransitionOptions options, Trigger trigger) {
+        FacilityCheckIn checkIn = new FacilityCheckIn(facility, options, trigger);
         checkIn.enterSync();
         return facility;
     }
@@ -74,7 +86,13 @@ public abstract class StationFacility<T extends TransitStation> extends Conditio
      * @param <F> the type of StationFacility exited.
      */
     public static <F extends StationFacility> F exitSync(F facility, Trigger trigger) {
-        FacilityCheckOut checkOut = new FacilityCheckOut(facility, trigger);
+        return exitSync(facility, TransitionOptions.DEFAULT, trigger);
+    }
+
+    /** Version of #exitSync() with extra TransitionOptions. */
+    public static <F extends StationFacility> F exitSync(
+            F facility, TransitionOptions options, Trigger trigger) {
+        FacilityCheckOut checkOut = new FacilityCheckOut(facility, options, trigger);
         checkOut.exitSync();
         return facility;
     }

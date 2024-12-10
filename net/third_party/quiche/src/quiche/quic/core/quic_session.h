@@ -26,6 +26,7 @@
 #include "quiche/quic/core/legacy_quic_stream_id_manager.h"
 #include "quiche/quic/core/proto/cached_network_parameters_proto.h"
 #include "quiche/quic/core/quic_connection.h"
+#include "quiche/quic/core/quic_constants.h"
 #include "quiche/quic/core/quic_control_frame_manager.h"
 #include "quiche/quic/core/quic_crypto_stream.h"
 #include "quiche/quic/core/quic_datagram_queue.h"
@@ -105,6 +106,9 @@ class QUICHE_EXPORT QuicSession
 
     virtual void OnServerPreferredAddressAvailable(
         const QuicSocketAddress& /*server_preferred_address*/) = 0;
+
+    // Called when connection detected path degrading.
+    virtual void OnPathDegrading() = 0;
   };
 
   // Does not take ownership of |connection| or |visitor|.
@@ -502,6 +506,9 @@ class QUICHE_EXPORT QuicSession
 
   // Returns the Google QUIC error code
   QuicErrorCode error() const { return on_closed_frame_.quic_error_code; }
+  // The error code on the wire.  For Google QUIC frames, this has the same
+  // value as `error()`.
+  uint64_t wire_error() const { return on_closed_frame_.wire_error_code; }
   const std::string& error_details() const {
     return on_closed_frame_.error_details;
   }
@@ -639,7 +646,8 @@ class QUICHE_EXPORT QuicSession
 
   virtual QuicSSLConfig GetSSLConfig() const { return QuicSSLConfig(); }
 
-  // Try converting all pending streams to normal streams.
+  // Start converting all pending streams to normal streams in the same order as
+  // they are created, which may need several event loops to finish.
   void ProcessAllPendingStreams();
 
   const ParsedQuicVersionVector& client_original_supported_versions() const {
@@ -674,6 +682,10 @@ class QUICHE_EXPORT QuicSession
   // streams.
   QuicStream* GetActiveStream(QuicStreamId id) const;
 
+  // Called in the following event loop to reset
+  // |new_incoming_streams_in_current_loop_| and process any pending streams.
+  void OnStreamCountReset();
+
   // Returns the priority type used by the streams in the session.
   QuicPriorityType priority_type() const { return QuicPriorityType::kHttp; }
 
@@ -681,8 +693,10 @@ class QUICHE_EXPORT QuicSession
   using StreamMap =
       absl::flat_hash_map<QuicStreamId, std::unique_ptr<QuicStream>>;
 
+  // Use a linked hash map for pending streams so that they will be processed in
+  // a FIFO order to avoid starvation.
   using PendingStreamMap =
-      absl::flat_hash_map<QuicStreamId, std::unique_ptr<PendingStream>>;
+      quiche::QuicheLinkedHashMap<QuicStreamId, std::unique_ptr<PendingStream>>;
 
   using ClosedStreams = std::vector<std::unique_ptr<QuicStream>>;
 
@@ -804,7 +818,8 @@ class QUICHE_EXPORT QuicSession
   size_t num_draining_streams() const { return num_draining_streams_; }
 
   // How a pending stream is converted to a full QuicStream depends on subclass
-  // implementations. Here as UsesPendingStreamForFrame() returns false, this
+  // implementations. As the default value of max_streams_accepted_per_loop_ is
+  // kMaxQuicStreamCount and UsesPendingStreamForFrame() returns false, this
   // method is not supposed to be called at all.
   virtual QuicStream* ProcessReadUnidirectionalPendingStream(
       PendingStream* /*pending*/) {
@@ -813,7 +828,7 @@ class QUICHE_EXPORT QuicSession
   }
   virtual QuicStream* ProcessBidirectionalPendingStream(
       PendingStream* /*pending*/) {
-    QUICHE_BUG(received unexpected bidirectional pending stream);
+    QUICHE_BUG(received unexpected pending bidirectional stream);
     return nullptr;
   }
 
@@ -859,6 +874,14 @@ class QUICHE_EXPORT QuicSession
   // if stream has buffered data and is not stream level flow control blocked,
   // it has to be in the write blocked list.
   virtual bool CheckStreamWriteBlocked(QuicStream* stream) const;
+
+  // Sets the limit on the maximum number of new streams that can be created in
+  // a single event loop. Any addition stream data will be stored in a
+  // PendingStream until a subsequent event loop.
+  void set_max_streams_accepted_per_loop(
+      QuicStreamCount max_streams_accepted_per_loop) {
+    max_streams_accepted_per_loop_ = max_streams_accepted_per_loop;
+  }
 
  private:
   friend class test::QuicSessionPeer;
@@ -918,7 +941,9 @@ class QUICHE_EXPORT QuicSession
                                          QuicStreamId id) const;
 
   // Process the pending stream if possible.
-  void MaybeProcessPendingStream(PendingStream* pending);
+  // Returns true if more pending streams should be processed afterwards while
+  // iterating through all pending streams.
+  bool MaybeProcessPendingStream(PendingStream* pending);
 
   // Creates or gets pending stream, feeds it with |frame|, and returns the
   // pending stream. Can return NULL, e.g., if the stream ID is invalid.
@@ -940,6 +965,8 @@ class QUICHE_EXPORT QuicSession
   // If the pending stream has been converted to a normal stream, returns a
   // pointer to the new stream; otherwise, returns nullptr.
   QuicStream* ProcessPendingStream(PendingStream* pending);
+
+  bool ExceedsPerLoopStreamLimit() const;
 
   // Keep track of highest received byte offset of locally closed streams, while
   // waiting for a definitive final highest offset from the peer.
@@ -1057,9 +1084,13 @@ class QUICHE_EXPORT QuicSession
   // creation of new outgoing bidirectional streams.
   bool liveness_testing_in_progress_;
 
-  // If true, then do not send MAX_STREAM frames if there are already two
-  // outstanding. Latched value of flag quic_limit_sending_max_streams.
-  bool limit_sending_max_streams_;
+  // The counter for newly created non-static incoming streams in the current
+  // event loop and gets reset for each event loop.
+  QuicStreamCount new_incoming_streams_in_current_loop_ = 0u;
+  // Default to max stream count so that there is no stream creation limit per
+  // event loop.
+  QuicStreamCount max_streams_accepted_per_loop_ = kMaxQuicStreamCount;
+  std::unique_ptr<QuicAlarm> stream_count_reset_alarm_;
 };
 
 }  // namespace quic

@@ -5,13 +5,13 @@
 #ifndef NET_DNS_PUBLIC_DNS_OVER_HTTPS_SERVER_CONFIG_H_
 #define NET_DNS_PUBLIC_DNS_OVER_HTTPS_SERVER_CONFIG_H_
 
+#include <optional>
 #include <string>
+#include <string_view>
 
-#include "base/strings/string_piece.h"
 #include "base/values.h"
 #include "net/base/ip_address.h"
 #include "net/base/net_export.h"
-#include "third_party/abseil-cpp/absl/types/optional.h"
 
 namespace net {
 
@@ -31,18 +31,18 @@ class NET_EXPORT DnsOverHttpsServerConfig {
   ~DnsOverHttpsServerConfig();
 
   // Returns nullopt if |doh_template| is invalid.
-  static absl::optional<DnsOverHttpsServerConfig> FromString(
+  static std::optional<DnsOverHttpsServerConfig> FromString(
       std::string doh_template,
       Endpoints endpoints = {});
 
-  static absl::optional<DnsOverHttpsServerConfig> FromValue(
+  static std::optional<DnsOverHttpsServerConfig> FromValue(
       base::Value::Dict value);
 
   bool operator==(const DnsOverHttpsServerConfig& other) const;
   bool operator<(const DnsOverHttpsServerConfig& other) const;
 
   const std::string& server_template() const;
-  base::StringPiece server_template_piece() const;
+  std::string_view server_template_piece() const;
   bool use_post() const;
   const Endpoints& endpoints() const;
 

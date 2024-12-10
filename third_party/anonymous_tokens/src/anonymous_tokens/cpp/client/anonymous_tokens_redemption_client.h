@@ -24,7 +24,6 @@
 #include "absl/status/statusor.h"
 #include "anonymous_tokens/proto/anonymous_tokens.pb.h"
 
-
 namespace anonymous_tokens {
 
 // This class generates AnonymousTokens Redemption request using the anonymous
@@ -44,7 +43,7 @@ class AnonymousTokensRedemptionClient {
   // Creates AnonymousTokensRedemptionClient for a valid use case and key
   // version.
   static absl::StatusOr<std::unique_ptr<AnonymousTokensRedemptionClient>>
-  Create(AnonymousTokensUseCase use_case, int64_t key_version);
+  Create(AnonymousTokensUseCase use_case, uint64_t key_version);
 
   // Creates a redemption request for anonymous tokens against plaintext
   // messages and public metadatas (if they are set).
@@ -73,14 +72,13 @@ class AnonymousTokensRedemptionClient {
   // This constructor is only called from
   // AnonymousTokensRedemptionClient::Create method.
   AnonymousTokensRedemptionClient(AnonymousTokensUseCase use_case,
-                                  int64_t key_version);
+                                  uint64_t key_version);
 
   const std::string use_case_;
-  const int64_t key_version_;
+  const uint64_t key_version_;
   absl::flat_hash_map<std::string, RedemptionInfo> token_to_input_map_;
 };
 
 }  // namespace anonymous_tokens
-
 
 #endif  // ANONYMOUS_TOKENS_CPP_CLIENT_ANONYMOUS_TOKENS_REDEMPTION_CLIENT_H_

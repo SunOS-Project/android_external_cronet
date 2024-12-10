@@ -20,6 +20,7 @@
 #include "build/build_config.h"
 #include "partition_alloc/address_pool_manager.h"
 #include "partition_alloc/allocation_guard.h"
+#include "partition_alloc/internal_allocator.h"
 #include "partition_alloc/page_allocator.h"
 #include "partition_alloc/page_allocator_constants.h"
 #include "partition_alloc/partition_address_space.h"
@@ -38,14 +39,14 @@
 #include "partition_alloc/partition_alloc_check.h"
 #include "partition_alloc/partition_alloc_config.h"
 #include "partition_alloc/partition_alloc_constants.h"
+#include "partition_alloc/partition_freelist_entry.h"
 #include "partition_alloc/partition_page.h"
 #include "partition_alloc/reservation_offset_table.h"
-#include "partition_alloc/starscan/metadata_allocator.h"
+#include "partition_alloc/stack/stack.h"
 #include "partition_alloc/starscan/pcscan_scheduling.h"
 #include "partition_alloc/starscan/raceful_worklist.h"
 #include "partition_alloc/starscan/scan_loop.h"
 #include "partition_alloc/starscan/snapshot.h"
-#include "partition_alloc/starscan/stack/stack.h"
 #include "partition_alloc/starscan/stats_collector.h"
 #include "partition_alloc/starscan/stats_reporter.h"
 #include "partition_alloc/tagging.h"
@@ -176,16 +177,16 @@ static_assert(kSuperPageSize >= sizeof(QuarantineCardTable),
 #endif  // PA_CONFIG(STARSCAN_USE_CARD_TABLE)
 
 template <typename T>
-using MetadataVector = std::vector<T, MetadataAllocator<T>>;
+using MetadataVector = std::vector<T, InternalAllocator<T>>;
 template <typename T>
-using MetadataSet = std::set<T, std::less<>, MetadataAllocator<T>>;
+using MetadataSet = std::set<T, std::less<>, InternalAllocator<T>>;
 template <typename K, typename V>
 using MetadataHashMap =
     std::unordered_map<K,
                        V,
                        std::hash<K>,
                        std::equal_to<>,
-                       MetadataAllocator<std::pair<const K, V>>>;
+                       InternalAllocator<std::pair<const K, V>>>;
 
 struct GetSlotStartResult final {
   PA_ALWAYS_INLINE bool is_found() const {
@@ -408,8 +409,6 @@ static_assert(
     "SuperPageSnapshot must stay relatively small to be allocated on stack");
 
 SuperPageSnapshot::SuperPageSnapshot(uintptr_t super_page) {
-  using SlotSpan = SlotSpanMetadata;
-
   auto* extent_entry = PartitionSuperPageToExtent(super_page);
 
   ::partition_alloc::internal::ScopedGuard lock(
@@ -430,8 +429,10 @@ SuperPageSnapshot::SuperPageSnapshot(uintptr_t super_page) {
   size_t current = 0;
 
   IterateNonEmptySlotSpans(
-      super_page, nonempty_slot_spans, [this, &current](SlotSpan* slot_span) {
-        const uintptr_t payload_begin = SlotSpan::ToSlotSpanStart(slot_span);
+      super_page, nonempty_slot_spans,
+      [this, &current](SlotSpanMetadata* slot_span) {
+        const uintptr_t payload_begin =
+            SlotSpanMetadata::ToSlotSpanStart(slot_span);
         // For single-slot slot-spans, scan only utilized slot part.
         const size_t provisioned_size =
             PA_UNLIKELY(slot_span->CanStoreRawSize())
@@ -478,7 +479,7 @@ class PCScanScanLoop;
 // This class is responsible for performing the entire PCScan task.
 // TODO(bikineev): Move PCScan algorithm out of PCScanTask.
 class PCScanTask final : public base::RefCountedThreadSafe<PCScanTask>,
-                         public AllocatedOnPCScanMetadataPartition {
+                         public InternalPartitionAllocated {
  public:
   // Creates and initializes a PCScan state.
   PCScanTask(PCScan& pcscan, size_t quarantine_last_size);
@@ -736,7 +737,7 @@ void PCScanTask::ClearQuarantinedSlotsAndPrepareCardTable() {
     auto* bitmap = StateBitmapFromAddr(super_page);
     auto* root = Root::FromFirstSuperPage(super_page);
     bitmap->IterateQuarantined([root, clear_type](uintptr_t slot_start) {
-      auto* slot_span = SlotSpan::FromSlotStart(slot_start);
+      auto* slot_span = SlotSpanMetadata::FromSlotStart(slot_start);
       // Use zero as a zapping value to speed up the fast bailout check in
       // ScanPartitions.
       const size_t size = root->GetSlotUsableSize(slot_span);
@@ -845,7 +846,7 @@ void PCScanTask::ScanStack() {
   }
   // Check if the stack top was registered. It may happen that it's not if the
   // current allocation happens from pthread trampolines.
-  void* stack_top = pcscan.GetCurrentThreadStackTop();
+  void* stack_top = StackTopRegistry::Get().GetCurrentThreadStackTop();
   if (PA_UNLIKELY(!stack_top)) {
     return;
   }
@@ -1009,17 +1010,18 @@ void UnmarkInCardTable(uintptr_t slot_start, SlotSpanMetadata* slot_span) {
                                                     uintptr_t super_page,
                                                     size_t epoch,
                                                     SweepStat& stat) {
-  using SlotSpan = SlotSpanMetadata;
-
   auto* bitmap = StateBitmapFromAddr(super_page);
-  SlotSpan* previous_slot_span = nullptr;
-  internal::EncodedNextFreelistEntry* freelist_tail = nullptr;
-  internal::EncodedNextFreelistEntry* freelist_head = nullptr;
+  SlotSpanMetadata* previous_slot_span = nullptr;
+  internal::PartitionFreelistEntry* freelist_tail = nullptr;
+  internal::PartitionFreelistEntry* freelist_head = nullptr;
   size_t freelist_entries = 0;
 
   const auto bitmap_iterator = [&](uintptr_t slot_start) {
-    SlotSpan* current_slot_span = SlotSpan::FromSlotStart(slot_start);
-    auto* entry = EncodedNextFreelistEntry::EmplaceAndInitNull(slot_start);
+    SlotSpanMetadata* current_slot_span =
+        SlotSpanMetadata::FromSlotStart(slot_start);
+    const internal::PartitionFreelistDispatcher* freelist_dispatcher =
+        root->get_freelist_dispatcher();
+    auto* entry = freelist_dispatcher->EmplaceAndInitNull(slot_start);
 
     if (current_slot_span != previous_slot_span) {
       // We started scanning a new slot span. Flush the accumulated freelist to
@@ -1035,7 +1037,7 @@ void UnmarkInCardTable(uintptr_t slot_start, SlotSpanMetadata* slot_span) {
     }
 
     if (freelist_tail) {
-      freelist_tail->SetNext(entry);
+      freelist_dispatcher->SetNext(freelist_tail, entry);
     }
     freelist_tail = entry;
     ++freelist_entries;
@@ -1547,27 +1549,6 @@ void PCScanInternal::DisableStackScanning() {
 }
 bool PCScanInternal::IsStackScanningEnabled() const {
   return stack_scanning_enabled_;
-}
-
-void PCScanInternal::NotifyThreadCreated(void* stack_top) {
-  const auto tid = base::PlatformThread::CurrentId();
-  std::lock_guard<std::mutex> lock(stack_tops_mutex_);
-  const auto res = stack_tops_.insert({tid, stack_top});
-  PA_DCHECK(res.second);
-}
-
-void PCScanInternal::NotifyThreadDestroyed() {
-  const auto tid = base::PlatformThread::CurrentId();
-  std::lock_guard<std::mutex> lock(stack_tops_mutex_);
-  PA_DCHECK(1 == stack_tops_.count(tid));
-  stack_tops_.erase(tid);
-}
-
-void* PCScanInternal::GetCurrentThreadStackTop() const {
-  const auto tid = base::PlatformThread::CurrentId();
-  std::lock_guard<std::mutex> lock(stack_tops_mutex_);
-  auto it = stack_tops_.find(tid);
-  return it != stack_tops_.end() ? it->second : nullptr;
 }
 
 bool PCScanInternal::WriteProtectionEnabled() const {

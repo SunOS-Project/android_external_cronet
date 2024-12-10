@@ -6,6 +6,7 @@
 
 #include <atomic>
 #include <memory>
+#include <string_view>
 
 #include "base/atomicops.h"
 #include "base/cancelable_callback.h"
@@ -591,7 +592,9 @@ TEST_F(TaskEnvironmentTest, SuspendedAdvanceClockDoesNotRunTasks) {
 }
 
 TEST_F(TaskEnvironmentTest, AdvanceClockSchedulesRipeDelayedTasks) {
-  TaskEnvironment task_environment(TaskEnvironment::TimeSource::MOCK_TIME);
+  TaskEnvironment task_environment(
+      TaskEnvironment::TimeSource::MOCK_TIME,
+      TaskEnvironment::ThreadPoolExecutionMode::QUEUED);
 
   bool ran = false;
 
@@ -606,7 +609,9 @@ TEST_F(TaskEnvironmentTest, AdvanceClockSchedulesRipeDelayedTasks) {
 }
 
 TEST_F(TaskEnvironmentTest, SuspendedAdvanceClockSchedulesRipeDelayedTasks) {
-  TaskEnvironment task_environment(TaskEnvironment::TimeSource::MOCK_TIME);
+  TaskEnvironment task_environment(
+      TaskEnvironment::TimeSource::MOCK_TIME,
+      TaskEnvironment::ThreadPoolExecutionMode::QUEUED);
 
   bool ran = false;
 
@@ -1019,11 +1024,11 @@ TEST_F(TaskEnvironmentTest, DescribeCurrentTasksHasPendingMainThreadTasks) {
   mock_log.StartCapturingLogs();
 
   // Thread pool tasks (none here) are logged.
-  EXPECT_CALL(mock_log, Log(::logging::LOG_INFO, _, _, _,
+  EXPECT_CALL(mock_log, Log(::logging::LOGGING_INFO, _, _, _,
                             HasSubstr("ThreadPool currently running tasks")))
       .WillOnce(Return(true));
   // The pending task posted above to the main thread is logged.
-  EXPECT_CALL(mock_log, Log(::logging::LOG_INFO, _, _, _,
+  EXPECT_CALL(mock_log, Log(::logging::LOGGING_INFO, _, _, _,
                             HasSubstr("task_environment_unittest.cc")))
       .WillOnce(Return(true));
   task_environment.DescribeCurrentTasks();
@@ -1031,11 +1036,11 @@ TEST_F(TaskEnvironmentTest, DescribeCurrentTasksHasPendingMainThreadTasks) {
   task_environment.RunUntilIdle();
 
   // Thread pool tasks (none here) are logged.
-  EXPECT_CALL(mock_log, Log(::logging::LOG_INFO, _, _, _,
+  EXPECT_CALL(mock_log, Log(::logging::LOGGING_INFO, _, _, _,
                             HasSubstr("ThreadPool currently running tasks")))
       .WillOnce(Return(true));
   // Pending tasks (none left) are logged.
-  EXPECT_CALL(mock_log, Log(::logging::LOG_INFO, _, _, _,
+  EXPECT_CALL(mock_log, Log(::logging::LOGGING_INFO, _, _, _,
                             HasSubstr("\"immediate_work_queue_size\":0")))
       .WillOnce(Return(true));
   task_environment.DescribeCurrentTasks();
@@ -1067,11 +1072,11 @@ TEST_F(TaskEnvironmentTest, DescribeCurrentTasksHasThreadPoolTasks) {
   mock_log.StartCapturingLogs();
 
   // The pending task posted above is logged.
-  EXPECT_CALL(mock_log, Log(::logging::LOG_INFO, _, _, _,
+  EXPECT_CALL(mock_log, Log(::logging::LOGGING_INFO, _, _, _,
                             HasSubstr("task_environment_unittest.cc")))
       .WillOnce(Return(true));
   // Pending tasks (none here) are logged.
-  EXPECT_CALL(mock_log, Log(::logging::LOG_INFO, _, _, _,
+  EXPECT_CALL(mock_log, Log(::logging::LOGGING_INFO, _, _, _,
                             HasSubstr("\"immediate_work_queue_size\":0")))
       .WillOnce(Return(true));
   task_environment.DescribeCurrentTasks();
@@ -1081,11 +1086,11 @@ TEST_F(TaskEnvironmentTest, DescribeCurrentTasksHasThreadPoolTasks) {
   task_environment.RunUntilIdle();
 
   // The current thread pool tasks (none left) are logged.
-  EXPECT_CALL(mock_log, Log(::logging::LOG_INFO, _, _, _,
+  EXPECT_CALL(mock_log, Log(::logging::LOGGING_INFO, _, _, _,
                             Not(HasSubstr("task_environment_unittest.cc"))))
       .WillOnce(Return(true));
   // Main thread pending tasks (none here) are logged.
-  EXPECT_CALL(mock_log, Log(::logging::LOG_INFO, _, _, _,
+  EXPECT_CALL(mock_log, Log(::logging::LOGGING_INFO, _, _, _,
                             HasSubstr("\"immediate_work_queue_size\":0")))
       .WillOnce(Return(true));
   task_environment.DescribeCurrentTasks();
@@ -1619,7 +1624,7 @@ bool FailOnTaskEnvironmentLog(int severity,
                               int line,
                               size_t message_start,
                               const std::string& str) {
-  StringPiece file_str(file);
+  std::string_view file_str(file);
   if (file_str.find("task_environment.cc") != StringPiece::npos) {
     ADD_FAILURE() << str;
     return true;

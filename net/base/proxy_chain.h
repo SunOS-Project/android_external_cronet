@@ -7,8 +7,8 @@
 
 #include <stdint.h>
 
+#include <iosfwd>
 #include <optional>
-#include <ostream>
 #include <string>
 #include <string_view>
 #include <tuple>
@@ -24,10 +24,6 @@ namespace net {
 // servers means that a single connection will go through all of the proxies in
 // order, using a tunnel through the first proxy to connect to the second, etc.
 // A "direct" connection is a chain of length zero.
-//
-// TODO(crbug.com/1491092): Initial implementations of proxy chaining may, in
-// fact, not tunnel through the last proxy in the ProxyChain if the destination
-// is http.
 class NET_EXPORT ProxyChain {
  public:
   // Constructs an invalid ProxyChain.
@@ -68,7 +64,15 @@ class NET_EXPORT ProxyChain {
     return ProxyChain(ProxyServer::FromSchemeHostAndPort(scheme, host, port));
   }
   // Create a "direct" proxy chain, which includes no proxy servers.
-  static ProxyChain Direct() { return ProxyChain(ProxyServer::Direct()); }
+  static ProxyChain Direct() { return ProxyChain(std::vector<ProxyServer>()); }
+
+  // Creates a `ProxyChain` for use by the IP Protection feature. This is used
+  // for metrics collection and for special handling.  If not given, the
+  // chain_id defaults to 0 which corresponds to an un-identified chain.
+  static ProxyChain ForIpProtection(std::vector<ProxyServer> proxy_server_list,
+                                    int chain_id = 0) {
+    return ProxyChain(std::move(proxy_server_list), chain_id);
+  }
 
   // Get ProxyServer at index in chain. This is not valid for direct or invalid
   // proxy chains.
@@ -78,16 +82,28 @@ class NET_EXPORT ProxyChain {
   // proxy chains. An empty vector is returned for direct proxy chains.
   const std::vector<ProxyServer>& proxy_servers() const;
 
+  // Return the last proxy server in the chain, together with all of the
+  // preceding proxies. The chain must have at least one proxy server. If it
+  // only has one proxy server, then the resulting chain will be direct.
+  std::pair<ProxyChain, const ProxyServer&> SplitLast() const;
+
+  // Return a prefix of this proxy chain, of the given length. This length must
+  // be less than or equal to the chain's length.
+  ProxyChain Prefix(size_t length) const;
+
+  // Get the first ProxyServer in this chain, which must have at least one
+  // server.
+  const ProxyServer& First() const;
+
+  // Get the last ProxyServer in this chain, which must have at least one
+  // server.
+  const ProxyServer& Last() const;
+
   // Get the ProxyServers in this chain, or `nullopt` if the chain is not valid.
   const std::optional<std::vector<ProxyServer>>& proxy_servers_if_valid()
       const {
     return proxy_server_list_;
   }
-
-  // Get the single ProxyServer equivalent to this chain. This must not be
-  // called for multi-proxy chains.
-  // TODO(crbug.com/1491092): Remove this method.
-  const ProxyServer& proxy_server() const;
 
   // Returns number of proxy servers in chain.
   size_t length() const {
@@ -115,26 +131,71 @@ class NET_EXPORT ProxyChain {
                                           : false;
   }
 
-  // Returns true if a proxy server list is available .
+  template <class Predicate>
+  bool AnyProxy(Predicate p) const {
+    return proxy_server_list_.has_value() &&
+           std::any_of(proxy_server_list_->begin(), proxy_server_list_->end(),
+                       p);
+  }
+
+  // Determines if HTTP GETs to the last proxy in the chain are allowed,
+  // instead of establishing a tunnel with CONNECT. This is no longer supported
+  // for QUIC proxy chains and is not currently supported for multi-proxy
+  // chains.
+  bool is_get_to_proxy_allowed() const {
+    return is_single_proxy() && (First().is_http() || First().is_https());
+  }
+
+  // Returns true if a proxy server list is available.
   bool IsValid() const { return proxy_server_list_.has_value(); }
 
+  // A negative value for `ip_protection_chain_id()` indicating this is not an
+  // IP protection chain. All IP-Protection chain IDs are non-negative.
+  static constexpr int kNotIpProtectionChainId = -1;
+
+  // A value for `ip_protection_chain_id()` for IP protection chains for which
+  // no other chain ID was specified.
+  static constexpr int kDefaultIpProtectionChainId = 0;
+
+  // The largest allowed ip_protection_chain_id.
+  static constexpr int kMaxIpProtectionChainId = 3;
+
+  bool is_for_ip_protection() const {
+    return ip_protection_chain_id_ != kNotIpProtectionChainId;
+  }
+  int ip_protection_chain_id() const { return ip_protection_chain_id_; }
+
   bool operator==(const ProxyChain& other) const {
-    return proxy_server_list_ == other.proxy_server_list_;
+    return std::tie(proxy_server_list_, ip_protection_chain_id_) ==
+           std::tie(other.proxy_server_list_, other.ip_protection_chain_id_);
   }
 
   bool operator!=(const ProxyChain& other) const { return !(*this == other); }
 
   // Comparator function so this can be placed in a std::map.
   bool operator<(const ProxyChain& other) const {
-    return proxy_server_list_ < other.proxy_server_list_;
+    return std::tie(proxy_server_list_, ip_protection_chain_id_) <
+           std::tie(other.proxy_server_list_, other.ip_protection_chain_id_);
   }
 
   std::string ToDebugString() const;
 
  private:
+  explicit ProxyChain(std::vector<ProxyServer> proxy_server_list,
+                      int ip_protection_chain_id);
+
   std::optional<std::vector<ProxyServer>> proxy_server_list_;
 
-  // Returns true if this chain is valid.
+  // If used for IP protection, this is the chain_id received from the server.
+  // A negative value indicates this chain is not used for IP protection.
+  int ip_protection_chain_id_ = kNotIpProtectionChainId;
+
+  // Returns true if this chain is valid. A chain is considered valid if
+  //  (1) it is a single valid proxy server, or
+  //  (2) it is a chain of servers, composed of zero or more SCHEME_QUIC servers
+  //  followed by zero or more SCHEME_HTTPS servers.
+  // If any SCHEME_QUIC servers are included, then the chain must be for IP
+  // protection.
   bool IsValidInternal() const;
 };
 

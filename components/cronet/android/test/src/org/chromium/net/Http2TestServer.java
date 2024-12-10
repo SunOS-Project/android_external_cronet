@@ -165,10 +165,10 @@ public final class Http2TestServer {
         throws Exception {
         sReportingCollector = new ReportingCollector();
         Http2TestServerRunnable http2TestServerRunnable =
-            new Http2TestServerRunnable(
-                new File(CertTestUtil.CERTS_DIRECTORY + certFileName),
-                new File(CertTestUtil.CERTS_DIRECTORY + keyFileName),
-                hangingUrlLatch);
+                new Http2TestServerRunnable(
+                        new File(CertTestUtil.CERTS_DIRECTORY + certFileName),
+                        new File(CertTestUtil.CERTS_DIRECTORY + keyFileName),
+                        hangingUrlLatch);
         // This will run synchronously as we can't run the test before we have
         // started the test-server, if the test-server has failed to start then
         // the caller should assert on the value returned to make sure that the test
@@ -218,9 +218,9 @@ public final class Http2TestServer {
                     ServerBootstrap b = new ServerBootstrap();
                     b.option(ChannelOption.SO_BACKLOG, 1024);
                     b.group(group)
-                        .channel(NioServerSocketChannel.class)
-                        .handler(new LoggingHandler(LogLevel.INFO))
-                        .childHandler(new Http2ServerInitializer(mSslCtx, mHangingUrlLatch));
+                            .channel(NioServerSocketChannel.class)
+                            .handler(new LoggingHandler(LogLevel.INFO))
+                            .childHandler(new Http2ServerInitializer(mSslCtx, mHangingUrlLatch));
 
                     sServerChannel = b.bind(PORT).sync().channel();
                     Log.i(TAG, "Netty HTTP/2 server started on " + getServerUrl());

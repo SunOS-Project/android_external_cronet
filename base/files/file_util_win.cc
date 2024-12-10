@@ -5,6 +5,7 @@
 #include "base/files/file_util.h"
 
 #include <windows.h>
+#include <winsock2.h>
 
 #include <io.h>
 #include <psapi.h>
@@ -13,7 +14,6 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <time.h>
-#include <winsock2.h>
 
 #include <algorithm>
 #include <limits>
@@ -379,6 +379,7 @@ OnceClosure GetDeleteFileCallbackInternal(
 // might cause the browser or operating system to fail in unexpected ways.
 bool IsPathSafeToSetAclOn(const FilePath& path) {
 #if BUILDFLAG(CLANG_PROFILING)
+  // TODO(crbug.com/329482479) Use PreventExecuteMappingUnchecked for .profraw.
   // Ignore .profraw profiling files, as they can occur anywhere, and only occur
   // during testing.
   if (path.Extension() == FILE_PATH_LITERAL(".profraw")) {
@@ -816,11 +817,11 @@ bool NormalizeFilePath(const FilePath& path, FilePath* real_path) {
   // The expansion of |path| into a full path may make it longer.
   constexpr int kMaxPathLength = MAX_PATH + 10;
   wchar_t native_file_path[kMaxPathLength];
-  // kMaxPathLength includes space for trailing '\0' so we subtract 1.
-  // Returned length, used_wchars, does not include trailing '\0'.
-  // Failure is indicated by returning 0 or >= kMaxPathLength.
+  // On success, `used_wchars` returns the number of written characters, not
+  // include the trailing '\0'. Thus, failure is indicated by returning 0 or >=
+  // kMaxPathLength.
   DWORD used_wchars = ::GetFinalPathNameByHandle(
-      file.GetPlatformFile(), native_file_path, kMaxPathLength - 1,
+      file.GetPlatformFile(), native_file_path, kMaxPathLength,
       FILE_NAME_NORMALIZED | VOLUME_NAME_NT);
 
   if (used_wchars >= kMaxPathLength || used_wchars == 0)
@@ -902,10 +903,37 @@ bool CreateWinHardLink(const FilePath& to_file, const FilePath& from_file) {
                           nullptr);
 }
 
-// TODO(rkc): Work out if we want to handle NTFS junctions here or not, handle
-// them if we do decide to.
 bool IsLink(const FilePath& file_path) {
-  return false;
+  ScopedBlockingCall scoped_blocking_call(FROM_HERE, BlockingType::MAY_BLOCK);
+
+  // Opens the file or directory specified by file_path for querying attributes.
+  // No access rights are requested (FILE_READ_ATTRIBUTES), as we're only
+  // interested in the attributes. The file share mode allows other processes to
+  // read, write, and delete the file while we have it open. The flags
+  // FILE_FLAG_BACKUP_SEMANTICS and FILE_FLAG_OPEN_REPARSE_POINT are used to
+  // ensure we can open directories and work with reparse points, respectively.
+  //
+  // NOTE: In future, we can consider using GetFileInformationByName(...)
+  // instead.
+  win::ScopedHandle file(
+      ::CreateFile(file_path.value().c_str(), FILE_READ_ATTRIBUTES,
+                   FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                   /*lpSecurityAttributes=*/nullptr, OPEN_EXISTING,
+                   FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT,
+                   /*hTemplateFile=*/nullptr));
+
+  if (!file.is_valid()) {
+    return false;
+  }
+
+  FILE_ATTRIBUTE_TAG_INFO attr_taginfo;
+  if (!::GetFileInformationByHandleEx(file.get(), FileAttributeTagInfo,
+                                      &attr_taginfo, sizeof(attr_taginfo))) {
+    return false;
+  }
+
+  return (attr_taginfo.FileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) &&
+         (attr_taginfo.ReparseTag == IO_REPARSE_TAG_SYMLINK);
 }
 
 bool GetFileInfo(const FilePath& file_path, File::Info* results) {
@@ -983,23 +1011,26 @@ File FILEToFile(FILE* file_stream) {
   return File(ScopedPlatformFile(other_handle));
 }
 
-int ReadFile(const FilePath& filename, char* data, int max_size) {
+std::optional<uint64_t> ReadFile(const FilePath& filename, span<char> buffer) {
   ScopedBlockingCall scoped_blocking_call(FROM_HERE, BlockingType::MAY_BLOCK);
   win::ScopedHandle file(CreateFile(filename.value().c_str(), GENERIC_READ,
                                     FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                                     OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN,
                                     NULL));
-  if (!file.is_valid() || max_size < 0)
-    return -1;
-
-  DWORD read;
-  if (::ReadFile(file.get(), data, static_cast<DWORD>(max_size), &read, NULL)) {
-    // TODO(crbug.com/1333521): Change to return some type with a uint64_t size
-    // and eliminate this cast.
-    return checked_cast<int>(read);
+  if (!file.is_valid()) {
+    return std::nullopt;
   }
 
-  return -1;
+  // TODO(crbug.com/1333521): Consider supporting reading more than INT_MAX
+  // bytes.
+  DWORD bytes_to_read = static_cast<DWORD>(checked_cast<int>(buffer.size()));
+
+  DWORD bytes_read;
+  if (!::ReadFile(file.get(), buffer.data(), bytes_to_read, &bytes_read,
+                  nullptr)) {
+    return std::nullopt;
+  }
+  return bytes_read;
 }
 
 int WriteFile(const FilePath& filename, const char* data, int size) {
@@ -1117,6 +1148,7 @@ bool SetNonBlocking(int fd) {
 
 bool PreReadFile(const FilePath& file_path,
                  bool is_executable,
+                 bool sequential,
                  int64_t max_bytes) {
   DCHECK_GE(max_bytes, 0);
 
@@ -1131,8 +1163,9 @@ bool PreReadFile(const FilePath& file_path,
                                         ? MemoryMappedFile::READ_CODE_IMAGE
                                         : MemoryMappedFile::READ_ONLY;
   MemoryMappedFile mapped_file;
-  if (!mapped_file.Initialize(file_path, access))
-    return internal::PreReadFileSlow(file_path, max_bytes);
+  if (!mapped_file.Initialize(file_path, access)) {
+    return false;
+  }
 
   const ::SIZE_T length =
       std::min(base::saturated_cast<::SIZE_T>(max_bytes),
@@ -1142,21 +1175,18 @@ bool PreReadFile(const FilePath& file_path,
   // simple data file read, more from a RAM perspective than CPU. This is
   // because reading the file as data results in double mapping to
   // Image/executable pages for all pages of code executed.
-  if (!::PrefetchVirtualMemory(::GetCurrentProcess(),
-                               /*NumberOfEntries=*/1, &address_range,
-                               /*Flags=*/0)) {
-    return internal::PreReadFileSlow(file_path, max_bytes);
-  }
-  return true;
+  return ::PrefetchVirtualMemory(::GetCurrentProcess(),
+                                 /*NumberOfEntries=*/1, &address_range,
+                                 /*Flags=*/0);
 }
 
-bool PreventExecuteMapping(const FilePath& path) {
+bool PreventExecuteMappingInternal(const FilePath& path, bool skip_path_check) {
   if (!base::FeatureList::IsEnabled(
           features::kEnforceNoExecutableFileHandles)) {
     return true;
   }
 
-  bool is_path_safe = IsPathSafeToSetAclOn(path);
+  bool is_path_safe = skip_path_check || IsPathSafeToSetAclOn(path);
 
   if (!is_path_safe) {
     // To mitigate the effect of past OS bugs where attackers are able to use
@@ -1203,6 +1233,16 @@ bool PreventExecuteMapping(const FilePath& path) {
   // ACE if it already exists.
   return win::DenyAccessToPath(path, *sids, FILE_EXECUTE, /*NO_INHERITANCE=*/0,
                                /*recursive=*/false);
+}
+
+bool PreventExecuteMapping(const FilePath& path) {
+  return PreventExecuteMappingInternal(path, false);
+}
+
+bool PreventExecuteMappingUnchecked(
+    const FilePath& path,
+    base::PassKey<PreventExecuteMappingClasses> passkey) {
+  return PreventExecuteMappingInternal(path, true);
 }
 
 void SetExtraNoExecuteAllowedPath(int path_key) {

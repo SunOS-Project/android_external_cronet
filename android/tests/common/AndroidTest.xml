@@ -49,6 +49,12 @@
         <option name="exclude-filter" value="org.chromium.net.impl.CronetLoggerTest#testEngineCreation" />
         <!-- b/327182569 -->
         <option name="exclude-filter" value="org.chromium.net.urlconnection.CronetURLStreamHandlerFactoryTest#testSetUrlStreamFactoryUsesCronetForNative" />
+        <!-- b/345344485 -->
+        <option name="exclude-filter" value="org.chromium.net.impl.AndroidHttpEngineBuilderWrapperTest" />
+        <!-- b/345344485 -->
+        <option name="exclude-filter" value="org.chromium.net.impl.CronetLoggerTest#testCronetEngineBuilderInitializedLoggedFromImplIfApiIsTooOld" />
+        <!-- b/345344485 -->
+        <option name="exclude-filter" value="org.chromium.net.impl.CronetLoggerTest#testCronetEngineInfoCreation" />
         <option name="hidden-api-checks" value="false"/>
         <option name="isolated-storage" value="false"/>
         <option name="orchestrator" value="true"/>

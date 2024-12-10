@@ -4,9 +4,8 @@
 
 #include "partition_alloc/partition_alloc.h"
 
-#include <string.h>
-
 #include <cstdint>
+#include <cstring>
 #include <memory>
 
 #include "partition_alloc/address_pool_manager.h"
@@ -51,8 +50,9 @@ void PartitionAllocGlobalInit(OomFunction on_out_of_memory) {
   STATIC_ASSERT_OR_PA_CHECK(
       (internal::PartitionPageSize() & internal::SystemPageOffsetMask()) == 0,
       "ok partition page multiple");
-  static_assert(sizeof(internal::PartitionPage) <= internal::kPageMetadataSize,
-                "PartitionPage should not be too big");
+  static_assert(
+      sizeof(internal::PartitionPageMetadata) <= internal::kPageMetadataSize,
+      "PartitionPage should not be too big");
   STATIC_ASSERT_OR_PA_CHECK(
       internal::kPageMetadataSize * internal::NumPartitionPagesPerSuperPage() <=
           internal::SystemPageSize(),
@@ -72,28 +72,28 @@ void PartitionAllocGlobalInit(OomFunction on_out_of_memory) {
       internal::MaxSystemPagesPerRegularSlotSpan() <= 16,
       "System pages per slot span must be no greater than 16.");
 
-#if BUILDFLAG(PUT_REF_COUNT_IN_PREVIOUS_SLOT)
+#if BUILDFLAG(ENABLE_BACKUP_REF_PTR_SUPPORT)
   STATIC_ASSERT_OR_PA_CHECK(
-      internal::GetPartitionRefCountIndexMultiplierShift() <
+      internal::GetInSlotMetadataIndexMultiplierShift() <
           std::numeric_limits<size_t>::max() / 2,
-      "Calculation in GetPartitionRefCountIndexMultiplierShift() must not "
+      "Calculation in GetInSlotMetadataIndexMultiplierShift() must not "
       "underflow.");
-  // Check that the GetPartitionRefCountIndexMultiplierShift() calculation is
+  // Check that the GetInSlotMetadataIndexMultiplierShift() calculation is
   // correct.
   STATIC_ASSERT_OR_PA_CHECK(
-      (1 << internal::GetPartitionRefCountIndexMultiplierShift()) ==
+      (1 << internal::GetInSlotMetadataIndexMultiplierShift()) ==
           (internal::SystemPageSize() /
-           (sizeof(internal::PartitionRefCount) *
+           (sizeof(internal::InSlotMetadata) *
             (internal::kSuperPageSize / internal::SystemPageSize()))),
       "Bitshift must match the intended multiplication.");
   STATIC_ASSERT_OR_PA_CHECK(
-      ((sizeof(internal::PartitionRefCount) *
+      ((sizeof(internal::InSlotMetadata) *
         (internal::kSuperPageSize / internal::SystemPageSize()))
-       << internal::GetPartitionRefCountIndexMultiplierShift()) <=
+       << internal::GetInSlotMetadataIndexMultiplierShift()) <=
           internal::SystemPageSize(),
-      "PartitionRefCount Bitmap size must be smaller than or equal to "
+      "InSlotMetadata table size must be smaller than or equal to "
       "<= SystemPageSize().");
-#endif  // BUILDFLAG(PUT_REF_COUNT_IN_PREVIOUS_SLOT)
+#endif  // BUILDFLAG(ENABLE_BACKUP_REF_PTR_SUPPORT)
 
   PA_DCHECK(on_out_of_memory);
   internal::g_oom_handling_function = on_out_of_memory;

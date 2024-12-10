@@ -5,17 +5,16 @@
 #include "base/test/scoped_feature_list.h"
 
 #include <atomic>
+#include <string_view>
 #include <utility>
 #include <vector>
 
 #include "base/check_op.h"
 #include "base/containers/contains.h"
-#include "base/containers/cxx20_erase_vector.h"
 #include "base/containers/flat_map.h"
 #include "base/memory/ptr_util.h"
 #include "base/metrics/field_trial_param_associator.h"
 #include "base/strings/string_number_conversions.h"
-#include "base/strings/string_piece.h"
 #include "base/strings/string_split.h"
 #include "base/strings/string_util.h"
 #include "base/strings/stringprintf.h"
@@ -24,14 +23,6 @@
 
 namespace base {
 namespace test {
-namespace {
-
-// A monotonically increasing id, passed to `FeatureList`s as they are created
-// to invalidate the cache member of `base::Feature` objects that were queried
-// with a different `FeatureList` installed.
-uint16_t g_current_caching_context = 1;
-
-}  // namespace
 
 // A struct describes ParsedEnableFeatures()' result.
 struct ScopedFeatureList::FeatureWithStudyGroup {
@@ -87,12 +78,12 @@ struct ScopedFeatureList::FeatureWithStudyGroup {
     return ":" + params;
   }
 
-  static bool IsValidFeatureOrFieldTrialName(const StringPiece& name) {
+  static bool IsValidFeatureOrFieldTrialName(std::string_view name) {
     return IsStringASCII(name) &&
            name.find_first_of(",<*") == std::string::npos;
   }
 
-  static bool IsValidFeatureName(const StringPiece& feature_name) {
+  static bool IsValidFeatureName(std::string_view feature_name) {
     return IsValidFeatureOrFieldTrialName(
         StartsWith(feature_name, "*") ? feature_name.substr(1) : feature_name);
   }
@@ -172,8 +163,8 @@ std::string EscapeValue(const std::string& value) {
 
 // Extracts a feature name from a feature state string. For example, given
 // the input "*MyLovelyFeature<SomeFieldTrial", returns "MyLovelyFeature".
-StringPiece GetFeatureName(StringPiece feature) {
-  StringPiece feature_name = feature;
+std::string_view GetFeatureName(std::string_view feature) {
+  std::string_view feature_name = feature;
 
   // Remove default info.
   if (StartsWith(feature_name, "*"))
@@ -193,7 +184,7 @@ StringPiece GetFeatureName(StringPiece feature) {
 // with GetFeatureName() and also could be without parameters.
 bool ContainsFeature(
     const std::vector<ScopedFeatureList::FeatureWithStudyGroup>& feature_vector,
-    StringPiece feature_name) {
+    std::string_view feature_name) {
   return Contains(feature_vector, feature_name,
                   [](const ScopedFeatureList::FeatureWithStudyGroup& a) {
                     return a.feature_name;
@@ -210,7 +201,7 @@ void OverrideFeatures(
     FeatureList::OverrideState override_state,
     ScopedFeatureList::Features* merged_features) {
   for (const auto& feature : features_list) {
-    StringPiece feature_name = GetFeatureName(feature.feature_name);
+    std::string_view feature_name = GetFeatureName(feature.feature_name);
 
     if (ContainsFeature(merged_features->enabled_feature_list, feature_name) ||
         ContainsFeature(merged_features->disabled_feature_list, feature_name)) {
@@ -393,7 +384,6 @@ void ScopedFeatureList::InitWithFeatureList(
       "ScopedFeatureList must be Init from the test main thread");
 
   original_feature_list_ = FeatureList::ClearInstanceForTesting();
-  feature_list->SetCachingContextForTesting(++g_current_caching_context);
   FeatureList::SetInstance(std::move(feature_list));
   init_called_ = true;
 }
@@ -551,7 +541,7 @@ void ScopedFeatureList::InitWithMergedFeatures(
     // set through |merged_features.enabled_feature_list|. In this case,
     // FieldTrialParamAssociator::AssociateFieldTrialParams() will fail.
     // So remove such field trials from |all_states| here.
-    EraseIf(all_states, [feature](const auto& state) {
+    std::erase_if(all_states, [feature](const auto& state) {
       return state.trial_name == feature.StudyNameOrDefault();
     });
 

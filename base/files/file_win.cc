@@ -4,6 +4,8 @@
 
 #include "base/files/file.h"
 
+#include <windows.h>
+
 #include <io.h>
 #include <stdint.h>
 
@@ -16,8 +18,6 @@
 #include "base/notreached.h"
 #include "base/strings/string_util.h"
 #include "base/threading/scoped_blocking_call.h"
-
-#include <windows.h>
 
 namespace base {
 
@@ -168,7 +168,7 @@ int File::WriteAtCurrentPosNoBestEffort(const char* data, int size) {
   return WriteAtCurrentPos(data, size);
 }
 
-int64_t File::GetLength() {
+int64_t File::GetLength() const {
   ScopedBlockingCall scoped_blocking_call(FROM_HERE, BlockingType::MAY_BLOCK);
   DCHECK(IsValid());
 

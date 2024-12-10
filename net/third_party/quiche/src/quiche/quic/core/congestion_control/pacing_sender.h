@@ -44,9 +44,7 @@ class QUICHE_EXPORT PacingSender {
     max_pacing_rate_ = max_pacing_rate;
   }
 
-  void set_alarm_granularity(QuicTime::Delta alarm_granularity) {
-    alarm_granularity_ = alarm_granularity;
-  }
+  void set_remove_non_initial_burst() { remove_non_initial_burst_ = true; }
 
   QuicBandwidth max_pacing_rate() const { return max_pacing_rate_; }
 
@@ -99,16 +97,11 @@ class QUICHE_EXPORT PacingSender {
   // is consumed after burst_tokens_ ran out.
   uint32_t lumpy_tokens_;
 
-  // If the next send time is within alarm_granularity_, send immediately.
-  // TODO(fayang): Remove alarm_granularity_ when deprecating
-  // quic_offload_pacing_to_usps2 flag.
-  QuicTime::Delta alarm_granularity_;
-
   // Indicates whether pacing throttles the sending. If true, make up for lost
   // time.
   bool pacing_limited_;
 
-  const bool remove_non_initial_burst_ =
+  bool remove_non_initial_burst_ =
       GetQuicReloadableFlag(quic_pacing_remove_non_initial_burst);
 };
 

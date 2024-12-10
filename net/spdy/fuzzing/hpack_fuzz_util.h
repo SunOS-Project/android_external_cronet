@@ -11,8 +11,10 @@
 #include <memory>
 #include <vector>
 
+#include "base/containers/span.h"
 #include "net/third_party/quiche/src/quiche/spdy/core/hpack/hpack_decoder_adapter.h"
 #include "net/third_party/quiche/src/quiche/spdy/core/hpack/hpack_encoder.h"
+#include "net/third_party/quiche/src/quiche/spdy/core/recording_headers_handler.h"
 
 namespace spdy {
 
@@ -42,8 +44,28 @@ class HpackFuzzUtil {
     Input();  // Initializes |offset| to zero.
     ~Input();
 
-    size_t remaining() { return input.size() - offset; }
-    const char* ptr() { return input.data() + offset; }
+    // Returns a span over the next `bytes` many characters in the buffer, and
+    // advances the buffer offset past them.
+    base::span<const uint8_t> ReadSpan(size_t bytes) {
+      auto out = RemainingBytes().first(bytes);
+      offset += bytes;
+      return out;
+    }
+    // Returns a span over the next `bytes` many characters in the buffer, and
+    // advances the buffer offset past them.
+    //
+    // This version takes a compile-time size and returns a fixed-size span.
+    template <size_t bytes>
+    base::span<const uint8_t, bytes> ReadSpan() {
+      auto out = RemainingBytes().first<bytes>();
+      offset += bytes;
+      return out;
+    }
+
+    // Returns a span over all remaining bytes in the input buffer.
+    base::span<const uint8_t> RemainingBytes() {
+      return base::as_byte_span(input).subspan(offset);
+    }
 
     std::string input;
     size_t offset = 0;
@@ -63,8 +85,10 @@ class HpackFuzzUtil {
     FuzzerContext();
     ~FuzzerContext();
     std::unique_ptr<HpackDecoderAdapter> first_stage;
+    std::unique_ptr<RecordingHeadersHandler> first_stage_handler;
     std::unique_ptr<HpackEncoder> second_stage;
     std::unique_ptr<HpackDecoderAdapter> third_stage;
+    std::unique_ptr<RecordingHeadersHandler> third_stage_handler;
   };
 
   static void InitializeFuzzerContext(FuzzerContext* context);

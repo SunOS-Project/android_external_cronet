@@ -4,6 +4,9 @@
 
 #include "base/task/current_thread.h"
 
+#include <utility>
+
+#include "base/callback_list.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
 #include "base/message_loop/message_pump_for_io.h"
@@ -87,27 +90,29 @@ void CurrentThread::SetAddQueueTimeToTasks(bool enable) {
   current_->SetAddQueueTimeToTasks(enable);
 }
 
-void CurrentThread::RegisterOnNextIdleCallback(
+CallbackListSubscription CurrentThread::RegisterOnNextIdleCallback(
+    RegisterOnNextIdleCallbackPasskey,
     OnceClosure on_next_idle_callback) {
-  current_->RegisterOnNextIdleCallback(std::move(on_next_idle_callback));
+  return current_->RegisterOnNextIdleCallback(std::move(on_next_idle_callback));
 }
 
 CurrentThread::ScopedAllowApplicationTasksInNativeNestedLoop::
     ScopedAllowApplicationTasksInNativeNestedLoop()
     : sequence_manager_(GetCurrentSequenceManagerImpl()),
-      previous_state_(sequence_manager_->IsTaskExecutionAllowed()) {
+      previous_state_(
+          sequence_manager_->IsTaskExecutionAllowedInNativeNestedLoop()) {
   TRACE_EVENT_BEGIN0("base", "ScopedNestableTaskAllower");
-  sequence_manager_->SetTaskExecutionAllowed(true);
+  sequence_manager_->SetTaskExecutionAllowedInNativeNestedLoop(true);
 }
 
 CurrentThread::ScopedAllowApplicationTasksInNativeNestedLoop::
     ~ScopedAllowApplicationTasksInNativeNestedLoop() {
-  sequence_manager_->SetTaskExecutionAllowed(previous_state_);
+  sequence_manager_->SetTaskExecutionAllowedInNativeNestedLoop(previous_state_);
   TRACE_EVENT_END0("base", "ScopedNestableTaskAllower");
 }
 
 bool CurrentThread::ApplicationTasksAllowedInNativeNestedLoop() const {
-  return current_->IsTaskExecutionAllowed();
+  return current_->IsTaskExecutionAllowedInNativeNestedLoop();
 }
 
 #if !BUILDFLAG(IS_NACL)

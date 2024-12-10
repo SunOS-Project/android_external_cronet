@@ -15,6 +15,7 @@
 
 #include <iomanip>
 #include <memory>
+#include <string_view>
 
 #include "base/base_export.h"
 #include "base/files/dir_reader_posix.h"
@@ -181,8 +182,9 @@ pid_t FindThreadIDWithSyscall(pid_t pid, const std::string& expected_data,
       continue;
 
     *syscall_supported = true;
-    if (!ReadFromFD(fd.get(), syscall_data.data(), syscall_data.size()))
+    if (!ReadFromFD(fd.get(), syscall_data)) {
       continue;
+    }
 
     if (0 == strncmp(expected_data.c_str(), syscall_data.data(),
                      expected_data.size())) {
@@ -207,12 +209,12 @@ pid_t FindThreadID(pid_t pid, pid_t ns_tid, bool* ns_pid_supported) {
       return -1;
     StringTokenizer tokenizer(status, "\n");
     while (tokenizer.GetNext()) {
-      StringPiece value_str(tokenizer.token_piece());
+      std::string_view value_str(tokenizer.token_piece());
       if (!StartsWith(value_str, "NSpid"))
         continue;
 
       *ns_pid_supported = true;
-      std::vector<StringPiece> split_value_str = SplitStringPiece(
+      std::vector<std::string_view> split_value_str = SplitStringPiece(
           value_str, "\t", TRIM_WHITESPACE, SPLIT_WANT_NONEMPTY);
       DCHECK_GE(split_value_str.size(), 2u);
       int value;

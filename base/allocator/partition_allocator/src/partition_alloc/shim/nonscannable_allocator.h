@@ -2,14 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef BASE_ALLOCATOR_PARTITION_ALLOCATOR_SRC_PARTITION_ALLOC_SHIM_NONSCANNABLE_ALLOCATOR_H_
-#define BASE_ALLOCATOR_PARTITION_ALLOCATOR_SRC_PARTITION_ALLOC_SHIM_NONSCANNABLE_ALLOCATOR_H_
+#ifndef PARTITION_ALLOC_SHIM_NONSCANNABLE_ALLOCATOR_H_
+#define PARTITION_ALLOC_SHIM_NONSCANNABLE_ALLOCATOR_H_
 
 #include <atomic>
 #include <cstddef>
 #include <memory>
 
 #include "partition_alloc/partition_alloc_base/component_export.h"
+#include "partition_alloc/partition_alloc_base/export_template.h"
 #include "partition_alloc/partition_alloc_base/no_destructor.h"
 #include "partition_alloc/partition_alloc_buildflags.h"
 
@@ -17,7 +18,7 @@
 #include "partition_alloc/partition_alloc.h"
 
 #if BUILDFLAG(USE_STARSCAN)
-#include "partition_alloc/starscan/metadata_allocator.h"
+#include "partition_alloc/internal_allocator_forward.h"
 #endif
 #endif  // BUILDFLAG(USE_PARTITION_ALLOC_AS_MALLOC)
 
@@ -31,7 +32,7 @@ namespace internal {
 // PCScan. An example would be strings or socket/IPC/file buffers. Use with
 // caution.
 template <bool quarantinable>
-class PA_COMPONENT_EXPORT(ALLOCATOR_SHIM) NonScannableAllocatorImpl final {
+class NonScannableAllocatorImpl final {
  public:
   static NonScannableAllocatorImpl& Instance();
 
@@ -66,14 +67,16 @@ class PA_COMPONENT_EXPORT(ALLOCATOR_SHIM) NonScannableAllocatorImpl final {
 
 #if BUILDFLAG(USE_STARSCAN)
   std::unique_ptr<partition_alloc::PartitionAllocator,
-                  partition_alloc::internal::PCScanMetadataDeleter>
+                  partition_alloc::internal::InternalPartitionDeleter>
       allocator_;
   std::atomic_bool pcscan_enabled_{false};
 #endif  // BUILDFLAG(USE_STARSCAN)
 };
 
-extern template class NonScannableAllocatorImpl<true>;
-extern template class NonScannableAllocatorImpl<false>;
+extern template class PA_EXPORT_TEMPLATE_DECLARE(
+    PA_COMPONENT_EXPORT(ALLOCATOR_SHIM)) NonScannableAllocatorImpl<true>;
+extern template class PA_EXPORT_TEMPLATE_DECLARE(
+    PA_COMPONENT_EXPORT(ALLOCATOR_SHIM)) NonScannableAllocatorImpl<false>;
 
 }  // namespace internal
 
@@ -84,4 +87,4 @@ using NonQuarantinableAllocator = internal::NonScannableAllocatorImpl<false>;
 
 }  // namespace allocator_shim
 
-#endif  // BASE_ALLOCATOR_PARTITION_ALLOCATOR_SRC_PARTITION_ALLOC_SHIM_NONSCANNABLE_ALLOCATOR_H_
+#endif  // PARTITION_ALLOC_SHIM_NONSCANNABLE_ALLOCATOR_H_

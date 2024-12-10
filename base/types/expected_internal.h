@@ -43,21 +43,22 @@ inline constexpr bool UnderlyingIsOk = false;
 template <typename T>
 inline constexpr bool UnderlyingIsOk<ok<T>> = true;
 template <typename T>
-inline constexpr bool IsOk = UnderlyingIsOk<remove_cvref_t<T>>;
+inline constexpr bool IsOk = UnderlyingIsOk<std::remove_cvref_t<T>>;
 
 template <typename T>
 inline constexpr bool UnderlyingIsUnexpected = false;
 template <typename E>
 inline constexpr bool UnderlyingIsUnexpected<unexpected<E>> = true;
 template <typename T>
-inline constexpr bool IsUnexpected = UnderlyingIsUnexpected<remove_cvref_t<T>>;
+inline constexpr bool IsUnexpected =
+    UnderlyingIsUnexpected<std::remove_cvref_t<T>>;
 
 template <typename T>
 inline constexpr bool UnderlyingIsExpected = false;
 template <typename T, typename E>
 inline constexpr bool UnderlyingIsExpected<expected<T, E>> = true;
 template <typename T>
-inline constexpr bool IsExpected = UnderlyingIsExpected<remove_cvref_t<T>>;
+inline constexpr bool IsExpected = UnderlyingIsExpected<std::remove_cvref_t<T>>;
 
 template <typename T, typename U>
 inline constexpr bool IsConstructibleOrConvertible =
@@ -80,7 +81,8 @@ template <typename T,
           typename E,
           typename UF,
           typename GF,
-          typename ExUG = expected<remove_cvref_t<UF>, remove_cvref_t<GF>>>
+          typename ExUG =
+              expected<std::remove_cvref_t<UF>, std::remove_cvref_t<GF>>>
 inline constexpr bool IsValidConversion =
     std::is_constructible_v<T, UF> && std::is_constructible_v<E, GF> &&
     !IsAnyConstructibleOrConvertible<T, ExUG> &&
@@ -95,7 +97,7 @@ inline constexpr bool IsValidConversion =
 template <typename E,
           typename U,
           typename GF,
-          typename ExUG = expected<U, remove_cvref_t<GF>>>
+          typename ExUG = expected<U, std::remove_cvref_t<GF>>>
 inline constexpr bool IsValidVoidConversion =
     std::is_void_v<U> && std::is_constructible_v<E, GF> &&
     !IsAnyConstructibleOrConvertible<unexpected<E>, ExUG>;
@@ -104,25 +106,25 @@ inline constexpr bool IsValidVoidConversion =
 template <typename T, typename E, typename U>
 inline constexpr bool IsValidValueConstruction =
     std::is_constructible_v<T, U> &&
-    !std::is_same_v<remove_cvref_t<U>, absl::in_place_t> &&
-    !std::is_same_v<remove_cvref_t<U>, expected<T, E>> && !IsOk<U> &&
+    !std::is_same_v<std::remove_cvref_t<U>, absl::in_place_t> &&
+    !std::is_same_v<std::remove_cvref_t<U>, expected<T, E>> && !IsOk<U> &&
     !IsUnexpected<U>;
 
 template <typename T, typename U>
 inline constexpr bool IsOkValueConstruction =
-    !std::is_same_v<remove_cvref_t<U>, ok<T>> &&
-    !std::is_same_v<remove_cvref_t<U>, absl::in_place_t> &&
+    !std::is_same_v<std::remove_cvref_t<U>, ok<T>> &&
+    !std::is_same_v<std::remove_cvref_t<U>, absl::in_place_t> &&
     std::is_constructible_v<T, U>;
 
 template <typename T, typename U>
 inline constexpr bool IsUnexpectedValueConstruction =
-    !std::is_same_v<remove_cvref_t<U>, unexpected<T>> &&
-    !std::is_same_v<remove_cvref_t<U>, absl::in_place_t> &&
+    !std::is_same_v<std::remove_cvref_t<U>, unexpected<T>> &&
+    !std::is_same_v<std::remove_cvref_t<U>, absl::in_place_t> &&
     std::is_constructible_v<T, U>;
 
 template <typename T, typename E, typename U>
 inline constexpr bool IsValueAssignment =
-    !std::is_same_v<expected<T, E>, remove_cvref_t<U>> && !IsOk<U> &&
+    !std::is_same_v<expected<T, E>, std::remove_cvref_t<U>> && !IsOk<U> &&
     !IsUnexpected<U> && std::is_constructible_v<T, U> &&
     std::is_assignable_v<T&, U>;
 
@@ -264,8 +266,8 @@ class ExpectedImpl {
 
 template <typename Exp, typename F>
 constexpr auto AndThen(Exp&& exp, F&& f) noexcept {
-  using T = remove_cvref_t<decltype(exp.value())>;
-  using E = remove_cvref_t<decltype(exp.error())>;
+  using T = std::remove_cvref_t<decltype(exp.value())>;
+  using E = std::remove_cvref_t<decltype(exp.error())>;
 
   auto invoke_f = [&]() -> decltype(auto) {
     if constexpr (!std::is_void_v<T>) {
@@ -289,7 +291,7 @@ constexpr auto AndThen(Exp&& exp, F&& f) noexcept {
 
 template <typename Exp, typename F>
 constexpr auto OrElse(Exp&& exp, F&& f) noexcept {
-  using T = remove_cvref_t<decltype(exp.value())>;
+  using T = std::remove_cvref_t<decltype(exp.value())>;
   using G = std::invoke_result_t<F, decltype(std::forward<Exp>(exp).error())>;
 
   static_assert(internal::IsExpected<G>,
@@ -304,7 +306,7 @@ constexpr auto OrElse(Exp&& exp, F&& f) noexcept {
   }
 
   if constexpr (!std::is_void_v<T>) {
-    return G(absl::in_place, std::forward<Exp>(exp).value());
+    return G(std::in_place, std::forward<Exp>(exp).value());
   } else {
     return G();
   }
@@ -312,8 +314,8 @@ constexpr auto OrElse(Exp&& exp, F&& f) noexcept {
 
 template <typename Exp, typename F>
 constexpr auto Transform(Exp&& exp, F&& f) noexcept {
-  using T = remove_cvref_t<decltype(exp.value())>;
-  using E = remove_cvref_t<decltype(exp.error())>;
+  using T = std::remove_cvref_t<decltype(exp.value())>;
+  using E = std::remove_cvref_t<decltype(exp.error())>;
 
   auto invoke_f = [&]() -> decltype(auto) {
     if constexpr (!std::is_void_v<T>) {
@@ -350,7 +352,7 @@ constexpr auto Transform(Exp&& exp, F&& f) noexcept {
   }
 
   if constexpr (!std::is_void_v<U>) {
-    return expected<U, E>(absl::in_place, invoke_f());
+    return expected<U, E>(std::in_place, invoke_f());
   } else {
     invoke_f();
     return expected<U, E>();
@@ -359,7 +361,7 @@ constexpr auto Transform(Exp&& exp, F&& f) noexcept {
 
 template <typename Exp, typename F>
 constexpr auto TransformError(Exp&& exp, F&& f) noexcept {
-  using T = remove_cvref_t<decltype(exp.value())>;
+  using T = std::remove_cvref_t<decltype(exp.value())>;
   using G = std::remove_cv_t<
       std::invoke_result_t<F, decltype(std::forward<Exp>(exp).error())>>;
 
@@ -391,7 +393,7 @@ constexpr auto TransformError(Exp&& exp, F&& f) noexcept {
   if constexpr (std::is_void_v<T>) {
     return expected<T, G>();
   } else {
-    return expected<T, G>(absl::in_place, std::forward<Exp>(exp).value());
+    return expected<T, G>(std::in_place, std::forward<Exp>(exp).value());
   }
 }
 
