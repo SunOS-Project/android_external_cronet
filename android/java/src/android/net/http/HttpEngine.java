@@ -15,6 +15,7 @@ import android.net.Network;
 import org.chromium.net.ExperimentalCronetEngine;
 import org.chromium.net.ICronetEngineBuilder;
 import org.chromium.net.ApiVersion;
+import org.chromium.net.impl.CronetLibraryLoader;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -69,6 +70,7 @@ public abstract class HttpEngine {
             throw new IllegalStateException("HttpEngine already preloaded");
         }
 
+        CronetLibraryLoader.preload();
         try {
             // TODO(b/380349437): Preload all of HttpEngine Impl classes
             // and the shared library as well.
