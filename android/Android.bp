@@ -48,6 +48,7 @@ java_library {
         "framework-annotations-lib",
         "framework-connectivity.stubs.module_lib",
         "cronet_aml_api_java",
+        "cronet_aml_java",
     ],
     static_libs: ["com.android.net.http.flags-aconfig-java"],
     sdk_version: "module_current",
