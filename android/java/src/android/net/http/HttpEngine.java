@@ -71,6 +71,10 @@ public abstract class HttpEngine {
             throw new IllegalStateException("HttpEngine already preloaded");
         }
 
+        if (Flags.preloadHttpengineSharedLibrary()) {
+            CronetLibraryLoader.preload();
+        }
+
         try {
             // TODO(b/380349437): Preload all of HttpEngine Impl classes
             // and the shared library as well.
