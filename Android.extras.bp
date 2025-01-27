@@ -223,6 +223,11 @@ java_defaults {
 // from the repository root.
 cc_library_headers {
     name: "cronet_repository_root_include_dirs_anchor",
+    host_supported: true,
+    apex_available: [
+        "com.android.tethering",
+    ],
+    min_sdk_version: "30",
     export_include_dirs: ["."],
     visibility: [
         "//external/cronet:__subpackages__",
