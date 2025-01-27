@@ -36,6 +36,7 @@ import android.net.http.ConnectionMigrationOptions;
 import android.net.http.DnsOptions;
 import android.net.http.Flags;
 import android.net.http.HttpEngine;
+import android.net.http.HttpEngineJavaClasses;
 import android.net.http.QuicOptions;
 import android.net.http.UrlRequest;
 import android.net.http.UrlResponseInfo;
@@ -43,7 +44,10 @@ import android.net.http.cts.util.HttpCtsTestServer;
 import android.net.http.cts.util.TestUrlRequestCallback;
 import android.net.http.cts.util.TestUrlRequestCallback.ResponseStep;
 import android.os.Build;
+import android.platform.test.annotations.DisableFlags;
+import android.platform.test.annotations.EnableFlags;
 import android.platform.test.annotations.RequiresFlagsEnabled;
+import android.platform.test.flag.junit.SetFlagsRule;
 
 import androidx.test.core.app.ApplicationProvider;
 
@@ -52,6 +56,7 @@ import com.android.testutils.DevSdkIgnoreRunner;
 
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mockito;
@@ -73,6 +78,9 @@ public class HttpEngineTest {
     private UrlRequest mRequest;
     private HttpEngine mEngine;
     private Context mContext;
+
+    @Rule
+    public final SetFlagsRule mSetFlagsRule = new SetFlagsRule();
 
     @Before
     public void setUp() throws Exception {
@@ -118,6 +126,46 @@ public class HttpEngineTest {
         } catch (Exception e) {
             // Do nothing.
         }
+    }
+
+    /** This is to confirm that the generated list of classes to be preloaded actually
+     * has something in it so it doesn't just silently break. It does not need to have
+     * everything but we assume that if it includes few essential classes then that
+     * should mean it's working as intended.
+     */
+    @Test
+    public void testHttpEngine_PreloadedClassesListContainsEssentialClasses() {
+        assertThat(HttpEngineJavaClasses.ALL_CLASSES).asList().containsAtLeast(
+                "android.net.connectivity.org.chromium.net.impl.CronetUrlRequestContext",
+                "android.net.connectivity.org.chromium.net.impl.CronetUrlRequest",
+                "android.net.connectivity.org.chromium.net.CronetEngine",
+                "android.net.http.CronetEngineWrapper");
+        assertThat(HttpEngineJavaClasses.ALL_CLASSES).asList().doesNotContain(
+                "android.net.connectivity.org.chromium.base.BuildInfo$Holder");
+    }
+
+    @Test
+    @EnableFlags({Flags.FLAG_PRELOAD_HTTPENGINE_SHARED_LIBRARY})
+    public void testHttpEngine_RequestSucceedsWithNativePreload() throws Exception {
+        testHttpEngine_Default();
+    }
+
+    @Test
+    @DisableFlags({Flags.FLAG_PRELOAD_HTTPENGINE_SHARED_LIBRARY})
+    public void testHttpEngine_RequestSucceedsWithoutNativePreload() throws Exception {
+        testHttpEngine_Default();
+    }
+
+    @Test
+    @EnableFlags({Flags.FLAG_PRELOAD_HTTPENGINE_JAVA_IMPL_CLASSES})
+    public void testHttpEngine_RequestSucceedsWithPreloadJavaClasses() throws Exception {
+        testHttpEngine_Default();
+    }
+
+    @Test
+    @DisableFlags({Flags.FLAG_PRELOAD_HTTPENGINE_JAVA_IMPL_CLASSES})
+    public void testHttpEngine_RequestSucceedsWithoutPreloadJavaClasses() throws Exception {
+        testHttpEngine_Default();
     }
 
     @Test
