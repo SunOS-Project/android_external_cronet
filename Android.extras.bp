@@ -122,7 +122,8 @@ java_library {
     static_libs: [
         "cronet_aml_net_android_net_test_support_provider_java__testing",
         "cronet_aml_net_android_net_java_test_support__testing",
-        "cronet_aml_net_android_net_tests_java__testing"
+        "cronet_aml_net_android_net_tests_java__testing",
+        "cronet_aml_net_android_dummy_spnego_authenticator_java__testing",
     ],
 }
 
@@ -206,15 +207,7 @@ android_library {
 
 java_defaults {
     name: "cronet_aml_java_framework_defaults",
-    libs: [
-        "framework-connectivity-pre-jarjar-without-cronet",
-        "framework-connectivity-t.stubs.module_lib",
-        "framework-location.stubs.module_lib",
-        "framework-mediaprovider.stubs.module_lib",
-        "framework-statsd.stubs.module_lib",
-        "framework-wifi.stubs.module_lib",
-    ],
-    sdk_version: "module_current",
+    sdk_version: "system_current",
     visibility: [
         "//external/cronet:__subpackages__",
     ],
