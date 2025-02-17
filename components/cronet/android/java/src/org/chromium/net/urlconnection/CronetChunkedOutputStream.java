@@ -8,8 +8,6 @@ import org.chromium.base.metrics.ScopedSysTraceEvent;
 import org.chromium.net.UploadDataProvider;
 import org.chromium.net.UploadDataSink;
 
-import androidx.annotation.VisibleForTesting;
-
 import java.io.IOException;
 import java.net.HttpRetryException;
 import java.nio.ByteBuffer;
@@ -21,8 +19,7 @@ import java.util.Objects;
  * entire request body in memory. It does not support rewind. Note that {@link #write} should only
  * be called from the thread on which the {@link #mConnection} is created.
  */
-@VisibleForTesting
-public final class CronetChunkedOutputStream extends CronetOutputStream {
+final class CronetChunkedOutputStream extends CronetOutputStream {
     private final MessageLoop mMessageLoop;
     private final ByteBuffer mBuffer;
     private final UploadDataProvider mUploadDataProvider = new UploadDataProviderImpl();
