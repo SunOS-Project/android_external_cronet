@@ -10,8 +10,6 @@ import org.chromium.base.metrics.ScopedSysTraceEvent;
 import org.chromium.net.UploadDataProvider;
 import org.chromium.net.UploadDataSink;
 
-import androidx.annotation.VisibleForTesting;
-
 import java.io.IOException;
 import java.net.HttpRetryException;
 import java.net.ProtocolException;
@@ -24,13 +22,12 @@ import java.util.Objects;
  * the entire request body in memory. It does not support rewind. Note that {@link #write} should
  * only be called from the thread on which the {@link #mConnection} is created.
  */
-@VisibleForTesting
-public final class CronetFixedModeOutputStream extends CronetOutputStream {
+final class CronetFixedModeOutputStream extends CronetOutputStream {
     // CronetFixedModeOutputStream buffers up to this value and wait for UploadDataStream
     // to consume the data. This field is non-final, so it can be changed for tests.
     // Using 16384 bytes is because the internal read buffer is 14520 for QUIC,
     // 16384 for SPDY, and 16384 for normal HTTP/1.1 stream.
-    @VisibleForTesting public static int sDefaultBufferLength = 16384;
+    @VisibleForTesting private static int sDefaultBufferLength = 16384;
     private final MessageLoop mMessageLoop;
     private final long mContentLength;
     // Internal buffer for holding bytes from the client until the bytes are
@@ -205,10 +202,8 @@ public final class CronetFixedModeOutputStream extends CronetOutputStream {
         }
     }
 
-    /**
-     * Sets the default buffer length for use in tests.
-     */
-    public static void setDefaultBufferLengthForTesting(int length) {
+    /** Sets the default buffer length for use in tests. */
+    static void setDefaultBufferLengthForTesting(int length) {
         sDefaultBufferLength = length;
     }
 }
