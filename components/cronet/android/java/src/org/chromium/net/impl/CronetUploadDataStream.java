@@ -464,8 +464,7 @@ public final class CronetUploadDataStream extends UploadDataSink {
         }
     }
 
-    @VisibleForTesting
-    public void setOnDestroyedCallbackForTesting(Runnable onDestroyedCallbackForTesting) {
+    void setOnDestroyedCallbackForTesting(Runnable onDestroyedCallbackForTesting) {
         mOnDestroyedCallbackForTesting = onDestroyedCallbackForTesting;
     }
 
