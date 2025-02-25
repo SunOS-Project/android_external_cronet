@@ -30,8 +30,8 @@ java_test_host {
         "tradefed",
         "framework-annotations-lib",
     ],
-    data: [
-        ":net_unittests_data",
+    defaults: [
+        "net_unittests_data",
     ],
     device_common_data: [
         ":cronet_net_tester_app",
