@@ -1,4 +1,0 @@
-include_rules = [
-  "+components/sampling_profiler/call_stack_profile_params.h",
-  "+components/sampling_profiler/process_type.h",
-]
