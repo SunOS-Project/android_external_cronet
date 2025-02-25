@@ -31,6 +31,9 @@ def PathOf(x):
   return x if not PREFIX else os.path.join(PREFIX, x)
 
 
+TARGET_PREFIX = ''
+
+
 LICENSE_TEMPLATE = """Copyright (c) 2015, Google Inc.
 
 Permission to use, copy, modify, and/or distribute this software for any
@@ -64,6 +67,7 @@ class Android(object):
 """
 
   def PrintVariableSection(self, out, name, files):
+    name = f'{TARGET_PREFIX}{name}'
     out.write('%s := \\\n' % name)
     for f in sorted(files):
       out.write('  %s\\\n' % f)
@@ -99,6 +103,7 @@ class Android(object):
 
   def PrintDefaults(self, blueprint, name, files, asm_files=[], data=[]):
     """Print a cc_defaults section from a list of C files and optionally assembly outputs"""
+    name = f'{TARGET_PREFIX}{name}'
     if asm_files:
       blueprint.write('\n')
       blueprint.write('%s_asm = [\n' % name)
@@ -676,10 +681,12 @@ ALL_PLATFORMS = {
 
 if __name__ == '__main__':
   parser = optparse.OptionParser(
-      usage='Usage: %%prog [--prefix=<path>] [all|%s]' %
+      usage='Usage: %%prog [--prefix=<path>] [--target-prefix=<prefix>] [all|%s]' %
       '|'.join(sorted(ALL_PLATFORMS.keys())))
   parser.add_option('--prefix', dest='prefix',
       help='For Bazel, prepend argument to all source files')
+  parser.add_option('--target-prefix', dest='target_prefix',
+      help='For Android, prepend argument to all target names')
   parser.add_option(
       '--embed_test_data', dest='embed_test_data', action='store_true',
       help='Generates the legacy crypto_test_data.cc file. To use, build with' +
@@ -688,6 +695,7 @@ if __name__ == '__main__':
   options, args = parser.parse_args(sys.argv[1:])
   PREFIX = options.prefix
   EMBED_TEST_DATA = options.embed_test_data
+  TARGET_PREFIX = options.target_prefix
 
   if not args:
     parser.print_help()
