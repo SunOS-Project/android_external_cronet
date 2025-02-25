@@ -1,3 +1,0 @@
-include_rules = [
-    '+../apr_private_common.h',
-]

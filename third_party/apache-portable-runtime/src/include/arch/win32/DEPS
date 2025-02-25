@@ -1,4 +1,0 @@
-include_rules = [
-    '+../apr_private_common.h',
-    '+arch/win32/apr_arch_utf8.h',
-]
