@@ -320,23 +320,6 @@ enable_cronet_tot_java_defaults {
     },
 }
 
-android_test_helper_app {
-    name: "cronet_tester_app",
-    defaults: [
-        "cronet_native_unittests_defaults",
-    ],
-    manifest: "test_runner/AndroidManifest.xml",
-}
-
-android_test_helper_app {
-    name: "cronet_net_tester_app",
-    defaults: [
-        "cronet_native_unittests_defaults",
-        "cronet_native_net_unittests_defaults",
-    ],
-    manifest: "test_runner/AndroidNetManifest.xml",
-}
-
 enable_cronet_tot_java_defaults {
     name: "net_unittests_data",
     soong_config_variables: {
@@ -351,4 +334,91 @@ enable_cronet_tot_java_defaults {
             },
         },
     },
+}
+
+android_test_helper_app {
+    name: "cronet_tester_app",
+    defaults: [
+        "cronet_native_unittests_defaults",
+    ],
+    jni_libs: select(release_flag("RELEASE_ENABLE_TOT_CRONET"), {
+        true: [
+            "tot_cronet_components_cronet_android_cronet_unittests_android__library__testing",
+        ],
+        default: [
+            "stable_cronet_components_cronet_android_cronet_unittests_android__library__testing",
+        ],
+    }),
+    manifest: "test_runner/AndroidManifest.xml",
+}
+
+// This is required to keep testing Cronet Stable. TH does not support, trivially, presubmit
+// testing of non-trunk_staging targets. In trunk_staging, Cronet ToT is "selected", while
+// Stable is selected everywhere else. To circumvent that, we expose a targets which are
+// always backed by Cronet Stable (hence the stable_ prefix).
+android_test_helper_app {
+    name: "stable_cronet_tester_app",
+    defaults: [
+        "mts-target-sdk-version-current",
+    ],
+    aaptflags: ["-0 .dat"],
+    compile_multilib: "both",
+    min_sdk_version: "31", // b/270049141
+    asset_dirs: [
+        "stable/third_party/icu/android",
+    ],
+    static_libs: [
+        "stable_cronet_testing_android_native_test_native_test_java__testing",
+        "stable_cronet_components_cronet_android_cronet_impl_native_java__testing",
+        "stable_cronet_components_cronet_android_cronet_jni_registration_java__testing",
+        "stable_cronet_components_cronet_android_cronet_tests_jni_registration_java__testing",
+        "androidx.annotation_annotation",
+        "junit",
+    ],
+    jni_libs: [
+        "stable_cronet_components_cronet_android_cronet_unittests_android__library__testing",
+    ],
+    manifest: "test_runner/AndroidManifest.xml",
+}
+
+android_test_helper_app {
+    name: "cronet_net_tester_app",
+    defaults: [
+        "cronet_native_unittests_defaults",
+        "cronet_native_net_unittests_defaults",
+    ],
+    manifest: "test_runner/AndroidNetManifest.xml",
+}
+
+// This is required to keep testing Cronet Stable. TH does not support, trivially, presubmit
+// testing of non-trunk_staging targets. In trunk_staging, Cronet ToT is "selected", while
+// Stable is selected everywhere else. To circumvent that, we expose a targets which are
+// always backed by Cronet Stable (hence the stable_ prefix).
+android_test_helper_app {
+    name: "stable_cronet_net_tester_app",
+    defaults: [
+        "mts-target-sdk-version-current",
+    ],
+    aaptflags: ["-0 .dat"],
+    compile_multilib: "both",
+    min_sdk_version: "31", // b/270049141
+    asset_dirs: [
+        "stable/third_party/icu/android",
+    ],
+    static_libs: [
+        "stable_cronet_testing_android_native_test_native_test_java__testing",
+        "stable_cronet_components_cronet_android_cronet_impl_native_java__testing",
+        "stable_cronet_components_cronet_android_cronet_jni_registration_java__testing",
+        "stable_cronet_components_cronet_android_cronet_tests_jni_registration_java__testing",
+        "androidx.annotation_annotation",
+        "stable_cronet_for_testing_net_java",
+        "junit",
+    ],
+    jni_libs: [
+        "stable_cronet_net_net_unittests__library__testing",
+    ],
+    manifest: "test_runner/AndroidNetManifest.xml",
+    resource_dirs: [
+        "stable/net/android/unittest_support/res",
+    ],
 }

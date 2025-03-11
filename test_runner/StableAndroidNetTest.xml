@@ -29,7 +29,7 @@
     <!-- Uploading the APK to device and installing it -->
     <target_preparer class="com.android.tradefed.targetprep.suite.SuiteApkInstaller">
         <option name="cleanup-apks" value="true"/>
-        <option name="test-file-name" value="cronet_net_tester_app.apk"/>
+        <option name="test-file-name" value="stable_cronet_net_tester_app.apk"/>
     </target_preparer>
     <!-- Push the testing data to the specified directory before running tests -->
     <target_preparer class="com.android.tradefed.targetprep.PushFilePreparer">
@@ -39,7 +39,7 @@
     </target_preparer>
     <!-- Runs the test -->
     <test class="com.android.tradefed.testtype.HostTest">
-        <option name="jar" value="net_unittests_tester.jar"/>
+        <option name="jar" value="stable_net_unittests_tester.jar"/>
         <option name="set-option" value="library-to-load:net_unittests__library"/>
         <!-- Use exclude-filter once (b/342355769) has been fixed -->
         <option name="set-option" value="exclude-filter:HttpAuthNegotiateAndroidTest.GenerateAuthToken"/>
